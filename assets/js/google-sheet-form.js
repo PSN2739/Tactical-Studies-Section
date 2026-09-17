@@ -15,9 +15,6 @@
   const registrationModal = document.getElementById('registration');
   const registrationOpenButton = document.getElementById('open-registration');
   const registrationOpenSecondaryButton = document.getElementById('open-registration-secondary');
-  const registrationModalCloseButton = registrationModal
-    ? registrationModal.querySelector('.registration-modal-close')
-    : null;
   const registrationPopup = document.getElementById('registration-popup');
   const registrationPopupMessage = document.getElementById('registration-popup-message');
   const registrationPopupCloseButtons = registrationPopup
@@ -79,16 +76,20 @@
       document.body.classList.remove('registration-modal-open');
     }
 
-    if (closeSearchButton) {
-      closeSearchButton.addEventListener('click', closeRegistrationModal);
-    }
+  }
 
-    if (closeDetailsButton) {
-      closeDetailsButton.addEventListener('click', () => {
-        resetRegistrationForm();
-        closeRegistrationModal();
-      });
-    }
+  if (closeSearchButton) {
+    closeSearchButton.addEventListener('click', () => {
+      resetRegistrationForm();
+      closeRegistrationModal();
+    });
+  }
+
+  if (closeDetailsButton) {
+    closeDetailsButton.addEventListener('click', () => {
+      resetRegistrationForm();
+      closeRegistrationModal();
+    });
   }
 
   if (registrationOpenButton) {
@@ -105,10 +106,6 @@
       event.preventDefault();
       if (registrationOpenButton) registrationOpenButton.click();
     });
-  }
-
-  if (registrationModalCloseButton) {
-    registrationModalCloseButton.addEventListener('click', closeRegistrationModal);
   }
 
   if (registrationModal) {
