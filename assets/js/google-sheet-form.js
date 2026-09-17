@@ -7,6 +7,7 @@
   const endpoint = form.getAttribute('action');
   const lookupStudentIdField = document.getElementById('lookup-student-id');
   const registrationIdField = document.getElementById('registration-student-id');
+  const registrationDetails = document.getElementById('registration-details');
   const resultBox = document.getElementById('student-result');
   const lookupButton = document.getElementById('lookup-student');
 
@@ -53,6 +54,14 @@
     if (!/^\d{13}$/.test(registrationId)) {
       throw new Error('กรุณากรอกหมายเลขประจำตัวให้ครบ 13 หลัก');
     }
+
+    function validateEpisode() {
+      const episode = form.elements.episode.value;
+      if (!episode) {
+        throw new Error('กรุณาเลือกตอนที่');
+      }
+      return episode;
+    }
     return registrationId;
   }
 
@@ -74,6 +83,10 @@
           <div><dt>${escapeHtml(columns[3].label)}</dt><dd>${escapeHtml(columns[3].value || '-')}</dd></div>
         </dl>
       </div>`;
+    registrationDetails.classList.remove('d-none');
+    form.elements.email.required = true;
+    registrationIdField.required = true;
+    form.elements.episode.required = true;
     setMessage('error-message', '');
   }
 
@@ -92,6 +105,7 @@
     try {
       const registrationId = validateRegistrationId();
       validateLookupId();
+      const episode = validateEpisode();
       if (loading) loading.classList.remove('d-none');
       if (submitButton) submitButton.disabled = true;
       setMessage('error-message', '');
@@ -101,6 +115,7 @@
         lookupId: lookupStudentIdField.value.trim(),
         registrationId,
         email: form.elements.email.value.trim(),
+        episode,
         formName: form.dataset.formName || 'class-registration'
       });
       const response = await fetch(endpoint, {
