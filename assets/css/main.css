@@ -204,6 +204,15 @@ body.registration-modal-open { overflow: hidden; }
 }
 .registration-button:hover { background: color-mix(in srgb, var(--accent-color), #000 12%); }
 .registration-button-secondary { color: var(--heading-color); background: color-mix(in srgb, var(--accent-color), transparent 84%); }
+.registration-button-close {
+  color: color-mix(in srgb, var(--default-color), transparent 15%);
+  background: color-mix(in srgb, var(--default-color), transparent 90%);
+}
+.registration-button-close:hover {
+  color: var(--heading-color);
+  background: color-mix(in srgb, var(--default-color), transparent 80%);
+}
+.registration-save-actions { margin-top: 20px; }
 .registration-button:disabled { cursor: wait; opacity: 0.65; }
 .registration-form .loading,
 .registration-form .error-message,
