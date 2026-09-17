@@ -519,7 +519,6 @@
             <span class="registration-icon"><i class="bi bi-person-vcard"></i></span>
             <div>
               <h3>ลงทะเบียนแผนกยุทธวิธี</h3>
-              <p>กรอกข้อมูลเข้าระบบ</p>
             </div>
           </div>
           <form id="registration-form" class="registration-form gs-form"
@@ -530,9 +529,8 @@
                   pattern="[0-9]{4}" maxlength="4" minlength="4" autocomplete="off"></label>
             </div>
             <div id="student-result" class="student-result" aria-live="polite"></div>
-            <div class="registration-actions">
+            <div id="registration-lookup-actions" class="registration-actions">
               <button type="button" id="lookup-student" class="registration-button registration-button-secondary"><i class="bi bi-search"></i> ตรวจสอบข้อมูล</button>
-              <button type="button" id="close-registration-search" class="registration-button registration-button-close">ปิด</button>
             </div>
             <div id="registration-details" class="registration-details d-none">
               <div class="registration-fields">
@@ -541,7 +539,7 @@
                   id="registration-student-id" inputmode="numeric" pattern="[0-9]{13}" maxlength="13"
                   minlength="13" autocomplete="off"></label>
               </div>
-              <label class="registration-episode"><span>ดรอปดาวน์ ตอนที่</span>
+              <label class="registration-episode"><span>ตอนที่</span>
                 <select name="episode" id="registration-episode">
                   <option value="">เลือกตอนที่</option>
                   <option value="ตอนที่ 1">ตอนที่ 1</option>
@@ -677,7 +675,7 @@
   <script src="assets/vendor/swiper/swiper-bundle.min.js"></script>
 
   <!-- Google Sheets form handler -->
-  <script src="assets/js/google-sheet-form.js?v=20260917-close-buttons-only"></script>
+  <script src="assets/js/google-sheet-form.js?v=20260917-registration-cleanup"></script>
 
   <!-- Main JS File -->
   <script src="assets/js/main.js"></script>
