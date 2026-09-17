@@ -54,15 +54,15 @@
     if (!/^\d{13}$/.test(registrationId)) {
       throw new Error('กรุณากรอกหมายเลขประจำตัวให้ครบ 13 หลัก');
     }
-
-    function validateEpisode() {
-      const episode = form.elements.episode.value;
-      if (!episode) {
-        throw new Error('กรุณาเลือกตอนที่');
-      }
-      return episode;
-    }
     return registrationId;
+  }
+
+  function validateEpisode() {
+    const episode = form.elements.episode.value;
+    if (!episode) {
+      throw new Error('กรุณาเลือกตอนที่');
+    }
+    return episode;
   }
 
   async function lookupStudent() {
