@@ -56,7 +56,7 @@
           <li class="dropdown"><a href="#"><span>ระบบงานทะเบียน</span> <i
                 class="bi bi-chevron-down toggle-dropdown"></i></a>
             <ul>
-              <li><a href="#">ลงทะเบียน แผนกวิชายุทธวิธี</a></li>
+              <li><a href="#registration">ลงทะเบียน แผนกวิชายุทธวิธี</a></li>
               <li><a href="https://script.google.com/macros/s/AKfycbwPBxB0MwTM6JkgFJ_QsEW6W3UrQMaVboa5U1CDay3QnLXkQmL4QH0o9etCiKDtjriv/exec">ลงทะเบียน เข้าเรียน</a></li>
               <!-- <li><a href="#">เรียน รูปขบวน หมู่ ปล.</a></li>
               <li><a href="#">เรียน แบบฝึก หมู่ ปล.</a></li>
@@ -508,76 +508,37 @@
       </div>
     </section><!-- /Gallery Section -->
 
-    <section class="section registration-section">
-      <div class="container section-title" data-aos="fade-up">
-        <h2>ระบบลงทะเบียน</h2>
-        <div><span>Registration System</span> <span class="description-title">ใช้ข้อมูลจากชีต Data และบันทึกลง Sheet ใหม่</span></div>
-      </div>
-
+    <section id="registration" class="registration section">
       <div class="container">
-        <div class="row g-4 align-items-start">
-          <div class="col-lg-5">
-            <div class="card h-100 border-0 shadow-sm">
-              <div class="card-body">
-                <h4 class="card-title">ค้นหาข้อมูลนักเรียน</h4>
-                <form class="gs-lookup" data-result-id="student-result" action="https://script.google.com/macros/s/AKfycbykjsaJL8Vs-vLcqE4IGRIP95yiBMHe_C-3-idbySGzO1GqDuuPIb1Uz808YdnnKaMh/exec" method="GET">
-                  <div class="mb-3">
-                    <label for="student-id" class="form-label">เลขประจำตัว</label>
-                    <input id="student-id" type="text" name="studentId" class="form-control" placeholder="กรอกเลขประจำตัว 4 หลัก" required>
-                  </div>
-                  <button type="submit" class="btn btn-primary">ค้นหา</button>
-                </form>
-                <div id="student-result" class="mt-3"></div>
-              </div>
+        <div class="section-title" data-aos="fade-up">
+          <h2>ระบบงานทะเบียน</h2>
+          <div><span>ลงทะเบียน</span> <span class="description-title">เข้าเรียน</span></div>
+        </div>
+        <div class="registration-card" data-aos="fade-up" data-aos-delay="100">
+          <div class="registration-card-header">
+            <span class="registration-icon"><i class="bi bi-person-vcard"></i></span>
+            <div>
+              <h3>ลงทะเบียนเข้าเรียน</h3>
+              <p>กรอกหมายเลขประจำตัว 13 หลักเพื่อเรียกข้อมูลจากระบบ</p>
             </div>
           </div>
-
-          <div class="col-lg-7">
-            <div class="card border-0 shadow-sm">
-              <div class="card-body">
-                <h4 class="card-title">แบบฟอร์มลงทะเบียนใหม่</h4>
-                <form class="gs-form" id="registration-form" action="https://script.google.com/macros/s/AKfycbykjsaJL8Vs-vLcqE4IGRIP95yiBMHe_C-3-idbySGzO1GqDuuPIb1Uz808YdnnKaMh/exec" data-form-name="registration" method="POST">
-                  <div class="row g-3">
-                    <div class="col-md-6">
-                      <label class="form-label" for="reg-student-id">เลขประจำตัว</label>
-                      <input id="reg-student-id" type="text" name="studentId" class="form-control" required>
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label" for="reg-full-name">ชื่อ-นามสกุล</label>
-                      <input id="reg-full-name" type="text" name="fullName" class="form-control" required>
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label" for="reg-email">อีเมล</label>
-                      <input id="reg-email" type="email" name="email" class="form-control" required>
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label" for="reg-phone">เบอร์โทรศัพท์</label>
-                      <input id="reg-phone" type="tel" name="phone" class="form-control" required>
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label" for="reg-department">สังกัด/แผนก</label>
-                      <input id="reg-department" type="text" name="department" class="form-control">
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label" for="reg-quota">โควตา</label>
-                      <input id="reg-quota" type="text" name="quota" class="form-control">
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label" for="reg-note">หมายเหตุ</label>
-                      <textarea id="reg-note" name="note" class="form-control" rows="4"></textarea>
-                    </div>
-                  </div>
-
-                  <div class="mt-4 d-flex align-items-center gap-3 flex-wrap">
-                    <button type="submit" class="btn btn-success">บันทึกการลงทะเบียน</button>
-                    <div class="loading d-none">กำลังส่งข้อมูล...</div>
-                    <div class="error-message d-none text-danger"></div>
-                    <div class="sent-message d-none text-success"></div>
-                  </div>
-                </form>
-              </div>
+          <form id="registration-form" class="registration-form gs-form"
+            action="https://script.google.com/macros/s/AKfycbykjsaJL8Vs-vLcqE4IGRIP95yiBMHe_C-3-idbySGzO1GqDuuPIb1Uz808YdnnKaMh/exec"
+            data-form-name="class-registration">
+            <div class="registration-fields">
+              <label><span>หมายเลขประจำตัว 13 หลัก</span><input type="text" name="studentId" id="registration-student-id"
+                  inputmode="numeric" pattern="[0-9]{13}" maxlength="13" minlength="13" autocomplete="off" required></label>
+              <label><span>อีเมล</span><input type="email" name="email" id="registration-email" autocomplete="email" required></label>
             </div>
-          </div>
+            <div id="student-result" class="student-result" aria-live="polite"></div>
+            <div class="registration-actions">
+              <button type="button" id="lookup-student" class="registration-button registration-button-secondary"><i class="bi bi-search"></i> ตรวจสอบข้อมูล</button>
+              <button type="submit" class="registration-button"><i class="bi bi-check2-circle"></i> บันทึกการลงทะเบียน</button>
+            </div>
+            <div class="loading d-none">กำลังบันทึกข้อมูล...</div>
+            <div class="error-message d-none" role="alert"></div>
+            <div class="sent-message d-none" role="status"></div>
+          </form>
         </div>
       </div>
     </section>
