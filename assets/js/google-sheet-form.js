@@ -9,8 +9,8 @@
   const registrationIdField = document.getElementById('registration-student-id');
   const registrationDetails = document.getElementById('registration-details');
   const resultBox = document.getElementById('student-result');
+  const lookupActions = document.getElementById('registration-lookup-actions');
   const lookupButton = document.getElementById('lookup-student');
-  const closeSearchButton = document.getElementById('close-registration-search');
   const closeDetailsButton = document.getElementById('close-registration-details');
   const registrationModal = document.getElementById('registration');
   const registrationOpenButton = document.getElementById('open-registration');
@@ -52,6 +52,7 @@
   function resetRegistrationForm() {
     form.reset();
     resultBox.innerHTML = '';
+    lookupActions.classList.remove('d-none');
     registrationDetails.classList.add('d-none');
     form.elements.email.required = false;
     registrationIdField.required = false;
@@ -76,13 +77,6 @@
       document.body.classList.remove('registration-modal-open');
     }
 
-  }
-
-  if (closeSearchButton) {
-    closeSearchButton.addEventListener('click', () => {
-      resetRegistrationForm();
-      closeRegistrationModal();
-    });
   }
 
   if (closeDetailsButton) {
@@ -167,6 +161,7 @@
         </dl>
       </div>`;
     registrationDetails.classList.remove('d-none');
+    lookupActions.classList.add('d-none');
     form.elements.email.required = true;
     registrationIdField.required = true;
     form.elements.episode.required = true;
