@@ -66,6 +66,108 @@ body {
   font-family: var(--default-font);
 }
 
+.registration-card {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 36px;
+  background: var(--surface-color);
+  border-radius: 24px;
+  box-shadow: 0 16px 45px rgba(4, 6, 119, 0.12);
+}
+
+.registration-card-header {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.registration-card-header h3 { margin: 0 0 6px; color: var(--heading-color); }
+.registration-card-header p { margin: 0; color: color-mix(in srgb, var(--default-color), transparent 25%); }
+
+.registration-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  flex: 0 0 58px;
+  color: var(--contrast-color);
+  background: var(--accent-color);
+  border-radius: 16px;
+  font-size: 28px;
+}
+
+.registration-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.registration-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--heading-color);
+  font-weight: 600;
+}
+
+.registration-form input {
+  width: 100%;
+  padding: 13px 16px;
+  border: 1px solid color-mix(in srgb, var(--default-color), transparent 75%);
+  border-radius: 12px;
+  color: var(--default-color);
+  background: var(--background-color);
+}
+
+.registration-form input:focus {
+  outline: 0;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color), transparent 80%);
+}
+
+.student-result { margin-top: 22px; }
+.registration-result {
+  padding: 18px 20px;
+  border: 1px solid color-mix(in srgb, var(--accent-color), transparent 70%);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent-color), transparent 94%);
+}
+.registration-result dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 24px;
+  margin: 14px 0 0;
+}
+.registration-result dl div { display: grid; gap: 3px; }
+.registration-result dt { color: color-mix(in srgb, var(--default-color), transparent 30%); font-size: 13px; }
+.registration-result dd { margin: 0; color: var(--heading-color); font-weight: 600; }
+.registration-result-error { color: #b42318; background: #fff1f0; border-color: #f5c2c0; }
+
+.registration-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.registration-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 22px;
+  color: var(--contrast-color);
+  background: var(--accent-color);
+  font-weight: 600;
+  transition: 0.3s;
+}
+.registration-button:hover { background: color-mix(in srgb, var(--accent-color), #000 12%); }
+.registration-button-secondary { color: var(--heading-color); background: color-mix(in srgb, var(--accent-color), transparent 84%); }
+.registration-button:disabled { cursor: wait; opacity: 0.65; }
+.registration-form .loading,
+.registration-form .error-message,
+.registration-form .sent-message { margin-top: 16px; text-align: center; }
+.registration-form .error-message { color: #b42318; }
+.registration-form .sent-message { color: #087443; }
+
+@media (max-width: 575px) {
+  .registration-card { padding: 24px 18px; }
+  .registration-fields, .registration-result dl { grid-template-columns: 1fr; }
+  .registration-actions .registration-button { width: 100%; }
+}
+
 a {
   color: var(--accent-color);
   text-decoration: none;
