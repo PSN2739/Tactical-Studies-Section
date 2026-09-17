@@ -10,6 +10,12 @@
   const registrationDetails = document.getElementById('registration-details');
   const resultBox = document.getElementById('student-result');
   const lookupButton = document.getElementById('lookup-student');
+  const registrationModal = document.getElementById('registration');
+  const registrationOpenButton = document.getElementById('open-registration');
+  const registrationOpenSecondaryButton = document.getElementById('open-registration-secondary');
+  const registrationModalCloseButton = registrationModal
+    ? registrationModal.querySelector('.registration-modal-close')
+    : null;
   const registrationPopup = document.getElementById('registration-popup');
   const registrationPopupMessage = document.getElementById('registration-popup-message');
   const registrationPopupCloseButtons = registrationPopup
@@ -48,6 +54,39 @@
     button.addEventListener('click', () => {
       registrationPopup.classList.add('d-none');
     });
+
+    function closeRegistrationModal() {
+      if (registrationModal) {
+        registrationModal.classList.add('d-none');
+        document.body.classList.remove('registration-modal-open');
+      }
+    }
+
+    if (registrationOpenButton) {
+      registrationOpenButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        registrationModal.classList.remove('d-none');
+        document.body.classList.add('registration-modal-open');
+        lookupStudentIdField.focus();
+      });
+    }
+
+    if (registrationOpenSecondaryButton) {
+      registrationOpenSecondaryButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (registrationOpenButton) registrationOpenButton.click();
+      });
+    }
+
+    if (registrationModalCloseButton) {
+      registrationModalCloseButton.addEventListener('click', closeRegistrationModal);
+    }
+
+    if (registrationModal) {
+      registrationModal.addEventListener('click', (event) => {
+        if (event.target === registrationModal) closeRegistrationModal();
+      });
+    }
   });
 
   function escapeHtml(value) {
