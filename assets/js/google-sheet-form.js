@@ -10,6 +10,11 @@
   const registrationDetails = document.getElementById('registration-details');
   const resultBox = document.getElementById('student-result');
   const lookupButton = document.getElementById('lookup-student');
+  const registrationPopup = document.getElementById('registration-popup');
+  const registrationPopupMessage = document.getElementById('registration-popup-message');
+  const registrationPopupCloseButtons = registrationPopup
+    ? registrationPopup.querySelectorAll('.registration-popup-close, .registration-popup-button')
+    : [];
 
   function parseResponse(text) {
     try {
@@ -30,6 +35,20 @@
       }
     });
   }
+
+  function showRegistrationPopup(message) {
+    if (!registrationPopup || !registrationPopupMessage) return;
+    registrationPopupMessage.textContent = message;
+    registrationPopup.classList.remove('d-none');
+    const closeButton = registrationPopup.querySelector('.registration-popup-button');
+    if (closeButton) closeButton.focus();
+  }
+
+  registrationPopupCloseButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      registrationPopup.classList.add('d-none');
+    });
+  });
 
   function escapeHtml(value) {
     return String(value || '').replace(/[&<>"']/g, (character) => ({
@@ -124,6 +143,10 @@
         body: payload.toString()
       });
       const data = parseResponse(await response.text());
+      if (data.code === 'DUPLICATE_REGISTRATION') {
+        showRegistrationPopup('ท่านลงทะเบียนแล้ว');
+        return;
+      }
       if (!response.ok || !data.ok) throw new Error(data.message || 'บันทึกข้อมูลไม่สำเร็จ');
 
       form.reset();
