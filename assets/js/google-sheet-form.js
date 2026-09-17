@@ -11,6 +11,7 @@
   const resultBox = document.getElementById('student-result');
   const lookupActions = document.getElementById('registration-lookup-actions');
   const lookupButton = document.getElementById('lookup-student');
+  const closeSearchButton = document.getElementById('close-registration-search');
   const closeDetailsButton = document.getElementById('close-registration-details');
   const registrationModal = document.getElementById('registration');
   const registrationOpenButton = document.getElementById('open-registration');
@@ -77,6 +78,13 @@
       document.body.classList.remove('registration-modal-open');
     }
 
+  }
+
+  if (closeSearchButton) {
+    closeSearchButton.addEventListener('click', () => {
+      resetRegistrationForm();
+      closeRegistrationModal();
+    });
   }
 
   if (closeDetailsButton) {
