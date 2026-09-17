@@ -257,23 +257,24 @@
     <section id="hero" class="hero section dark-background">
       <img src="assets/img/hero-bg-2.jpg" alt="" class="hero-bg">
 
-      <div class="container">
-        <div class="row gy-4 justify-content-between">
-          <div class="col-lg-4 order-lg-last hero-img" data-aos="zoom-out" data-aos-delay="100">
-            <img src="assets/img/logo.png" class="img-fluid animated" alt="">
+      <div class="container hero-layout">
+        <div class="hero-text" data-aos="fade-in">
+          <h1>
+            <span class="line-1">Tactical Studies</span>
+            <span class="line-2">Section</span>
+          </h1>
+          <p class="subtitle">แผนกวิชายุทธวิธี กองการศึกษา โรงเรียนนายสิบทหารบก</p>
+          <div class="hero-actions">
+            <a href="https://www.facebook.com/ncopsnchanel" class="btn-get-started">รูปภาพกิจกรรม</a>
+            <a href="https://youtu.be/mUxKtktJNiQ?si=KZQUhbBXxr_e1AfX"
+              class="glightbox btn-watch-video d-flex align-items-center"><i class="bi bi-play-circle"></i><span>Video Tactical Studies Section</span></a>
           </div>
+        </div>
 
-          <div class="col-lg-6  d-flex flex-column justify-content-center" data-aos="fade-in">
-            <h1>Army Non Commissioned Officer School <span>Tactical Studies Section</span></h1>
-            <p>แผนกวิชายุทธวิธี กองการศึกษา โรงเรียนนายสิบทหารบก</p>
-            <div class="d-flex">
-              <a href="https://www.facebook.com/ncopsnchanel" class="btn-get-started">รูปภาพกิจกรรม</a>
-              <a href="https://youtu.be/mUxKtktJNiQ?si=KZQUhbBXxr_e1AfX"
-                class="glightbox btn-watch-video d-flex align-items-center"><i class="bi bi-play-circle"></i><span>Video
-                  Tactical Studies Section</span></a>
-            </div>
+        <div class="hero-badge" data-aos="zoom-out" data-aos-delay="100" aria-label="Tactical Studies Section emblem">
+          <div class="ring-text">
+            <span>Army Non Commissioned Officer School</span>
           </div>
-
         </div>
       </div>
 
@@ -508,7 +509,79 @@
       </div>
     </section><!-- /Gallery Section -->
 
+    <section class="section registration-section">
+      <div class="container section-title" data-aos="fade-up">
+        <h2>ระบบลงทะเบียน</h2>
+        <div><span>Registration System</span> <span class="description-title">ใช้ข้อมูลจากชีต Data และบันทึกลง Sheet ใหม่</span></div>
+      </div>
 
+      <div class="container">
+        <div class="row g-4 align-items-start">
+          <div class="col-lg-5">
+            <div class="card h-100 border-0 shadow-sm">
+              <div class="card-body">
+                <h4 class="card-title">ค้นหาข้อมูลนักเรียน</h4>
+                <form class="gs-lookup" data-result-id="student-result" action="https://script.google.com/macros/s/AKfycbykjsaJL8Vs-vLcqE4IGRIP95yiBMHe_C-3-idbySGzO1GqDuuPIb1Uz808YdnnKaMh/exec" method="GET">
+                  <div class="mb-3">
+                    <label for="student-id" class="form-label">เลขประจำตัว</label>
+                    <input id="student-id" type="text" name="studentId" class="form-control" placeholder="กรอกเลขประจำตัว 4 หลัก" required>
+                  </div>
+                  <button type="submit" class="btn btn-primary">ค้นหา</button>
+                </form>
+                <div id="student-result" class="mt-3"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-7">
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <h4 class="card-title">แบบฟอร์มลงทะเบียนใหม่</h4>
+                <form class="gs-form" id="registration-form" action="https://script.google.com/macros/s/AKfycbykjsaJL8Vs-vLcqE4IGRIP95yiBMHe_C-3-idbySGzO1GqDuuPIb1Uz808YdnnKaMh/exec" data-form-name="registration" method="POST">
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label" for="reg-student-id">เลขประจำตัว</label>
+                      <input id="reg-student-id" type="text" name="studentId" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="reg-full-name">ชื่อ-นามสกุล</label>
+                      <input id="reg-full-name" type="text" name="fullName" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="reg-email">อีเมล</label>
+                      <input id="reg-email" type="email" name="email" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="reg-phone">เบอร์โทรศัพท์</label>
+                      <input id="reg-phone" type="tel" name="phone" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="reg-department">สังกัด/แผนก</label>
+                      <input id="reg-department" type="text" name="department" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="reg-quota">โควตา</label>
+                      <input id="reg-quota" type="text" name="quota" class="form-control">
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="reg-note">หมายเหตุ</label>
+                      <textarea id="reg-note" name="note" class="form-control" rows="4"></textarea>
+                    </div>
+                  </div>
+
+                  <div class="mt-4 d-flex align-items-center gap-3 flex-wrap">
+                    <button type="submit" class="btn btn-success">บันทึกการลงทะเบียน</button>
+                    <div class="loading d-none">กำลังส่งข้อมูล...</div>
+                    <div class="error-message d-none text-danger"></div>
+                    <div class="sent-message d-none text-success"></div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
   </main>
   <footer id="footer" class="footer dark-background  ">
@@ -551,15 +624,38 @@
 
 
         <div class="col-lg-4 col-md-12 footer-newsletter">
-          <h4>กองการศึกษา</h4>
-          <li><a href="#">แผนกอาวุธและหลักยิง</a></li>
-          <li><a href="https://signalnco24.weebly.com/">แผนกสื่อสาร</a></li>
-          <li><a href="#">แผนกยานยนต์</a></li>
-          <li><a href="#">แผนกทั่วไป</a></li>
-          <li><a href="#">แผนกสามัญ</a></li>
-          <li><a href="#">แผนกรบพิเศษ</a></li>
+          <h4>ข้อมูลนักศึกษา / การลงทะเบียน</h4>
+          <form class="newsletter-form gs-form" action="https://script.google.com/macros/s/AKfycbykjsaJL8Vs-vLcqE4IGRIP95yiBMHe_C-3-idbySGzO1GqDuuPIb1Uz808YdnnKaMh/exec" data-form-name="newsletter" method="POST">
+            <div class="mb-2">
+              <label for="newsletter-name">ชื่อ-นามสกุล</label>
+              <input id="newsletter-name" type="text" name="name" placeholder="กรอกชื่อ-นามสกุล" required>
+            </div>
+            <div class="mb-2">
+              <label for="newsletter-email">อีเมล</label>
+              <input id="newsletter-email" type="email" name="email" placeholder="your@email.com" required>
+            </div>
+            <div class="mb-2">
+              <label for="newsletter-phone">เบอร์โทรศัพท์</label>
+              <input id="newsletter-phone" type="tel" name="phone" placeholder="081-234-5678">
+            </div>
+            <div class="mb-2">
+              <label for="newsletter-department">หน่วย/แผนก</label>
+              <input id="newsletter-department" type="text" name="department" placeholder="แผนกวิชายุทธวิธี">
+            </div>
+            <button type="submit" class="btn btn-primary w-100">ส่งข้อมูล</button>
+            <div class="loading d-none mt-2">กำลังส่งข้อมูล...</div>
+            <div class="error-message d-none mt-2 text-danger"></div>
+            <div class="sent-message d-none mt-2 text-success">บันทึกข้อมูลเรียบร้อยแล้ว</div>
+          </form>
 
-
+          <ul class="mt-4 list-unstyled">
+            <li><a href="#">แผนกอาวุธและหลักยิง</a></li>
+            <li><a href="https://signalnco24.weebly.com/">แผนกสื่อสาร</a></li>
+            <li><a href="#">แผนกยานยนต์</a></li>
+            <li><a href="#">แผนกทั่วไป</a></li>
+            <li><a href="#">แผนกสามัญ</a></li>
+            <li><a href="#">แผนกรบพิเศษ</a></li>
+          </ul>
         </div>
         <div class="col-lg-2 col-md-3 footer-links">
           <a href="https://info.flagcounter.com/LYtL"><img
@@ -596,11 +692,13 @@
 
   <!-- Vendor JS Files -->
   <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-  <script src="assets/vendor/php-email-form/validate.js"></script>
   <script src="assets/vendor/aos/aos.js"></script>
   <script src="assets/vendor/glightbox/js/glightbox.min.js"></script>
   <script src="assets/vendor/purecounter/purecounter_vanilla.js"></script>
   <script src="assets/vendor/swiper/swiper-bundle.min.js"></script>
+
+  <!-- Google Sheets form handler -->
+  <script src="assets/js/google-sheet-form.js"></script>
 
   <!-- Main JS File -->
   <script src="assets/js/main.js"></script>
