@@ -533,6 +533,7 @@
             <div id="student-result" class="student-result" aria-live="polite"></div>
             <div class="registration-actions">
               <button type="button" id="lookup-student" class="registration-button registration-button-secondary"><i class="bi bi-search"></i> ตรวจสอบข้อมูล</button>
+              <button type="button" id="close-registration-search" class="registration-button registration-button-close">ปิด</button>
             </div>
             <div id="registration-details" class="registration-details d-none">
               <div class="registration-fields">
@@ -564,7 +565,10 @@
                   <option value="ตอนที่ 18">ตอนที่ 18</option>
                 </select>
               </label>
-              <button type="submit" class="registration-button"><i class="bi bi-check2-circle"></i> บันทึกการลงทะเบียน</button>
+              <div class="registration-actions registration-save-actions">
+                <button type="submit" class="registration-button"><i class="bi bi-check2-circle"></i> บันทึกการลงทะเบียน</button>
+                <button type="button" id="close-registration-details" class="registration-button registration-button-close">ปิด</button>
+              </div>
             </div>
             <div class="loading d-none">กำลังบันทึกข้อมูล...</div>
             <div class="error-message d-none" role="alert"></div>
