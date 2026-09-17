@@ -10,6 +10,8 @@
   const registrationDetails = document.getElementById('registration-details');
   const resultBox = document.getElementById('student-result');
   const lookupButton = document.getElementById('lookup-student');
+  const closeSearchButton = document.getElementById('close-registration-search');
+  const closeDetailsButton = document.getElementById('close-registration-details');
   const registrationModal = document.getElementById('registration');
   const registrationOpenButton = document.getElementById('open-registration');
   const registrationOpenSecondaryButton = document.getElementById('open-registration-secondary');
@@ -75,6 +77,14 @@
     if (registrationModal) {
       registrationModal.classList.add('d-none');
       document.body.classList.remove('registration-modal-open');
+    }
+
+    if (closeSearchButton) {
+      closeSearchButton.addEventListener('click', closeRegistrationModal);
+    }
+
+    if (closeDetailsButton) {
+      closeDetailsButton.addEventListener('click', resetRegistrationForm);
     }
   }
 
