@@ -1,170 +1,113 @@
 (function () {
   'use strict';
 
-  const GOOGLE_SHEET_URL_PLACEHOLDER = 'PASTE_YOUR_GOOGLE_APPS_SCRIPT_URL_HERE';
+  const form = document.getElementById('registration-form');
+  if (!form) return;
 
-  function getActionUrl(form) {
-    const action = form.getAttribute('action') || form.dataset.googleSheetUrl || '';
-    if (!action || action.includes(GOOGLE_SHEET_URL_PLACEHOLDER)) {
-      return '';
-    }
-    return action;
-  }
+  const endpoint = form.getAttribute('action');
+  const studentIdField = document.getElementById('registration-student-id');
+  const resultBox = document.getElementById('student-result');
+  const lookupButton = document.getElementById('lookup-student');
 
-  function setStatus(form, type, message) {
-    const loading = form.querySelector('.loading');
-    const errorMessage = form.querySelector('.error-message');
-    const sentMessage = form.querySelector('.sent-message');
-
-    if (loading) loading.classList.toggle('d-none', type !== 'loading');
-    if (errorMessage) {
-      errorMessage.textContent = message || '';
-      errorMessage.classList.toggle('d-block', type === 'error');
-      errorMessage.classList.toggle('d-none', type !== 'error');
-    }
-    if (sentMessage) {
-      sentMessage.textContent = message || 'บันทึกข้อมูลเรียบร้อยแล้ว';
-      sentMessage.classList.toggle('d-block', type === 'success');
-      sentMessage.classList.toggle('d-none', type !== 'success');
-    }
-  }
-
-  function showLookupResult(resultBox, payload) {
-    if (!resultBox) return;
-    if (!payload || !payload.found) {
-      resultBox.innerHTML = '<div class="alert alert-warning mb-0">ไม่พบข้อมูลตามเลขประจำตัวที่ค้นหา</div>';
-      return;
-    }
-
-    resultBox.innerHTML = `
-      <div class="alert alert-success mb-0">
-        <strong>พบข้อมูล:</strong><br>
-        ${payload.name || '-'}<br>
-        ${payload.department || '-'}<br>
-        ${payload.quota || '-'}
-      </div>
-    `;
-  }
-
-  function parseJsonResponse(responseText) {
+  function parseResponse(text) {
     try {
-      return JSON.parse(responseText);
+      return JSON.parse(text);
     } catch (error) {
-      return { ok: false, message: responseText || 'Unknown error' };
+      throw new Error('ระบบส่งข้อมูลกลับมาในรูปแบบที่ไม่ถูกต้อง');
     }
   }
 
-  document.querySelectorAll('.gs-lookup').forEach((form) => {
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-
-      const action = getActionUrl(form);
-      const resultBox = document.getElementById(form.dataset.resultId || 'student-result');
-      const field = form.querySelector('input[name="studentId"], input[name="studentCode"]');
-
-      if (!action) {
-        if (resultBox) {
-          resultBox.innerHTML = '<div class="alert alert-danger mb-0">กรุณาตั้งค่า Google Apps Script URL ก่อนใช้งาน</div>';
-        }
-        return;
-      }
-
-      if (!field || !field.value.trim()) {
-        if (resultBox) {
-          resultBox.innerHTML = '<div class="alert alert-warning mb-0">กรุณากรอกเลขประจำตัวก่อนค้นหา</div>';
-        }
-        return;
-      }
-
-      const query = new URLSearchParams({ action: 'lookup', studentId: field.value.trim() });
-      const url = `${action}?${query.toString()}`;
-
-      try {
-        const response = await fetch(url);
-        const text = await response.text();
-        const data = parseJsonResponse(text);
-
-        if (!response.ok || !data.ok) {
-          throw new Error(data.message || 'การค้นหาล้มเหลว');
-        }
-
-        showLookupResult(resultBox, data.data || null);
-        const registrationForm = document.getElementById('registration-form');
-        if (registrationForm) {
-          const studentField = registrationForm.querySelector('input[name="studentId"]');
-          if (studentField) studentField.value = field.value.trim();
-          const nameField = registrationForm.querySelector('input[name="fullName"]');
-          if (nameField && data.data && data.data.name) nameField.value = data.data.name;
-          const departmentField = registrationForm.querySelector('input[name="department"]');
-          if (departmentField && data.data && data.data.department) departmentField.value = data.data.department;
-          const quotaField = registrationForm.querySelector('input[name="quota"]');
-          if (quotaField && data.data && data.data.quota) quotaField.value = data.data.quota;
-        }
-      } catch (error) {
-        if (resultBox) {
-          resultBox.innerHTML = `<div class="alert alert-danger mb-0">${error.message}</div>`;
-        }
+  function setMessage(type, message) {
+    ['error-message', 'sent-message'].forEach((className) => {
+      const element = form.querySelector(`.${className}`);
+      if (element) {
+        element.textContent = className === type ? message : '';
+        const visible = className === type && Boolean(message);
+        element.classList.toggle('d-none', !visible);
+        element.classList.toggle('d-block', visible);
       }
     });
+  }
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    }[character]));
+  }
+
+  function validateStudentId() {
+    const studentId = studentIdField.value.trim();
+    if (!/^\d{13}$/.test(studentId)) {
+      throw new Error('กรุณากรอกหมายเลขประจำตัวให้ครบ 13 หลัก');
+    }
+    return studentId;
+  }
+
+  async function lookupStudent() {
+    const studentId = validateStudentId();
+    resultBox.innerHTML = '<div class="registration-result loading-result">กำลังค้นหาข้อมูล...</div>';
+    const response = await fetch(`${endpoint}?action=lookup&studentId=${encodeURIComponent(studentId)}`);
+    const data = parseResponse(await response.text());
+    if (!response.ok || !data.ok) throw new Error(data.message || 'ไม่พบข้อมูลในชีต Data');
+
+    const columns = data.data.columns;
+    resultBox.innerHTML = `
+      <div class="registration-result">
+        <strong>ข้อมูลจากชีต Data</strong>
+        <dl>
+          <div><dt>${escapeHtml(columns[0].label)}</dt><dd>${escapeHtml(columns[0].value || '-')}</dd></div>
+          <div><dt>${escapeHtml(columns[1].label)}</dt><dd>${escapeHtml(columns[1].value || '-')}</dd></div>
+          <div><dt>${escapeHtml(columns[2].label)}</dt><dd>${escapeHtml(columns[2].value || '-')}</dd></div>
+          <div><dt>${escapeHtml(columns[3].label)}</dt><dd>${escapeHtml(columns[3].value || '-')}</dd></div>
+        </dl>
+      </div>`;
+    setMessage('error-message', '');
+  }
+
+  lookupButton.addEventListener('click', async () => {
+    try {
+      await lookupStudent();
+    } catch (error) {
+      resultBox.innerHTML = `<div class="registration-result registration-result-error">${error.message}</div>`;
+    }
   });
 
-  document.querySelectorAll('.gs-form').forEach((form) => {
-    form.addEventListener('submit', async function (event) {
-      event.preventDefault();
-
-      const action = getActionUrl(form);
-      const loading = form.querySelector('.loading');
-      const submitButton = form.querySelector('button[type="submit"]');
-
-      if (!action) {
-        setStatus(form, 'error', 'กรุณาใส่ Google Apps Script URL ให้ถูกต้องก่อนส่งข้อมูล');
-        return;
-      }
-
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submitButton = form.querySelector('button[type="submit"]');
+    const loading = form.querySelector('.loading');
+    try {
+      const studentId = validateStudentId();
       if (loading) loading.classList.remove('d-none');
-      setStatus(form, 'error', '');
       if (submitButton) submitButton.disabled = true;
+      setMessage('error-message', '');
+      setMessage('sent-message', '');
 
-      try {
-        const formData = new FormData(form);
-        const payload = new URLSearchParams();
+      const payload = new URLSearchParams({
+        studentId,
+        email: form.elements.email.value.trim(),
+        formName: form.dataset.formName || 'class-registration'
+      });
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: payload.toString()
+      });
+      const data = parseResponse(await response.text());
+      if (!response.ok || !data.ok) throw new Error(data.message || 'บันทึกข้อมูลไม่สำเร็จ');
 
-        formData.forEach((value, key) => {
-          const text = value ? value.toString().trim() : '';
-          if (text) payload.append(key, text);
-        });
-
-        payload.append('formName', form.dataset.formName || 'registration');
-        payload.append('submittedAt', new Date().toISOString());
-
-        const response = await fetch(action, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          body: payload.toString()
-        });
-
-        const responseText = await response.text();
-        const data = parseJsonResponse(responseText);
-
-        if (!response.ok || !data.ok) {
-          throw new Error(data.message || 'ส่งข้อมูลล้มเหลว');
-        }
-
-        form.reset();
-        if (data.registrationId) {
-          setStatus(form, 'success', `บันทึกข้อมูลเรียบร้อยแล้ว เลขประจำตัว 13 หลัก: ${data.registrationId}`);
-        } else {
-          setStatus(form, 'success', data.message || 'บันทึกข้อมูลเรียบร้อยแล้ว');
-        }
-      } catch (error) {
-        setStatus(form, 'error', error.message || 'เกิดข้อผิดพลาดในการส่งข้อมูล');
-      } finally {
-        if (loading) loading.classList.add('d-none');
-        if (submitButton) submitButton.disabled = false;
-      }
-    });
+      form.reset();
+      resultBox.innerHTML = '';
+      setMessage('sent-message', 'บันทึกข้อมูลเรียบร้อยแล้ว');
+    } catch (error) {
+      setMessage('error-message', error.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+    } finally {
+      if (loading) loading.classList.add('d-none');
+      if (submitButton) submitButton.disabled = false;
+    }
   });
 })();
