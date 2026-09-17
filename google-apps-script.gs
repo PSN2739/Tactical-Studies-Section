@@ -9,6 +9,7 @@ const CONFIG = {
   spreadsheetId: '1Ul3s6_bxWazZA_8o1pW2q8z-hoRnxzYm9WWOSMLfVKw',
   sourceSheetName: 'Data',
   registrationSheetName: 'Registration',
+  lookupIdColumn: 3,
   studentIdLength: 13,
   registrationHeaders: [
     'registration_id',
@@ -97,6 +98,7 @@ function doPost(e) {
       email,
       normalizeValue_(data.formName) || 'class-registration'
     ]);
+    sortRegistrationSheet_(sheet);
 
     return jsonResponse_({
       ok: true,
@@ -195,6 +197,7 @@ function getOrCreateRegistrationSheet_() {
     headerRange.setValues([CONFIG.registrationHeaders]);
     headerRange.setFontWeight('bold');
   }
+  sheet.getRange(1, CONFIG.lookupIdColumn, sheet.getMaxRows(), 1).setNumberFormat('@');
   return sheet;
 }
 
@@ -227,6 +230,17 @@ function registrationIdExists_(sheet, registrationId) {
     .getDisplayValues()
     .flat();
   return existingIds.indexOf(registrationId) !== -1;
+}
+
+function sortRegistrationSheet_(sheet) {
+  const dataRowCount = sheet.getLastRow() - 1;
+  if (dataRowCount < 2) {
+    return;
+  }
+
+  sheet
+    .getRange(2, 1, dataRowCount, CONFIG.registrationHeaders.length)
+    .sort({ column: CONFIG.lookupIdColumn, ascending: true });
 }
 
 function isValidEmail_(email) {
