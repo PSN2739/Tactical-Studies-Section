@@ -93,11 +93,11 @@ function doPost(e) {
     }
 
     const sheet = getOrCreateRegistrationSheet_();
-    if (registrationIdExists_(sheet, registrationId)) {
+    if (registrationDataColumnBExists_(sheet, student.columns[1].value)) {
       return jsonResponse_({
         ok: false,
         code: 'DUPLICATE_REGISTRATION',
-        message: 'หมายเลขประจำตัว 13 หลักนี้ลงทะเบียนไว้แล้ว'
+        message: 'ข้อมูลนี้ลงทะเบียนไว้แล้ว'
       });
     }
 
@@ -105,7 +105,7 @@ function doPost(e) {
       registrationId,
       new Date(),
       lookupId,
-      student.columns[0].value,
+      lookupId,
       student.columns[1].value,
       student.columns[2].value,
       student.columns[3].value,
@@ -235,16 +235,16 @@ function createUniqueRegistrationId_(sheet) {
   return id;
 }
 
-function registrationIdExists_(sheet, registrationId) {
+function registrationDataColumnBExists_(sheet, dataColumnB) {
   if (sheet.getLastRow() < 2) {
     return false;
   }
 
-  const existingIds = sheet
-    .getRange(2, 1, sheet.getLastRow() - 1, 1)
+  const existingValues = sheet
+    .getRange(2, 5, sheet.getLastRow() - 1, 1)
     .getDisplayValues()
     .flat();
-  return existingIds.indexOf(registrationId) !== -1;
+  return existingValues.indexOf(normalizeValue_(dataColumnB)) !== -1;
 }
 
 function sortRegistrationSheet_(sheet) {

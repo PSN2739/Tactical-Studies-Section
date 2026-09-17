@@ -56,8 +56,8 @@
           <li class="dropdown"><a href="#"><span>ระบบงานทะเบียน</span> <i
                 class="bi bi-chevron-down toggle-dropdown"></i></a>
             <ul>
-              <li><a href="#registration">ลงทะเบียน แผนกวิชายุทธวิธี</a></li>
-              <li><a href="https://script.google.com/macros/s/AKfycbwPBxB0MwTM6JkgFJ_QsEW6W3UrQMaVboa5U1CDay3QnLXkQmL4QH0o9etCiKDtjriv/exec">ลงทะเบียน เข้าเรียน</a></li>
+              <li><a href="#registration" id="open-registration">ลงทะเบียน แผนกวิชายุทธวิธี</a></li>
+              <li><a href="#registration" id="open-registration-secondary">ลงทะเบียน เข้าเรียน</a></li>
               <!-- <li><a href="#">เรียน รูปขบวน หมู่ ปล.</a></li>
               <li><a href="#">เรียน แบบฝึก หมู่ ปล.</a></li>
               <li><a href="#">เรียน การเคลื่อนที่ หมู่ ปล.</a></li>
@@ -508,8 +508,9 @@
       </div>
     </section><!-- /Gallery Section -->
 
-    <section id="registration" class="registration section">
+    <section id="registration" class="registration registration-modal d-none">
       <div class="container">
+        <button type="button" class="registration-modal-close" aria-label="ปิดระบบงานทะเบียน">&times;</button>
         <div class="section-title" data-aos="fade-up">
           <h2>ระบบงานทะเบียน</h2>
           <div><span>ลงทะเบียน</span> <span class="description-title">เข้าเรียน</span></div>
