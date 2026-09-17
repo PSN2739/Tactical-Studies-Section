@@ -526,15 +526,18 @@
             action="https://script.google.com/macros/s/AKfycbykjsaJL8Vs-vLcqE4IGRIP95yiBMHe_C-3-idbySGzO1GqDuuPIb1Uz808YdnnKaMh/exec"
             data-form-name="class-registration">
             <div class="registration-fields">
-              <label><span>หมายเลขประจำตัว 13 หลัก</span><input type="text" name="studentId" id="registration-student-id"
-                  inputmode="numeric" pattern="[0-9]{13}" maxlength="13" minlength="13" autocomplete="off" required></label>
+              <label><span>ค้นหาด้วยเลข 4 หลัก</span><input type="text" id="lookup-student-id" inputmode="numeric"
+                  pattern="[0-9]{4}" maxlength="4" minlength="4" autocomplete="off" required></label>
               <label><span>อีเมล</span><input type="email" name="email" id="registration-email" autocomplete="email" required></label>
             </div>
             <div id="student-result" class="student-result" aria-live="polite"></div>
             <div class="registration-actions">
               <button type="button" id="lookup-student" class="registration-button registration-button-secondary"><i class="bi bi-search"></i> ตรวจสอบข้อมูล</button>
-              <button type="submit" class="registration-button"><i class="bi bi-check2-circle"></i> บันทึกการลงทะเบียน</button>
             </div>
+            <label class="registration-id-field"><span>หมายเลขประจำตัว 13 หลัก</span><input type="text"
+              name="registrationId" id="registration-student-id" inputmode="numeric" pattern="[0-9]{13}"
+              maxlength="13" minlength="13" autocomplete="off" required></label>
+            <button type="submit" class="registration-button"><i class="bi bi-check2-circle"></i> บันทึกการลงทะเบียน</button>
             <div class="loading d-none">กำลังบันทึกข้อมูล...</div>
             <div class="error-message d-none" role="alert"></div>
             <div class="sent-message d-none" role="status"></div>

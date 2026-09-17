@@ -12,7 +12,7 @@ const CONFIG = {
   registrationHeaders: [
     'registration_id',
     'registered_at',
-    'student_id',
+    'lookup_id',
     'data_column_a',
     'data_column_b',
     'data_column_c',
@@ -26,7 +26,7 @@ function doGet(e) {
   try {
     const params = (e && e.parameter) || {};
     if (String(params.action || '').toLowerCase() === 'lookup') {
-      return lookupStudent_(params.studentId || '');
+      return lookupStudent_(params.lookupId || params.studentId || '');
     }
 
     return jsonResponse_({
@@ -44,10 +44,18 @@ function doPost(e) {
   try {
     lock.waitLock(30000);
     const data = (e && e.parameter) || {};
-    const studentId = normalizeValue_(data.studentId);
+    const lookupId = normalizeValue_(data.lookupId);
+    const registrationId = normalizeValue_(data.registrationId);
     const email = normalizeValue_(data.email);
 
-    if (!/^\d{13}$/.test(studentId)) {
+    if (!/^\d{4}$/.test(lookupId)) {
+      return jsonResponse_({
+        ok: false,
+        message: 'กรุณาระบุเลขค้นหาให้ครบ 4 หลัก'
+      });
+    }
+
+    if (!/^\d{13}$/.test(registrationId)) {
       return jsonResponse_({
         ok: false,
         message: 'กรุณาระบุหมายเลขประจำตัวให้ครบ 13 หลัก'
@@ -61,7 +69,7 @@ function doPost(e) {
       });
     }
 
-    const student = findStudentRecord_(studentId);
+    const student = findStudentRecord_(lookupId);
     if (!student) {
       return jsonResponse_({
         ok: false,
@@ -70,11 +78,17 @@ function doPost(e) {
     }
 
     const sheet = getOrCreateRegistrationSheet_();
-    const registrationId = createUniqueRegistrationId_(sheet);
+    if (registrationIdExists_(sheet, registrationId)) {
+      return jsonResponse_({
+        ok: false,
+        message: 'หมายเลขประจำตัว 13 หลักนี้ลงทะเบียนไว้แล้ว'
+      });
+    }
+
     sheet.appendRow([
       registrationId,
       new Date(),
-      studentId,
+      lookupId,
       student.columns[0].value,
       student.columns[1].value,
       student.columns[2].value,
@@ -104,10 +118,10 @@ function setupRegistrationSheet() {
 
 function lookupStudent_(studentId) {
   const requestedId = normalizeValue_(studentId);
-  if (!/^\d{13}$/.test(requestedId)) {
+  if (!/^\d{4}$/.test(requestedId)) {
     return jsonResponse_({
       ok: false,
-      message: 'กรุณากรอกหมายเลขประจำตัวให้ครบ 13 หลัก'
+      message: 'กรุณากรอกเลขค้นหาให้ครบ 4 หลัก'
     });
   }
 
@@ -192,6 +206,18 @@ function createUniqueRegistrationId_(sheet) {
     id = String(Date.now()).slice(-13);
   } while (existingIds.indexOf(id) !== -1);
   return id;
+}
+
+function registrationIdExists_(sheet, registrationId) {
+  if (sheet.getLastRow() < 2) {
+    return false;
+  }
+
+  const existingIds = sheet
+    .getRange(2, 1, sheet.getLastRow() - 1, 1)
+    .getDisplayValues()
+    .flat();
+  return existingIds.indexOf(registrationId) !== -1;
 }
 
 function isValidEmail_(email) {
