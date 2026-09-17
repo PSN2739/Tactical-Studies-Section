@@ -51,8 +51,8 @@
 
   function validateRegistrationId() {
     const registrationId = registrationIdField.value.trim();
-    if (!/^\d{13}$/.test(registrationId)) {
-      throw new Error('กรุณากรอกหมายเลขประจำตัวให้ครบ 13 หลัก');
+    if (!/^\d{4}$/.test(registrationId)) {
+      throw new Error('กรุณากรอกหมายเลขประจำตัวให้ครบ 4 หลัก');
     }
 
     function validateEpisode() {
