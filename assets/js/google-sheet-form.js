@@ -143,7 +143,8 @@
         body: payload.toString()
       });
       const data = parseResponse(await response.text());
-      if (data.code === 'DUPLICATE_REGISTRATION') {
+      if (data.code === 'DUPLICATE_REGISTRATION'
+        || /ลงทะเบียนไว้แล้ว/.test(data.message || '')) {
         showRegistrationPopup('ท่านลงทะเบียนแล้ว');
         return;
       }
