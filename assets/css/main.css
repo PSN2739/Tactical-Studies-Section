@@ -74,6 +74,29 @@ body {
   border-radius: 24px;
   box-shadow: 0 16px 45px rgba(4, 6, 119, 0.12);
 }
+.registration-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  overflow-y: auto;
+  padding: 40px 15px;
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(4px);
+}
+.registration-modal > .container { position: relative; }
+.registration-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 22px;
+  z-index: 2;
+  border: 0;
+  color: color-mix(in srgb, var(--default-color), transparent 35%);
+  background: transparent;
+  cursor: pointer;
+  font-size: 30px;
+  line-height: 1;
+}
+body.registration-modal-open { overflow: hidden; }
 
 .registration-card-header {
   display: flex;
@@ -239,6 +262,8 @@ body {
 }
 .registration-form .error-message { color: #b42318; }
 .registration-form .sent-message { color: #087443; }
+#features,
+#gallery { display: none; }
 
 @media (max-width: 575px) {
   .registration-card { padding: 24px 18px; }
