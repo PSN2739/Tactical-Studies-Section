@@ -50,44 +50,59 @@
     if (closeButton) closeButton.focus();
   }
 
+  function resetRegistrationForm() {
+    form.reset();
+    resultBox.innerHTML = '';
+    registrationDetails.classList.add('d-none');
+    form.elements.email.required = false;
+    registrationIdField.required = false;
+    form.elements.episode.required = false;
+    setMessage('error-message', '');
+    setMessage('sent-message', '');
+  }
+
   registrationPopupCloseButtons.forEach((button) => {
     button.addEventListener('click', () => {
       registrationPopup.classList.add('d-none');
-    });
-
-    function closeRegistrationModal() {
-      if (registrationModal) {
-        registrationModal.classList.add('d-none');
-        document.body.classList.remove('registration-modal-open');
-      }
-    }
-
-    if (registrationOpenButton) {
-      registrationOpenButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        registrationModal.classList.remove('d-none');
-        document.body.classList.add('registration-modal-open');
+      if (button.classList.contains('registration-popup-button')) {
+        resetRegistrationForm();
         lookupStudentIdField.focus();
-      });
-    }
-
-    if (registrationOpenSecondaryButton) {
-      registrationOpenSecondaryButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        if (registrationOpenButton) registrationOpenButton.click();
-      });
-    }
-
-    if (registrationModalCloseButton) {
-      registrationModalCloseButton.addEventListener('click', closeRegistrationModal);
-    }
-
-    if (registrationModal) {
-      registrationModal.addEventListener('click', (event) => {
-        if (event.target === registrationModal) closeRegistrationModal();
-      });
-    }
+      }
+    });
   });
+
+  function closeRegistrationModal() {
+    if (registrationModal) {
+      registrationModal.classList.add('d-none');
+      document.body.classList.remove('registration-modal-open');
+    }
+  }
+
+  if (registrationOpenButton) {
+    registrationOpenButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      registrationModal.classList.remove('d-none');
+      document.body.classList.add('registration-modal-open');
+      lookupStudentIdField.focus();
+    });
+  }
+
+  if (registrationOpenSecondaryButton) {
+    registrationOpenSecondaryButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      if (registrationOpenButton) registrationOpenButton.click();
+    });
+  }
+
+  if (registrationModalCloseButton) {
+    registrationModalCloseButton.addEventListener('click', closeRegistrationModal);
+  }
+
+  if (registrationModal) {
+    registrationModal.addEventListener('click', (event) => {
+      if (event.target === registrationModal) closeRegistrationModal();
+    });
+  }
 
   function escapeHtml(value) {
     return String(value || '').replace(/[&<>"']/g, (character) => ({
