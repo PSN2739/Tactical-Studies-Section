@@ -84,7 +84,10 @@
     }
 
     if (closeDetailsButton) {
-      closeDetailsButton.addEventListener('click', resetRegistrationForm);
+      closeDetailsButton.addEventListener('click', () => {
+        resetRegistrationForm();
+        closeRegistrationModal();
+      });
     }
   }
 
