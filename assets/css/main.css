@@ -1856,3 +1856,89 @@ section,
 .starter-section {
   /* Add your styles here */
 }
+
+/* Keep the original landing-page design while the registration feature remains available below. */
+.header {
+  --background-color: rgba(255, 255, 255, 0);
+  padding: 20px 0;
+  border-bottom: 0;
+}
+
+.hero {
+  min-height: 70vh;
+  padding: 120px 0;
+  background: transparent;
+}
+
+.hero .hero-bg {
+  filter: none;
+}
+
+.hero:before {
+  background: color-mix(in srgb, var(--background-color), transparent 10%);
+}
+
+.hero .hero-layout {
+  display: block;
+}
+
+.hero .hero-text,
+.hero .hero-badge {
+  display: none;
+}
+
+.hero h1 {
+  margin: 0 0 20px 0;
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 56px;
+  letter-spacing: normal;
+  color: color-mix(in srgb, var(--heading-color), transparent 30%);
+  text-shadow: none;
+}
+
+.hero h1 span {
+  display: inline;
+  color: var(--heading-color);
+  border-bottom: 4px solid var(--accent-color);
+}
+
+.hero p {
+  color: color-mix(in srgb, var(--default-color), transparent 30%);
+  margin: 5px 0 30px 0;
+  font-size: 22px;
+  font-weight: 400;
+}
+
+.hero .btn-get-started {
+  font-family: var(--heading-font);
+  font-weight: 400;
+  font-size: 15px;
+  letter-spacing: 1px;
+  padding: 10px 28px 12px 28px;
+  border-radius: 50px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+}
+
+.hero .btn-watch-video {
+  font-size: 16px;
+  margin-left: 25px;
+  color: var(--default-color);
+}
+
+.hero .btn-watch-video i {
+  font-size: 32px;
+  margin-right: 8px;
+}
+
+@media (max-width: 640px) {
+  .hero h1 {
+    font-size: 28px;
+    line-height: 36px;
+  }
+
+  .hero p {
+    font-size: 18px;
+    line-height: 24px;
+  }
+}
