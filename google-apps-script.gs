@@ -163,10 +163,11 @@ function findStudentRecord_(studentId) {
   const sheet = getSourceSheet_();
   const values = sheet.getDataRange().getDisplayValues();
   const headers = values.length > 0 ? values[0] : [];
+  const requestedId = normalizeLookupId_(studentId);
 
   for (let rowIndex = 0; rowIndex < values.length; rowIndex += 1) {
     const row = values[rowIndex];
-    if (normalizeValue_(row[0]).replace(/\s+/g, '') !== studentId) {
+    if (normalizeLookupId_(row[0]) !== requestedId) {
       continue;
     }
 
@@ -212,7 +213,8 @@ function getOrCreateRegistrationSheet_() {
     headerRange.setValues([CONFIG.registrationHeaders]);
     headerRange.setFontWeight('bold');
   }
-  sheet.getRange(1, CONFIG.lookupIdColumn, sheet.getMaxRows(), 1).setNumberFormat('@');
+  sheet.getRange(1, CONFIG.lookupIdColumn, sheet.getMaxRows(), 2).setNumberFormat('@');
+  normalizeRegistrationLookupColumns_(sheet);
   return sheet;
 }
 
@@ -247,6 +249,20 @@ function registrationDataColumnBExists_(sheet, dataColumnB) {
   return existingValues.indexOf(normalizeValue_(dataColumnB)) !== -1;
 }
 
+function normalizeRegistrationLookupColumns_(sheet) {
+  const rowCount = sheet.getLastRow() - 1;
+  if (rowCount < 1) {
+    return;
+  }
+
+  const range = sheet.getRange(2, CONFIG.lookupIdColumn, rowCount, 2);
+  const values = range.getDisplayValues().map((row) => [
+    normalizeLookupId_(row[0]),
+    normalizeLookupId_(row[1])
+  ]);
+  range.setValues(values);
+}
+
 function sortRegistrationSheet_(sheet) {
   const dataRowCount = sheet.getLastRow() - 1;
   if (dataRowCount < 2) {
@@ -264,6 +280,13 @@ function isValidEmail_(email) {
 
 function normalizeValue_(value) {
   return value === null || value === undefined ? '' : String(value).trim();
+}
+
+function normalizeLookupId_(value) {
+  const normalized = normalizeValue_(value).replace(/\s+/g, '');
+  return /^\d{1,4}$/.test(normalized)
+    ? normalized.padStart(4, '0')
+    : normalized;
 }
 
 function getErrorMessage_(error) {
