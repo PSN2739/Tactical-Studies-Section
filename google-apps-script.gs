@@ -20,6 +20,7 @@ const CONFIG = {
     'data_column_c',
     'data_column_d',
     'email',
+    'episode',
     'form_name'
   ]
 };
@@ -49,6 +50,7 @@ function doPost(e) {
     const lookupId = normalizeValue_(data.lookupId);
     const registrationId = normalizeValue_(data.registrationId);
     const email = normalizeValue_(data.email);
+    const episode = normalizeValue_(data.episode);
 
     if (!/^\d{4}$/.test(lookupId)) {
       return jsonResponse_({
@@ -68,6 +70,17 @@ function doPost(e) {
       return jsonResponse_({
         ok: false,
         message: 'กรุณาระบุอีเมลให้ถูกต้อง'
+      });
+    }
+
+    const validEpisodes = [];
+    for (let episodeNumber = 1; episodeNumber <= 18; episodeNumber += 1) {
+      validEpisodes.push('ตอนที่ ' + episodeNumber);
+    }
+    if (validEpisodes.indexOf(episode) === -1) {
+      return jsonResponse_({
+        ok: false,
+        message: 'กรุณาเลือกตอนที่ 1-18'
       });
     }
 
@@ -96,6 +109,7 @@ function doPost(e) {
       student.columns[2].value,
       student.columns[3].value,
       email,
+      episode,
       normalizeValue_(data.formName) || 'class-registration'
     ]);
     sortRegistrationSheet_(sheet);

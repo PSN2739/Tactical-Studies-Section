@@ -525,19 +525,46 @@
           <form id="registration-form" class="registration-form gs-form"
             action="https://script.google.com/macros/s/AKfycbylfNRFHqfE5QztOXuICj-NCqVD5U2zPfXUu16Z3-aqUm0D2u4mNEFojzk-6vKQxFQ/exec"
             data-form-name="class-registration">
-            <div class="registration-fields">
+            <div class="registration-fields registration-lookup-fields">
               <label><span>ค้นหาด้วยเลข 4 หลัก</span><input type="text" id="lookup-student-id" inputmode="numeric"
-                  pattern="[0-9]{4}" maxlength="4" minlength="4" autocomplete="off" required></label>
-              <label><span>อีเมล</span><input type="email" name="email" id="registration-email" autocomplete="email" required></label>
+                  pattern="[0-9]{4}" maxlength="4" minlength="4" autocomplete="off"></label>
             </div>
             <div id="student-result" class="student-result" aria-live="polite"></div>
             <div class="registration-actions">
               <button type="button" id="lookup-student" class="registration-button registration-button-secondary"><i class="bi bi-search"></i> ตรวจสอบข้อมูล</button>
             </div>
-            <label class="registration-id-field"><span>หมายเลขประจำตัว 13 หลัก</span><input type="text"
-              name="registrationId" id="registration-student-id" inputmode="numeric" pattern="[0-9]{13}"
-              maxlength="13" minlength="13" autocomplete="off" required></label>
-            <button type="submit" class="registration-button"><i class="bi bi-check2-circle"></i> บันทึกการลงทะเบียน</button>
+            <div id="registration-details" class="registration-details d-none">
+              <div class="registration-fields">
+                <label><span>Email</span><input type="email" name="email" id="registration-email" autocomplete="email"></label>
+                <label><span>เลขประจำตัว 13 หลัก</span><input type="text" name="registrationId"
+                  id="registration-student-id" inputmode="numeric" pattern="[0-9]{13}" maxlength="13"
+                  minlength="13" autocomplete="off"></label>
+              </div>
+              <label class="registration-episode"><span>ดรอปดาวน์ ตอนที่</span>
+                <select name="episode" id="registration-episode">
+                  <option value="">เลือกตอนที่</option>
+                  <option value="ตอนที่ 1">ตอนที่ 1</option>
+                  <option value="ตอนที่ 2">ตอนที่ 2</option>
+                  <option value="ตอนที่ 3">ตอนที่ 3</option>
+                  <option value="ตอนที่ 4">ตอนที่ 4</option>
+                  <option value="ตอนที่ 5">ตอนที่ 5</option>
+                  <option value="ตอนที่ 6">ตอนที่ 6</option>
+                  <option value="ตอนที่ 7">ตอนที่ 7</option>
+                  <option value="ตอนที่ 8">ตอนที่ 8</option>
+                  <option value="ตอนที่ 9">ตอนที่ 9</option>
+                  <option value="ตอนที่ 10">ตอนที่ 10</option>
+                  <option value="ตอนที่ 11">ตอนที่ 11</option>
+                  <option value="ตอนที่ 12">ตอนที่ 12</option>
+                  <option value="ตอนที่ 13">ตอนที่ 13</option>
+                  <option value="ตอนที่ 14">ตอนที่ 14</option>
+                  <option value="ตอนที่ 15">ตอนที่ 15</option>
+                  <option value="ตอนที่ 16">ตอนที่ 16</option>
+                  <option value="ตอนที่ 17">ตอนที่ 17</option>
+                  <option value="ตอนที่ 18">ตอนที่ 18</option>
+                </select>
+              </label>
+              <button type="submit" class="registration-button"><i class="bi bi-check2-circle"></i> บันทึกการลงทะเบียน</button>
+            </div>
             <div class="loading d-none">กำลังบันทึกข้อมูล...</div>
             <div class="error-message d-none" role="alert"></div>
             <div class="sent-message d-none" role="status"></div>
