@@ -6,6 +6,7 @@
  */
 
 const CONFIG = {
+  spreadsheetId: '1Ul3s6_bxWazZA_8o1pW2q8z-hoRnxzYm9WWOSMLfVKw',
   sourceSheetName: 'Data',
   registrationSheetName: 'Registration',
   studentIdLength: 13,
@@ -166,9 +167,9 @@ function findStudentRecord_(studentId) {
 }
 
 function getSourceSheet_() {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const spreadsheet = getRegistrationSpreadsheet_();
   if (!spreadsheet) {
-    throw new Error('ไม่พบ Spreadsheet ที่เชื่อมกับ Apps Script นี้');
+    throw new Error('ไม่พบ Spreadsheet ต้นทาง');
   }
 
   const sheet = spreadsheet.getSheetByName(CONFIG.sourceSheetName);
@@ -179,9 +180,9 @@ function getSourceSheet_() {
 }
 
 function getOrCreateRegistrationSheet_() {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const spreadsheet = getRegistrationSpreadsheet_();
   if (!spreadsheet) {
-    throw new Error('ไม่พบ Spreadsheet ที่เชื่อมกับ Apps Script นี้');
+    throw new Error('ไม่พบ Spreadsheet ต้นทาง');
   }
 
   let sheet = spreadsheet.getSheetByName(CONFIG.registrationSheetName);
@@ -195,6 +196,14 @@ function getOrCreateRegistrationSheet_() {
     headerRange.setFontWeight('bold');
   }
   return sheet;
+}
+
+function getRegistrationSpreadsheet_() {
+  try {
+    return SpreadsheetApp.openById(CONFIG.spreadsheetId);
+  } catch (error) {
+    throw new Error('ไม่สามารถเปิด Spreadsheet ต้นทางได้ กรุณาตรวจสอบสิทธิ์การเข้าถึง');
+  }
 }
 
 function createUniqueRegistrationId_(sheet) {
