@@ -96,6 +96,7 @@ function doPost(e) {
     if (registrationIdExists_(sheet, registrationId)) {
       return jsonResponse_({
         ok: false,
+        code: 'DUPLICATE_REGISTRATION',
         message: 'หมายเลขประจำตัว 13 หลักนี้ลงทะเบียนไว้แล้ว'
       });
     }
