@@ -5,7 +5,8 @@
   if (!form) return;
 
   const endpoint = form.getAttribute('action');
-  const studentIdField = document.getElementById('registration-student-id');
+  const lookupStudentIdField = document.getElementById('lookup-student-id');
+  const registrationIdField = document.getElementById('registration-student-id');
   const resultBox = document.getElementById('student-result');
   const lookupButton = document.getElementById('lookup-student');
 
@@ -39,18 +40,26 @@
     }[character]));
   }
 
-  function validateStudentId() {
-    const studentId = studentIdField.value.trim();
-    if (!/^\d{13}$/.test(studentId)) {
+  function validateLookupId() {
+    const lookupId = lookupStudentIdField.value.trim();
+    if (!/^\d{4}$/.test(lookupId)) {
+      throw new Error('กรุณากรอกเลขค้นหาให้ครบ 4 หลัก');
+    }
+    return lookupId;
+  }
+
+  function validateRegistrationId() {
+    const registrationId = registrationIdField.value.trim();
+    if (!/^\d{13}$/.test(registrationId)) {
       throw new Error('กรุณากรอกหมายเลขประจำตัวให้ครบ 13 หลัก');
     }
-    return studentId;
+    return registrationId;
   }
 
   async function lookupStudent() {
-    const studentId = validateStudentId();
+    const lookupId = validateLookupId();
     resultBox.innerHTML = '<div class="registration-result loading-result">กำลังค้นหาข้อมูล...</div>';
-    const response = await fetch(`${endpoint}?action=lookup&studentId=${encodeURIComponent(studentId)}`);
+    const response = await fetch(`${endpoint}?action=lookup&lookupId=${encodeURIComponent(lookupId)}`);
     const data = parseResponse(await response.text());
     if (!response.ok || !data.ok) throw new Error(data.message || 'ไม่พบข้อมูลในชีต Data');
 
@@ -81,14 +90,16 @@
     const submitButton = form.querySelector('button[type="submit"]');
     const loading = form.querySelector('.loading');
     try {
-      const studentId = validateStudentId();
+      const registrationId = validateRegistrationId();
+      validateLookupId();
       if (loading) loading.classList.remove('d-none');
       if (submitButton) submitButton.disabled = true;
       setMessage('error-message', '');
       setMessage('sent-message', '');
 
       const payload = new URLSearchParams({
-        studentId,
+        lookupId: lookupStudentIdField.value.trim(),
+        registrationId,
         email: form.elements.email.value.trim(),
         formName: form.dataset.formName || 'class-registration'
       });
