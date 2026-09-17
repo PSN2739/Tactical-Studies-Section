@@ -535,13 +535,13 @@
             </div>
             <div id="registration-details" class="registration-details d-none">
               <div class="registration-fields">
-                <label><span>Email</span><input type="email" name="email" id="registration-email" autocomplete="email"></label>
+                <label><span>Email</span><input type="email" name="email" id="registration-email" autocomplete="email" required></label>
                 <label><span>เลขประจำตัว 13 หลัก</span><input type="text" name="registrationId"
                   id="registration-student-id" inputmode="numeric" pattern="[0-9]{13}" maxlength="13"
-                  minlength="13" autocomplete="off"></label>
+                  minlength="13" autocomplete="off" required></label>
               </div>
               <label class="registration-episode"><span>ตอนที่</span>
-                <select name="episode" id="registration-episode">
+                <select name="episode" id="registration-episode" required>
                   <option value="">เลือกตอนที่</option>
                   <option value="ตอนที่ 1">ตอนที่ 1</option>
                   <option value="ตอนที่ 2">ตอนที่ 2</option>
