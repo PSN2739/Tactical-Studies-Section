@@ -18,6 +18,10 @@
   const popup = document.getElementById('registration-popup');
   const popupMessage = document.getElementById('registration-popup-message');
 
+  if (closeButton && details && details.contains(closeButton)) {
+    lookupActions.appendChild(closeButton);
+  }
+
   function parseResponse(text) {
     try {
       return JSON.parse(text);
