@@ -15,7 +15,6 @@
   const closeDetailsButton = document.getElementById('close-registration-details');
   const registrationModal = document.getElementById('registration');
   const registrationOpenButton = document.getElementById('open-registration');
-  const registrationOpenSecondaryButton = document.getElementById('open-registration-secondary');
   const registrationPopup = document.getElementById('registration-popup');
   const registrationPopupMessage = document.getElementById('registration-popup-message');
   const registrationPopupCloseButtons = registrationPopup
@@ -100,13 +99,6 @@
       registrationModal.classList.remove('d-none');
       document.body.classList.add('registration-modal-open');
       lookupStudentIdField.focus();
-    });
-  }
-
-  if (registrationOpenSecondaryButton) {
-    registrationOpenSecondaryButton.addEventListener('click', (event) => {
-      event.preventDefault();
-      if (registrationOpenButton) registrationOpenButton.click();
     });
   }
 
