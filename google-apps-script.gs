@@ -302,31 +302,6 @@ function getOrCreateRegistrationSheet_() {
     throw new Error('ไม่พบ Spreadsheet ต้นทาง');
   }
 
-  function getRegistrationSheet_() {
-    const spreadsheet = getRegistrationSpreadsheet_();
-    const sheet = spreadsheet.getSheetByName(CONFIG.registrationSheetName);
-    if (!sheet) {
-      throw new Error('ไม่พบชีต Registration');
-    }
-    return sheet;
-  }
-
-  function getOrCreateAttendanceSheet_() {
-    const spreadsheet = getRegistrationSpreadsheet_();
-    let sheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
-    if (!sheet) {
-      sheet = spreadsheet.insertSheet(CONFIG.attendanceSheetName);
-    }
-
-    const headers = CONFIG.registrationHeaders;
-    const headerRange = sheet.getRange(1, 1, 1, headers.length);
-    if (headerRange.getValues()[0].every((value) => normalizeValue_(value) === '')) {
-      headerRange.setValues([headers]);
-      headerRange.setFontWeight('bold');
-    }
-    return sheet;
-  }
-
   let sheet = spreadsheet.getSheetByName(CONFIG.registrationSheetName);
   if (!sheet) {
     sheet = spreadsheet.insertSheet(CONFIG.registrationSheetName);
@@ -393,29 +368,54 @@ function sortRegistrationSheet_(sheet) {
     return;
   }
 
-  function attendanceDuplicateExists_(sheet, dataColumnB, formName) {
-    if (sheet.getLastRow() < 2) {
-      return false;
-    }
-
-    const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 10).getDisplayValues();
-    return values.some((row) =>
-      normalizeValue_(row[4]) === normalizeValue_(dataColumnB)
-      && normalizeValue_(row[9]) === normalizeValue_(formName)
-    );
-  }
-
-  function sortAttendanceSheet_(sheet) {
-    const dataRowCount = sheet.getLastRow() - 1;
-    if (dataRowCount < 2) {
-      return;
-    }
-    sheet.getRange(2, 1, dataRowCount, 10).sort({ column: 1, ascending: true });
-  }
-
   sheet
     .getRange(2, 1, dataRowCount, CONFIG.registrationHeaders.length)
     .sort({ column: CONFIG.lookupIdColumn, ascending: true });
+}
+
+function getRegistrationSheet_() {
+  const spreadsheet = getRegistrationSpreadsheet_();
+  const sheet = spreadsheet.getSheetByName(CONFIG.registrationSheetName);
+  if (!sheet) {
+    throw new Error('ไม่พบชีต Registration');
+  }
+  return sheet;
+}
+
+function getOrCreateAttendanceSheet_() {
+  const spreadsheet = getRegistrationSpreadsheet_();
+  let sheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(CONFIG.attendanceSheetName);
+  }
+
+  const headers = CONFIG.registrationHeaders;
+  const headerRange = sheet.getRange(1, 1, 1, headers.length);
+  if (headerRange.getValues()[0].every((value) => normalizeValue_(value) === '')) {
+    headerRange.setValues([headers]);
+    headerRange.setFontWeight('bold');
+  }
+  return sheet;
+}
+
+function attendanceDuplicateExists_(sheet, dataColumnB, formName) {
+  if (sheet.getLastRow() < 2) {
+    return false;
+  }
+
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 10).getDisplayValues();
+  return values.some((row) =>
+    normalizeValue_(row[4]) === normalizeValue_(dataColumnB)
+    && normalizeValue_(row[9]) === normalizeValue_(formName)
+  );
+}
+
+function sortAttendanceSheet_(sheet) {
+  const dataRowCount = sheet.getLastRow() - 1;
+  if (dataRowCount < 2) {
+    return;
+  }
+  sheet.getRange(2, 1, dataRowCount, 10).sort({ column: 1, ascending: true });
 }
 
 function isValidEmail_(email) {
