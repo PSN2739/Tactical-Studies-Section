@@ -135,49 +135,50 @@ function doPost(e) {
     lock.releaseLock();
   }
 
-  function saveAttendance_(data) {
-    const registrationId = normalizeValue_(data.registrationId);
-    const attendanceFormName = normalizeValue_(data.attendanceFormName);
+}
 
-    if (!/^\d{13}$/.test(registrationId)) {
-      return jsonResponse_({
-        ok: false,
-        message: 'กรุณาระบุหมายเลขประจำตัวให้ครบ 13 หลัก'
-      });
-    }
+function saveAttendance_(data) {
+  const registrationId = normalizeValue_(data.registrationId);
+  const attendanceFormName = normalizeValue_(data.attendanceFormName);
 
-    if (!/^ครั้งที่ [1-4]$/.test(attendanceFormName)) {
-      return jsonResponse_({
-        ok: false,
-        message: 'กรุณาเลือกครั้งที่ 1-4'
-      });
-    }
-
-    const source = findRegistrationRecord_(registrationId);
-    if (!source) {
-      return jsonResponse_({
-        ok: false,
-        message: 'ไม่พบหมายเลขประจำตัวในชีต Registration'
-      });
-    }
-
-    const sheet = getOrCreateAttendanceSheet_();
-    if (attendanceDuplicateExists_(sheet, source.values[4], attendanceFormName)) {
-      return jsonResponse_({
-        ok: false,
-        code: 'DUPLICATE_ATTENDANCE',
-        message: 'ข้อมูลนี้ลงทะเบียนไว้แล้ว'
-      });
-    }
-
-    sheet.appendRow(source.values.concat([attendanceFormName]));
-    sortAttendanceSheet_(sheet);
+  if (!/^\d{13}$/.test(registrationId)) {
     return jsonResponse_({
-      ok: true,
-      registrationId: registrationId,
-      message: 'บันทึกข้อมูลเรียบร้อยแล้ว'
+      ok: false,
+      message: 'กรุณาระบุหมายเลขประจำตัวให้ครบ 13 หลัก'
     });
   }
+
+  if (!/^ครั้งที่ [1-4]$/.test(attendanceFormName)) {
+    return jsonResponse_({
+      ok: false,
+      message: 'กรุณาเลือกครั้งที่ 1-4'
+    });
+  }
+
+  const source = findRegistrationRecord_(registrationId);
+  if (!source) {
+    return jsonResponse_({
+      ok: false,
+      message: 'ไม่พบหมายเลขประจำตัวในชีต Registration'
+    });
+  }
+
+  const sheet = getOrCreateAttendanceSheet_();
+  if (attendanceDuplicateExists_(sheet, source.values[4], attendanceFormName)) {
+    return jsonResponse_({
+      ok: false,
+      code: 'DUPLICATE_ATTENDANCE',
+      message: 'ข้อมูลนี้ลงทะเบียนไว้แล้ว'
+    });
+  }
+
+  sheet.appendRow(source.values.concat([attendanceFormName]));
+  sortAttendanceSheet_(sheet);
+  return jsonResponse_({
+    ok: true,
+    registrationId: registrationId,
+    message: 'บันทึกข้อมูลเรียบร้อยแล้ว'
+  });
 }
 
 function setupRegistrationSheet() {
@@ -196,51 +197,6 @@ function lookupStudent_(studentId) {
     });
   }
 
-  function lookupAttendance_(registrationId) {
-    const requestedId = normalizeValue_(registrationId);
-    if (!/^\d{13}$/.test(requestedId)) {
-      return jsonResponse_({
-        ok: false,
-        message: 'กรุณากรอกเลขประจำตัวให้ครบ 13 หลัก'
-      });
-    }
-
-    const record = findRegistrationRecord_(requestedId);
-    if (!record) {
-      return jsonResponse_({
-        ok: false,
-        message: 'ไม่พบหมายเลขประจำตัวในชีต Registration'
-      });
-    }
-
-    return jsonResponse_({
-      ok: true,
-      data: { columns: record.columns }
-    });
-  }
-
-  function findRegistrationRecord_(registrationId) {
-    const sheet = getRegistrationSheet_();
-    const values = sheet.getDataRange().getDisplayValues();
-    const headers = values.length > 0 ? values[0] : [];
-
-    for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
-      const row = values[rowIndex];
-      if (normalizeValue_(row[0]) !== registrationId) {
-        continue;
-      }
-
-      return {
-        values: row.slice(0, 9),
-        columns: row.slice(0, 9).map((value, index) => ({
-          label: normalizeValue_(headers[index]) || `คอลัมน์ ${String.fromCharCode(65 + index)}`,
-          value: normalizeValue_(value)
-        }))
-      };
-    }
-    return null;
-  }
-
   const student = findStudentRecord_(requestedId);
   if (!student) {
     return jsonResponse_({
@@ -255,6 +211,51 @@ function lookupStudent_(studentId) {
       columns: student.columns
     }
   });
+}
+
+function lookupAttendance_(registrationId) {
+  const requestedId = normalizeValue_(registrationId);
+  if (!/^\d{13}$/.test(requestedId)) {
+    return jsonResponse_({
+      ok: false,
+      message: 'กรุณากรอกเลขประจำตัวให้ครบ 13 หลัก'
+    });
+  }
+
+  const record = findRegistrationRecord_(requestedId);
+  if (!record) {
+    return jsonResponse_({
+      ok: false,
+      message: 'ไม่พบหมายเลขประจำตัวในชีต Registration'
+    });
+  }
+
+  return jsonResponse_({
+    ok: true,
+    data: { columns: record.columns }
+  });
+}
+
+function findRegistrationRecord_(registrationId) {
+  const sheet = getRegistrationSheet_();
+  const values = sheet.getDataRange().getDisplayValues();
+  const headers = values.length > 0 ? values[0] : [];
+
+  for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+    const row = values[rowIndex];
+    if (normalizeValue_(row[0]) !== registrationId) {
+      continue;
+    }
+
+    return {
+      values: row.slice(0, 9),
+      columns: row.slice(0, 9).map((value, index) => ({
+        label: normalizeValue_(headers[index]) || `คอลัมน์ ${String.fromCharCode(65 + index)}`,
+        value: normalizeValue_(value)
+      }))
+    };
+  }
+  return null;
 }
 
 function findStudentRecord_(studentId) {
