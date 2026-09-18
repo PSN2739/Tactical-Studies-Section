@@ -15,6 +15,7 @@
   const closeDetailsButton = document.getElementById('close-registration-details');
   const registrationModal = document.getElementById('registration');
   const registrationOpenButton = document.getElementById('open-registration');
+  const attendanceModal = document.getElementById('attendance-registration');
   const registrationPopup = document.getElementById('registration-popup');
   const registrationPopupMessage = document.getElementById('registration-popup-message');
   const registrationPopupCloseButtons = registrationPopup
@@ -96,6 +97,7 @@
   if (registrationOpenButton) {
     registrationOpenButton.addEventListener('click', (event) => {
       event.preventDefault();
+      if (attendanceModal) attendanceModal.classList.add('d-none');
       registrationModal.classList.remove('d-none');
       document.body.classList.add('registration-modal-open');
       lookupStudentIdField.focus();

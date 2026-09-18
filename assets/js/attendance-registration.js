@@ -6,7 +6,8 @@
 
   const endpoint = form.getAttribute('action');
   const modal = document.getElementById('attendance-registration');
-  const openButton = document.getElementById('open-registration-secondary');
+  const openButton = document.getElementById('open-attendance-registration');
+  const classRegistrationModal = document.getElementById('registration');
   const closeButton = document.getElementById('close-attendance');
   const studentIdField = document.getElementById('attendance-student-id');
   const lookupButton = document.getElementById('attendance-lookup');
@@ -81,6 +82,7 @@
 
   openButton.addEventListener('click', (event) => {
     event.preventDefault();
+    if (classRegistrationModal) classRegistrationModal.classList.add('d-none');
     modal.classList.remove('d-none');
     document.body.classList.add('registration-modal-open');
     studentIdField.focus();
