@@ -57,7 +57,7 @@
                 class="bi bi-chevron-down toggle-dropdown"></i></a>
             <ul>
               <li><a href="#registration" id="open-registration">ลงทะเบียน แผนกวิชายุทธวิธี</a></li>
-              <li><a href="#registration" id="open-registration-secondary">ลงทะเบียน เข้าเรียน</a></li>
+              <li><a href="#attendance-registration" id="open-registration-secondary">ลงทะเบียน เข้าเรียน</a></li>
               <!-- <li><a href="#">เรียน รูปขบวน หมู่ ปล.</a></li>
               <li><a href="#">เรียน แบบฝึก หมู่ ปล.</a></li>
               <li><a href="#">เรียน การเคลื่อนที่ หมู่ ปล.</a></li>
@@ -576,6 +576,52 @@
       </div>
     </section>
 
+    <section id="attendance-registration" class="registration registration-modal d-none">
+      <div class="container">
+        <div class="section-title">
+          <h2>ลงทะเบียนเข้าเรียน</h2>
+          <div><span>ตรวจสอบข้อมูล</span> <span class="description-title">และบันทึกการเข้าเรียน</span></div>
+        </div>
+        <div class="registration-card">
+          <div class="registration-card-header">
+            <span class="registration-icon"><i class="bi bi-person-check"></i></span>
+            <div><h3>ลงทะเบียน เข้าเรียน</h3></div>
+          </div>
+          <form id="attendance-form" class="registration-form"
+            action="https://script.google.com/macros/s/AKfycbylfNRFHqfE5QztOXuICj-NCqVD5U2zPfXUu16Z3-aqUm0D2u4mNEFojzk-6vKQxFQ/exec">
+            <div class="registration-fields">
+              <label><span>เลขประจำตัว 13 หลัก</span>
+                <input type="text" id="attendance-student-id" inputmode="numeric"
+                  pattern="[0-9]{13}" maxlength="13" minlength="13" required autocomplete="off">
+              </label>
+            </div>
+            <div id="attendance-result" class="student-result" aria-live="polite"></div>
+            <div id="attendance-lookup-actions" class="registration-actions">
+              <button type="button" id="attendance-lookup" class="registration-button registration-button-secondary"><i class="bi bi-search"></i> ค้นหา</button>
+            </div>
+            <div id="attendance-details" class="registration-details d-none">
+              <label class="registration-episode"><span>ครั้งที่</span>
+                <select id="attendance-form-name" required>
+                  <option value="">เลือกครั้งที่</option>
+                  <option value="ครั้งที่ 1">ครั้งที่ 1</option>
+                  <option value="ครั้งที่ 2">ครั้งที่ 2</option>
+                  <option value="ครั้งที่ 3">ครั้งที่ 3</option>
+                  <option value="ครั้งที่ 4">ครั้งที่ 4</option>
+                </select>
+              </label>
+              <div class="registration-actions registration-save-actions">
+                <button type="submit" class="registration-button"><i class="bi bi-check2-circle"></i> บันทึกข้อมูล</button>
+                <button type="button" id="close-attendance" class="registration-button registration-button-close">ปิด</button>
+              </div>
+            </div>
+            <div class="loading d-none">กำลังบันทึกข้อมูล...</div>
+            <div class="error-message d-none" role="alert"></div>
+            <div class="sent-message d-none" role="status"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
   </main>
   <div id="registration-popup" class="registration-popup d-none" role="alertdialog"
     aria-modal="true" aria-labelledby="registration-popup-title">
@@ -676,7 +722,8 @@
   <script src="assets/vendor/swiper/swiper-bundle.min.js"></script>
 
   <!-- Google Sheets form handler -->
-  <script src="assets/js/google-sheet-form.js?v=20260917-close-available"></script>
+  <script src="assets/js/google-sheet-form.js?v=20260918-attendance"></script>
+  <script src="assets/js/attendance-registration.js?v=20260918-attendance"></script>
 
   <!-- Main JS File -->
   <script src="assets/js/main.js"></script>
