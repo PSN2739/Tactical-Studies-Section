@@ -9,6 +9,7 @@ const CONFIG = {
   spreadsheetId: '1Ul3s6_bxWazZA_8o1pW2q8z-hoRnxzYm9WWOSMLfVKw',
   sourceSheetName: 'Data',
   registrationSheetName: 'Registration',
+  attendanceSheetName: 'Attendance',
   lookupIdColumn: 3,
   studentIdLength: 13,
   registrationHeaders: [
@@ -28,6 +29,9 @@ const CONFIG = {
 function doGet(e) {
   try {
     const params = (e && e.parameter) || {};
+    if (String(params.action || '').toLowerCase() === 'attendance-lookup') {
+      return lookupAttendance_(params.registrationId || '');
+    }
     if (String(params.action || '').toLowerCase() === 'lookup') {
       return lookupStudent_(params.lookupId || params.studentId || '');
     }
@@ -51,6 +55,11 @@ function doPost(e) {
     const registrationId = normalizeValue_(data.registrationId);
     const email = normalizeValue_(data.email);
     const episode = normalizeValue_(data.episode);
+    const formName = normalizeValue_(data.formName);
+
+    if (formName === 'attendance-registration') {
+      return saveAttendance_(data);
+    }
 
     if (!/^\d{4}$/.test(lookupId)) {
       return jsonResponse_({
@@ -125,6 +134,50 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+
+  function saveAttendance_(data) {
+    const registrationId = normalizeValue_(data.registrationId);
+    const attendanceFormName = normalizeValue_(data.attendanceFormName);
+
+    if (!/^\d{13}$/.test(registrationId)) {
+      return jsonResponse_({
+        ok: false,
+        message: 'กรุณาระบุหมายเลขประจำตัวให้ครบ 13 หลัก'
+      });
+    }
+
+    if (!/^ครั้งที่ [1-4]$/.test(attendanceFormName)) {
+      return jsonResponse_({
+        ok: false,
+        message: 'กรุณาเลือกครั้งที่ 1-4'
+      });
+    }
+
+    const source = findRegistrationRecord_(registrationId);
+    if (!source) {
+      return jsonResponse_({
+        ok: false,
+        message: 'ไม่พบหมายเลขประจำตัวในชีต Registration'
+      });
+    }
+
+    const sheet = getOrCreateAttendanceSheet_();
+    if (attendanceDuplicateExists_(sheet, source.values[4], attendanceFormName)) {
+      return jsonResponse_({
+        ok: false,
+        code: 'DUPLICATE_ATTENDANCE',
+        message: 'ข้อมูลนี้ลงทะเบียนไว้แล้ว'
+      });
+    }
+
+    sheet.appendRow(source.values.concat([attendanceFormName]));
+    sortAttendanceSheet_(sheet);
+    return jsonResponse_({
+      ok: true,
+      registrationId: registrationId,
+      message: 'บันทึกข้อมูลเรียบร้อยแล้ว'
+    });
+  }
 }
 
 function setupRegistrationSheet() {
@@ -141,6 +194,51 @@ function lookupStudent_(studentId) {
       ok: false,
       message: 'กรุณากรอกเลขค้นหาให้ครบ 4 หลัก'
     });
+  }
+
+  function lookupAttendance_(registrationId) {
+    const requestedId = normalizeValue_(registrationId);
+    if (!/^\d{13}$/.test(requestedId)) {
+      return jsonResponse_({
+        ok: false,
+        message: 'กรุณากรอกเลขประจำตัวให้ครบ 13 หลัก'
+      });
+    }
+
+    const record = findRegistrationRecord_(requestedId);
+    if (!record) {
+      return jsonResponse_({
+        ok: false,
+        message: 'ไม่พบหมายเลขประจำตัวในชีต Registration'
+      });
+    }
+
+    return jsonResponse_({
+      ok: true,
+      data: { columns: record.columns }
+    });
+  }
+
+  function findRegistrationRecord_(registrationId) {
+    const sheet = getRegistrationSheet_();
+    const values = sheet.getDataRange().getDisplayValues();
+    const headers = values.length > 0 ? values[0] : [];
+
+    for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+      const row = values[rowIndex];
+      if (normalizeValue_(row[0]) !== registrationId) {
+        continue;
+      }
+
+      return {
+        values: row.slice(0, 9),
+        columns: row.slice(0, 9).map((value, index) => ({
+          label: normalizeValue_(headers[index]) || `คอลัมน์ ${String.fromCharCode(65 + index)}`,
+          value: normalizeValue_(value)
+        }))
+      };
+    }
+    return null;
   }
 
   const student = findStudentRecord_(requestedId);
@@ -201,6 +299,31 @@ function getOrCreateRegistrationSheet_() {
   const spreadsheet = getRegistrationSpreadsheet_();
   if (!spreadsheet) {
     throw new Error('ไม่พบ Spreadsheet ต้นทาง');
+  }
+
+  function getRegistrationSheet_() {
+    const spreadsheet = getRegistrationSpreadsheet_();
+    const sheet = spreadsheet.getSheetByName(CONFIG.registrationSheetName);
+    if (!sheet) {
+      throw new Error('ไม่พบชีต Registration');
+    }
+    return sheet;
+  }
+
+  function getOrCreateAttendanceSheet_() {
+    const spreadsheet = getRegistrationSpreadsheet_();
+    let sheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(CONFIG.attendanceSheetName);
+    }
+
+    const headers = CONFIG.registrationHeaders;
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    if (headerRange.getValues()[0].every((value) => normalizeValue_(value) === '')) {
+      headerRange.setValues([headers]);
+      headerRange.setFontWeight('bold');
+    }
+    return sheet;
   }
 
   let sheet = spreadsheet.getSheetByName(CONFIG.registrationSheetName);
@@ -267,6 +390,26 @@ function sortRegistrationSheet_(sheet) {
   const dataRowCount = sheet.getLastRow() - 1;
   if (dataRowCount < 2) {
     return;
+  }
+
+  function attendanceDuplicateExists_(sheet, dataColumnB, formName) {
+    if (sheet.getLastRow() < 2) {
+      return false;
+    }
+
+    const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 10).getDisplayValues();
+    return values.some((row) =>
+      normalizeValue_(row[4]) === normalizeValue_(dataColumnB)
+      && normalizeValue_(row[9]) === normalizeValue_(formName)
+    );
+  }
+
+  function sortAttendanceSheet_(sheet) {
+    const dataRowCount = sheet.getLastRow() - 1;
+    if (dataRowCount < 2) {
+      return;
+    }
+    sheet.getRange(2, 1, dataRowCount, 10).sort({ column: 1, ascending: true });
   }
 
   sheet
