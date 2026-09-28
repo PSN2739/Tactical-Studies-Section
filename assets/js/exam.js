@@ -360,13 +360,22 @@
     const question = pendingQuestions[currentQuestionIndex];
     if (!question) return;
     const selectedAnswer = collectedAnswers[String(question.id)] || '';
+    const isYesNo = question.type === 'yes-no' || (Array.isArray(question.choices) && question.choices.length <= 2);
+    const choices = Array.isArray(question.choices) && question.choices.length ? question.choices : ['ได้', 'ไม่ได้'];
     questionsBox.innerHTML = `
       <fieldset class="quiz-question">
         <legend>${currentQuestionIndex + 1}. ${escapeHtml(question.question)}</legend>
-        ${question.choices.map((choice, choiceIndex) => `
+        ${choices.map((choice, choiceIndex) => `
           <label class="quiz-choice"><input type="radio" name="question-${question.id}" value="${choiceIndex + 1}" ${selectedAnswer === String(choiceIndex + 1) ? 'checked' : ''} required> ${escapeHtml(choice)}</label>
         `).join('')}
       </fieldset>`;
+    if (isYesNo && choices.length === 2) {
+      questionsBox.querySelectorAll('input[name^="question-"]').forEach((radio) => {
+        const value = radio.value;
+        if (value === '1') radio.nextSibling.textContent = ' ได้';
+        if (value === '2') radio.nextSibling.textContent = ' ไม่ได้';
+      });
+    }
     const lastQuestion = currentQuestionIndex === pendingQuestions.length - 1;
     nextButton.classList.toggle('d-none', lastQuestion);
     submitButton.classList.toggle('d-none', !lastQuestion);
@@ -453,6 +462,7 @@
       renderStudentInfo(data.student || student);
       pendingQuestions = data.questions;
       answerForm.dataset.duration = data.duration || 30;
+      answerForm.dataset.passScore = data.passScore || 70;
       startForm.classList.add('d-none');
       startActions.classList.remove('d-none');
     } catch (error) {
@@ -479,7 +489,18 @@
           attemptToken, answers: JSON.stringify(answers)
         }).toString()
       });
-      resultBox.textContent = `ผลคะแนน ${formatPhaseLabel(data.phase)}: ${data.score}/${data.total} คะแนน`;
+      const passType = data.passType || answerForm.dataset.passType || 'percent';
+      const passValue = Number(data.passValue ?? data.passScore ?? answerForm.dataset.passValue ?? answerForm.dataset.passScore ?? 70);
+      const score = Number(data.score || 0);
+      const total = Number(data.total || 0);
+      const percentage = total ? (score / total) * 100 : 0;
+      const passed = passType === 'count' ? score >= passValue : percentage >= passValue;
+      const thresholdText = passType === 'count' ? `${passValue} ข้อ` : `${passValue}%`;
+      resultBox.innerHTML = `
+        <strong>ผลคะแนน ${formatPhaseLabel(data.phase)}:</strong>
+        ${score}/${total} คะแนน
+        <span class="${passed ? 'success-message' : 'error-message'}">(${passed ? 'ผ่าน' : 'ไม่ผ่าน'} - เกณฑ์ ${thresholdText})</span>
+      `;
       resultBox.classList.add('registration-result');
       resultTableBox.innerHTML = '';
       answerForm.classList.add('d-none');
