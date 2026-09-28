@@ -21,6 +21,14 @@
   const registrationPopupCloseButtons = registrationPopup
     ? registrationPopup.querySelectorAll('.registration-popup-close, .registration-popup-button')
     : [];
+  const loadingOverlay = document.getElementById('quiz-loading-overlay');
+
+  function setGlobalLoading(isLoading) {
+    if (loadingOverlay) loadingOverlay.classList.toggle('d-none', !isLoading);
+    form.querySelectorAll('button, input, select').forEach((control) => {
+      control.disabled = isLoading;
+    });
+  }
 
   function parseResponse(text) {
     try {
@@ -172,9 +180,12 @@
 
   lookupButton.addEventListener('click', async () => {
     try {
+      setGlobalLoading(true);
       await lookupStudent();
     } catch (error) {
       resultBox.innerHTML = `<div class="registration-result registration-result-error">${error.message}</div>`;
+    } finally {
+      setGlobalLoading(false);
     }
   });
 
@@ -183,6 +194,7 @@
     const submitButton = form.querySelector('button[type="submit"]');
     const loading = form.querySelector('.loading');
     try {
+      setGlobalLoading(true);
       const registrationId = validateRegistrationId();
       validateLookupId();
       const episode = validateEpisode();
@@ -217,6 +229,7 @@
     } catch (error) {
       setMessage('error-message', error.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
     } finally {
+      setGlobalLoading(false);
       if (loading) loading.classList.add('d-none');
       if (submitButton) submitButton.disabled = false;
     }
