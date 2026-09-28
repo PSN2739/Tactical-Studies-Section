@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 
 <head>
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
   <title>Tactical Studies Section</title>
-  <meta name="description" content="">
-  <meta name="keywords" content="">
+  <meta name="description" content="แผนกวิชายุทธวิธี กองการศึกษา โรงเรียนนายสิบทหารบก - ระบบลงทะเบียน แบบทดสอบ และตรวจสอบผลคะแนน">
+  <meta name="keywords" content="Tactical Studies Section, โรงเรียนนายสิบทหารบก, ลงทะเบียน, แบบทดสอบ, กองการศึกษา">
 
   <!-- Favicons -->
   <link href="https://img5.pic.in.th/file/secure-sv1/Logo80cee50ab6e7bcc4.png" rel="icon">
@@ -24,7 +24,7 @@
   <link href="assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
   <link href="assets/vendor/aos/aos.css" rel="stylesheet">
   <link href="assets/vendor/glightbox/css/glightbox.min.css" rel="stylesheet">
-  <link href="assets/vendor/swiper/swiper-bundle.min.css" rel="stylesheet">
+  <link href="assets/swiper/swiper-bundle.min.css" rel="stylesheet">
 
   <!-- Main CSS File -->
   <link href="assets/css/main.css?v=20260917-close-buttons-only" rel="stylesheet">
@@ -69,79 +69,43 @@
           <!-- <li><a href="#features">แบบทดสอบ</a></li> -->
           <li class="dropdown"><a href="#"><span>แบบทดสอบ</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
             <ul>
-              <li class="dropdown"><a href="#"><span>เรื่อง ทัศนสัญาณ</span> <i
+              <!-- <li class="dropdown"><a href="#"><span>เรื่อง ทัศนสัญาณ</span> <i
                     class="bi bi-chevron-down toggle-dropdown"></i></a>
                 <ul>
                   <li><a
-                      href="#">ก่อนเรียน</a>
+                      href="#" data-quiz-title="ทัศนสัญาณ" data-quiz-phase="pre-test">ก่อนเรียน</a>
                   </li>
                   <li><a
-                      href="#">หลังเรียน</a>
+                      href="#" data-quiz-title="ทัศนสัญาณ" data-quiz-phase="post-test">หลังเรียน</a>
                   </li>
 
                 </ul>
-              </li>
+              </li> -->
 
-              <li class="dropdown"><a href="#"><span>เรื่อง รูปขบวน หมู่ ปล.</span> <i
+              <!-- <li class="dropdown"><a href="#"><span>เรื่อง รูปขบวน หมู่ ปล.</span> <i
                     class="bi bi-chevron-down toggle-dropdown"></i></a>
                 <ul>
                   <li><a
-                      href="#">ก่อนเรียน</a>
+                      href="#" data-quiz-title="รูปขบวน หมู่ ปล." data-quiz-phase="pre-test">ก่อนเรียน</a>
                   </li>
                   <li><a
-                      href="#">หลังเรียน</a>
+                      href="#" data-quiz-title="รูปขบวน หมู่ ปล." data-quiz-phase="post-test">หลังเรียน</a>
                   </li>
 
                 </ul>
-              </li>
+              </li> -->
 
-              <li class="dropdown"><a href="#"><span>เรื่อง แบบฝึก หมู่ ปล.</span> <i
+              <li class="dropdown"><a href="#"><span>เรื่อง การเข้าตีในเวลากลางวัน</span> <i
                     class="bi bi-chevron-down toggle-dropdown"></i></a>
                 <ul>
                   <li><a
-                      href="#">ก่อนเรียน</a>
+                      href="#" data-quiz-title="การเข้าตีในเวลากลางวัน" data-quiz-phase="pre-test">ก่อนเรียน</a>
                   </li>
                   <li><a
-                      href="#">หลังเรียน</a>
-                  </li>
-
-                </ul>
-              </li>
-
-              <li class="dropdown"><a href="#"><span>เรื่อง การเคลื่อนที่ หมู่ ปล.</span> <i
-                    class="bi bi-chevron-down toggle-dropdown"></i></a>
-                <ul>
-                  <li><a
-                      href="#">ก่อนเรียน</a>
+                      href="#" data-quiz-title="การเข้าตีในเวลากลางวัน" data-quiz-phase="post-test">หลังเรียน</a>
                   </li>
                   <li><a
-                      href="#">หลังเรียน</a>
-                  </li>
-
-                </ul>
-              </li>
-
-              <li class="dropdown"><a href="#"><span>เรื่อง การรบในพื้นที่สิ่งปลูกสร้าง</span> <i
-                    class="bi bi-chevron-down toggle-dropdown"></i></a>
-                <ul>
-                  <li><a
-                      href="#">ก่อนเรียน</a>
-                  </li>
-                  <li><a
-                      href="#">หลังเรียน</a>
-                  </li>
-
-                </ul>
-              </li>
-
-              <li class="dropdown"><a href="#"><span>เรียน การถอนตัวของหมู่ปืนเล็ก</span> <i
-                    class="bi bi-chevron-down toggle-dropdown"></i></a>
-                <ul>
-                  <li><a
-                      href="#">ก่อนเรียน</a>
-                  </li>
-                  <li><a
-                      href="#">หลังเรียน</a>
+                      href="#" data-quiz-title="การเข้าตีในเวลากลางวันเก็บคะแนน" data-quiz-phase="score">ประเมินความรู้</a>
                   </li>
 
                 </ul>
@@ -154,21 +118,19 @@
           <li class="dropdown"><a href="#"><span>แบบประเมินกิจเฉพาะ</span> <i
                 class="bi bi-chevron-down toggle-dropdown"></i></a>
             <ul>
-              <li><a
-                  href="https://script.google.com/macros/s/AKfycbxcekHBFwP5lUNP9ijjb8bbrijVdb5avbomnDDxaHdhMjwdJyvnhJrrLGPeGFouaJzW/exec">เรื่อง
-                  ทัศนสัญาณ</a></li>
-              <li><a href="https://script.google.com/macros/s/AKfycbzxFDr6nasMJxXGBzEKXh_Kj5D025Xdk3wNS_LESrqTD7ZKa1-sOMVbDiONoins57MdmA/exec">เรื่อง รูปขบวน หมู่ ปล.</a></li>
-              <li><a href="#">เรื่อง แบบฝึก หมู่ ปล.</a></li>
-              <li><a href="#">เรื่อง การเคลื่อนที่ หมู่ ปล.</a></li>
-              <li><a href="#">เรื่อง การรบในพื้นที่สิ่งปลูกสร้าง</a></li>
-              <li><a href="#">เรื่อง ตั้งรับ</a></li>
-              <li><a href="#">เรื่อง ระเบียบนำหน่วย คำสั่งฯ</a></li>
+              <!-- <li><a href="#">เรื่อง ทัศนสัญาณ</a></li> -->
+              <!-- <li><a href="#">เรื่อง รูปขบวน หมู่ ปล.</a></li> -->
+              <!-- <li><a href="#">เรื่อง แบบฝึก หมู่ ปล.</a></li> -->
+              <!-- <li><a href="#">เรื่อง การเคลื่อนที่ หมู่ ปล.</a></li> -->
+              <!-- <li><a href="#">เรื่อง การรบในพื้นที่สิ่งปลูกสร้าง</a></li> -->
+              <!-- <li><a href="#">เรื่อง ตั้งรับ</a></li> -->
+              <!-- <li><a href="#">เรื่อง ระเบียบนำหน่วย คำสั่งฯ</a></li> -->
               <li><a href="#">เรื่อง รบด้วยวิธีรุก-ตีกลางวัน</a></li>
-              <li><a href="#">เรื่อง ป้อมสนาม</a></li>
-              <li><a href="#">เรื่อง ถอนตัว</a></li>
-              <li><a href="#">เรื่อง เครื่องกีดขวาง</a></li>
-              <li><a href="#">เรื่อง รบด้วยวิธีรุก-ตีกลางคืน</a></li>
-              <li><a href="#">เรียน การยิงปืนประกอบการเคลื่อนที่</a></li>
+              <!-- <li><a href="#">เรื่อง ป้อมสนาม</a></li> -->
+              <!-- <li><a href="#">เรื่อง ถอนตัว</a></li> -->
+              <!-- <li><a href="#">เรื่อง เครื่องกีดขวาง</a></li> -->
+              <!-- <li><a href="#">เรื่อง รบด้วยวิธีรุก-ตีกลางคืน</a></li> -->
+              <!-- <li><a href="#">เรียน การยิงปืนประกอบการเคลื่อนที่</a></li> -->
             </ul>
           </li>
 
@@ -176,11 +138,11 @@
           <li class="dropdown"><a href="#"><span>ตรวจสอบผลคะแนน</span> <i
                 class="bi bi-chevron-down toggle-dropdown"></i></a>
             <ul>
-              <li><a href="https://script.google.com/macros/s/AKfycbxsfWDPB6Mp6d0_vgCQmR_7hQGR95FhAqvOldkIet2WTEGxvpjz13y9lHCLuqgVSmDX/exec">ผลคะแนนกิจเฉพาะ</a>
+              <li><a href="#">ผลคะแนนกิจเฉพาะ</a>
               </li>             
-              <li><a href="https://script.google.com/macros/s/AKfycbwJ-Ms40viDGte93uYw-ny1MgzT_vrwtjcyr30cVuCPXiBR3tVb-zca4o1b7EVC99A/exec">ผลคะแนนรายวิชา(เรื่อง)</a>
+              <li><a href="#">ผลคะแนนรายวิชา(เรื่อง)</a>
               </li>
-               <li><a href="https://script.google.com/macros/s/AKfycbxatWAwMIY92AEOJCUfjl9j_95P39H1LybSLMvh935X71ttjh6aBpxMNLpOQyUeIpg2/exec">ผลสอบก่อนเรียน-หลังเรียน</a></li>
+               <li><a href="#score-results" id="open-score-results">ผลสอบก่อนเรียน-หลังเรียน-คะแนนเก็บ</a></li>
                 <li><a href="#">ผลคะแนนเกรดเฉลี่ย</a></li>
               </ul>
               
@@ -192,41 +154,25 @@
           <li class="dropdown"><a href="#"><span>ตำรา/เอกสารเรียน</span> <i
                 class="bi bi-chevron-down toggle-dropdown"></i></a>
             <ul>
-              <li><a
-                  href="">รส./คฝ.</a>
-              </li>
+              <li><a href="#registration">รส./คฝ.</a></li>
               <li><a href="https://anyflip.com/bookcase/ggdby/">E-Book</a></li>
               <li class="dropdown"><a href="#"><span>เอกสารประกอบการเรียน</span> <i
                     class="bi bi-chevron-down toggle-dropdown"></i></a>
                 <ul>
-                  <li><a
-                      href="#">เรื่อง เทคนิคการเคลื่อนที่</a></li>
-                  <li><a
-                      href="#">เรื่อง ทัศนสัญญาณ</a></li>
-                  <li><a
-                      href="#">เรื่อง รูปขบวน หมู่ ปล.</a></li>
-                  <li><a
-                      href="#">เรื่อง แบบฝึกทำการรบ</a></li>
-                  <li><a
-                      href="#">เรื่อง MOUT</a></li>
-                  <li><a
-                      href="#">เรื่อง ตั้งรับ</a></li>
-                  <li><a
-                      href="#">เรื่อง ระเบียบนำหน่วย คำสั่งฯ</a></li>
-                  <li><a
-                      href="#">เรื่อง รบด้วยวิธีรุก-ตีกลางวัน</a></li>
-                  <li><a
-                      href="#">เรื่อง ป้อมสนาม</a></li>
-                  <li><a
-                      href="#">เรื่อง ถอนตัว</a></li>
-                  <li><a
-                      href="#">เรื่อง เครื่องกีดขวาง</a></li>
-                  <li><a
-                      href="#">เรื่อง รบด้วยวิธีรุก-ตีกลางคืน</a></li>
-                  <li><a
-                      href="#">เรื่อง Unit School</a></li>
-                   <li><a
-                      href="#">เรื่อง Drone Tactical </a></li>
+                  <!-- <li><a href="#">เรื่อง เทคนิคการเคลื่อนที่</a></li> -->
+                  <!-- <li><a href="#">เรื่อง ทัศนสัญญาณ</a></li> -->
+                  <li><a href="#">เรื่อง รูปขบวน หมู่ ปล.</a></li>
+                  <li><a href="#">เรื่อง แบบฝึกทำการรบ</a></li>
+                  <li><a href="#">เรื่อง MOUT</a></li>
+                  <li><a href="#">เรื่อง ตั้งรับ</a></li>
+                  <li><a href="#">เรื่อง ระเบียบนำหน่วย คำสั่งฯ</a></li>
+                  <li><a href="https://canva.link/04vveb3ub0sj3cx">เรื่อง รบด้วยวิธีรุก-ตีกลางวัน</a></li>
+                  <li><a href="#">เรื่อง ป้อมสนาม</a></li>
+                  <li><a href="#">เรื่อง ถอนตัว</a></li>
+                  <li><a href="#">เรื่อง เครื่องกีดขวาง</a></li>
+                  <li><a href="#">เรื่อง รบด้วยวิธีรุก-ตีกลางคืน</a></li>
+                  <li><a href="#">เรื่อง Unit School</a></li>
+                  <li><a href="#quiz-exam">เรื่อง Drone Tactical</a></li>
                 </ul>
               </li>
 
@@ -235,13 +181,11 @@
               <li><a href="#">คู่มือ ผยว.เล่ม 4</a></li> -->
             </ul>
           </li>
-           <li class="dropdown"><a href="#"><span>ตารางเรียน</span> <i
+           <li class="dropdown"><a href="#"><span>ครู/อาจารย์</span> <i
                 class="bi bi-chevron-down toggle-dropdown"></i></a>
                <ul>
-              <li><a
-                  href="https://script.google.com/macros/s/AKfycbxQvyaHKiM7oH33ff4w5TxXfYxY4UoGynr9YnhMYlbI3WvmrhTUrdbsUrmIRE6HJKw/exec">ตารางเรียน</a>
-              </li>             
-              <li><a href="https://script.google.com/macros/s/AKfycbz59M1m8ptmL97O-md8phVL8-vZpZjnftFNYtKR--2DBt01OSiIwwBDxLCUCvye6O4/exec">ปฏิทินแสดงตารางสอน</a></li>               
+                <li><a href="#quiz-builder" id="open-quiz-builder">Teacher</a></li>
+                <li><a href="https://canva.link/nmp78fse7wovd7p">คู่มือการใช้งานระบบ</a></li>
               </ul>
              </li>
 
@@ -318,14 +262,14 @@
           <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="200">
             <div class="features-item">
               <i class="bi bi-infinity" style="color: #5578ff;"></i>
-              <h3><a href="" class="stretched-link">เรื่อง เทคนิคการเคลื่อนที่</a></h3>
+              <h3><a href="#quiz-exam" class="stretched-link">เรื่อง เทคนิคการเคลื่อนที่</a></h3>
             </div>
           </div><!-- End Feature Item -->
 
           <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="300">
             <div class="features-item">
               <i class="bi bi-mortarboard" style="color: #e80368;"></i>
-              <h3><a href="" class="stretched-link">เรื่อง ทัศนสัญญาณ</a></h3>
+              <h3><a href="#quiz-exam" class="stretched-link">เรื่อง ทัศนสัญญาณ</a></h3>
             </div>
           </div><!-- End Feature Item -->
 
@@ -339,56 +283,56 @@
           <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="500">
             <div class="features-item">
               <i class="bi bi-shuffle" style="color: #47aeff;"></i>
-              <h3><a href="" class="stretched-link">เรื่อง ถอนตัว</a></h3>
+              <h3><a href="#quiz-exam" class="stretched-link">เรื่อง ถอนตัว</a></h3>
             </div>
           </div><!-- End Feature Item -->
 
           <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="600">
             <div class="features-item">
               <i class="bi bi-star" style="color: #ffa76e;"></i>
-              <h3><a href="" class="stretched-link">เรื่อง รบด้วยวิธีรุก-ตีกลางคืน</a></h3>
+              <h3><a href="#quiz-exam" class="stretched-link">เรื่อง รบด้วยวิธีรุก-ตีกลางคืน</a></h3>
             </div>
           </div><!-- End Feature Item -->
 
           <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="700">
             <div class="features-item">
               <i class="bi bi-x-diamond" style="color: #11dbcf;"></i>
-              <h3><a href="" class="stretched-link">เรื่อง รบด้วยวิธีรุก-ตีกลางวัน</a></h3>
+              <h3><a href="https://canva.link/04vveb3ub0sj3cx" class="stretched-link">เรื่อง รบด้วยวิธีรุก-ตีกลางวัน</a></h3>
             </div>
           </div><!-- End Feature Item -->
 
           <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="800">
             <div class="features-item">
               <i class="bi bi-camera-video" style="color: #4233ff;"></i>
-              <h3><a href="" class="stretched-link">เรื่อง แบบฝึกทำการรบ</a></h3>
+              <h3><a href="#quiz-exam" class="stretched-link">เรื่อง แบบฝึกทำการรบ</a></h3>
             </div>
           </div><!-- End Feature Item -->
 
           <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="900">
             <div class="features-item">
               <i class="bi bi-command" style="color: #b2904f;"></i>
-              <h3><a href="" class="stretched-link">เรื่อง MOUT</a></h3>
+              <h3><a href="#quiz-exam" class="stretched-link">เรื่อง MOUT</a></h3>
             </div>
           </div><!-- End Feature Item -->
 
           <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="1000">
             <div class="features-item">
               <i class="bi bi-dribbble" style="color: #b20969;"></i>
-              <h3><a href="" class="stretched-link">เรื่อง ระเบียบนำหน่วย คำสั่งฯ</a></h3>
+              <h3><a href="#quiz-exam" class="stretched-link">เรื่อง ระเบียบนำหน่วย คำสั่งฯ</a></h3>
             </div>
           </div><!-- End Feature Item -->
 
           <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="1100">
             <div class="features-item">
               <i class="bi bi-activity" style="color: #ff5828;"></i>
-              <h3><a href="" class="stretched-link">เรื่อง ยิงปืนฯ</a></h3>
+              <h3><a href="#quiz-exam" class="stretched-link">เรื่อง ยิงปืนฯ</a></h3>
             </div>
           </div><!-- End Feature Item -->
 
           <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="1200">
             <div class="features-item">
               <i class="bi bi-brightness-high" style="color: #29cc61;"></i>
-              <h3><a href="" class="stretched-link">เรื่อง ตั้งรับ</a></h3>
+              <h3><a href="#quiz-exam" class="stretched-link">เรื่อง ตั้งรับ</a></h3>
             </div>
           </div><!-- End Feature Item -->
         </div>
@@ -397,117 +341,6 @@
 
     <!-- Stats Section -->
     
-
-    <!-- Gallery Section -->
-    <section id="gallery" class="gallery section">
-      <!-- Section Title -->
-      <div class="container section-title" data-aos="fade-up">
-        <h2>Gallery</h2>
-        <div><span>Tactical Studies Section</span> <span class="description-title">Gallery</span></div>
-      </div><!-- End Section Title -->
-      <div class="container" data-aos="fade-up" data-aos-delay="100">
-        <div class="row g-0">
-
-          <div class="col-lg-3 col-md-4">
-            <div class="gallery-item">
-              <a href="assets/img/gallery/gallery-1.jpg" class="glightbox" data-gallery="images-gallery">
-                <img src="assets/img/gallery/gallery-1.jpg" alt="" class="img-fluid">
-              </a>
-            </div>
-          </div><!-- End Gallery Item -->
-
-          <div class="col-lg-3 col-md-4">
-            <div class="gallery-item">
-              <a href="assets/img/gallery/gallery-2.jpg" class="glightbox" data-gallery="images-gallery">
-                <img src="assets/img/gallery/gallery-2.jpg" alt="" class="img-fluid">
-              </a>
-            </div>
-          </div><!-- End Gallery Item -->
-
-          <div class="col-lg-3 col-md-4">
-            <div class="gallery-item">
-              <a href="assets/img/gallery/gallery-3.jpg" class="glightbox" data-gallery="images-gallery">
-                <img src="assets/img/gallery/gallery-3.jpg" alt="" class="img-fluid">
-              </a>
-            </div>
-          </div><!-- End Gallery Item -->
-
-          <div class="col-lg-3 col-md-4">
-            <div class="gallery-item">
-              <a href="assets/img/gallery/gallery-4.jpg" class="glightbox" data-gallery="images-gallery">
-                <img src="assets/img/gallery/gallery-4.jpg" alt="" class="img-fluid">
-              </a>
-            </div>
-          </div><!-- End Gallery Item -->
-
-          <div class="col-lg-3 col-md-4">
-            <div class="gallery-item">
-              <a href="assets/img/gallery/gallery-5.jpg" class="glightbox" data-gallery="images-gallery">
-                <img src="assets/img/gallery/gallery-5.jpg" alt="" class="img-fluid">
-              </a>
-            </div>
-          </div><!-- End Gallery Item -->
-
-          <div class="col-lg-3 col-md-4">
-            <div class="gallery-item">
-              <a href="assets/img/gallery/gallery-6.jpg" class="glightbox" data-gallery="images-gallery">
-                <img src="assets/img/gallery/gallery-6.jpg" alt="" class="img-fluid">
-              </a>
-            </div>
-          </div><!-- End Gallery Item -->
-
-          <div class="col-lg-3 col-md-4">
-            <div class="gallery-item">
-              <a href="assets/img/gallery/gallery-7.jpg" class="glightbox" data-gallery="images-gallery">
-                <img src="assets/img/gallery/gallery-7.jpg" alt="" class="img-fluid">
-              </a>
-            </div>
-          </div><!-- End Gallery Item -->
-
-          <div class="col-lg-3 col-md-4">
-            <div class="gallery-item">
-              <a href="assets/img/gallery/gallery-8.jpg" class="glightbox" data-gallery="images-gallery">
-                <img src="assets/img/gallery/gallery-8.jpg" alt="" class="img-fluid">
-              </a>
-            </div>
-          </div><!-- End Gallery Item -->
-
-          <div class="col-lg-3 col-md-4">
-            <div class="gallery-item">
-              <a href="assets/img/gallery/gallery-9.jpg" class="glightbox" data-gallery="images-gallery">
-                <img src="assets/img/gallery/gallery-9.jpg" alt="" class="img-fluid">
-              </a>
-            </div>
-          </div><!-- End Gallery Item -->
-
-          <div class="col-lg-3 col-md-4">
-            <div class="gallery-item">
-              <a href="assets/img/gallery/gallery-10.jpg" class="glightbox" data-gallery="images-gallery">
-                <img src="assets/img/gallery/gallery-10.jpg" alt="" class="img-fluid">
-              </a>
-            </div>
-          </div><!-- End Gallery Item -->
-
-          <div class="col-lg-3 col-md-4">
-            <div class="gallery-item">
-              <a href="assets/img/gallery/gallery-11.jpg" class="glightbox" data-gallery="images-gallery">
-                <img src="assets/img/gallery/gallery-11.jpg" alt="" class="img-fluid">
-              </a>
-            </div>
-          </div><!-- End Gallery Item -->
-
-          <div class="col-lg-3 col-md-4">
-            <div class="gallery-item">
-              <a href="assets/img/gallery/gallery-12.jpg" class="glightbox" data-gallery="images-gallery">
-                <img src="assets/img/gallery/gallery-12.jpg" alt="" class="img-fluid">
-              </a>
-            </div>
-          </div><!-- End Gallery Item -->
-
-        </div>
-      </div>
-    </section><!-- /Gallery Section -->
-
     <section id="registration" class="registration registration-modal d-none">
       <div class="container">
         <div class="section-title" data-aos="fade-up">
@@ -598,7 +431,6 @@
             <div id="attendance-result" class="student-result" aria-live="polite"></div>
             <div id="attendance-lookup-actions" class="registration-actions">
               <button type="button" id="attendance-lookup" class="registration-button registration-button-secondary"><i class="bi bi-search"></i> ค้นหา</button>
-              <button type="button" id="close-attendance" class="registration-button registration-button-close">ปิด</button>
             </div>
             <div id="attendance-details" class="registration-details d-none">
               <label class="registration-episode"><span>ครั้งที่</span>
@@ -612,6 +444,7 @@
               </label>
               <div class="registration-actions registration-save-actions">
                 <button type="submit" class="registration-button"><i class="bi bi-check2-circle"></i> บันทึกข้อมูล</button>
+                <button type="button" id="close-attendance" class="registration-button registration-button-close">ปิด</button>
               </div>
             </div>
             <div class="loading d-none">กำลังบันทึกข้อมูล...</div>
@@ -622,6 +455,242 @@
       </div>
     </section>
 
+    <section id="quiz-builder" class="registration registration-modal d-none">
+      <div class="container">
+        <div class="section-title">
+          <h2>จัดทำข้อสอบ</h2>
+          <div><span>สมัครครู</span> <span class="description-title">และอัปโหลดข้อสอบ</span></div>
+        </div>
+        <div class="registration-card">
+          <div class="registration-card-header">
+            <span class="registration-icon"><i class="bi bi-journal-plus"></i></span>
+            <div><h3>ระบบจัดทำข้อสอบ</h3><p>คำขอสมัครครูจะรอการอนุมัติก่อนใช้งาน</p></div>
+          </div>
+          <div id="quiz-auth-panel">
+            <form id="teacher-application-form" class="registration-form">
+              <h4>สมัครสมาชิกครู</h4>
+              <div class="registration-fields">
+                <label><span>ชื่อครู</span><input name="teacherName" required></label>
+                <label><span>อีเมล</span><input type="email" name="email" required></label>
+                <label><span>รหัสผ่านอย่างน้อย 8 ตัว</span><input type="password" name="password" minlength="8" required></label>
+                <label><span>ยืนยันรหัสผ่าน</span><input type="password" name="passwordConfirm" minlength="8" required></label>
+              </div>
+              <div class="registration-actions"><button type="submit" class="registration-button">ส่งคำขอสมัคร</button></div>
+              <div class="quiz-status error-message d-none" role="alert"></div>
+              <div class="quiz-status sent-message d-none" role="status"></div>
+            </form>
+            <form id="teacher-login-form" class="registration-form quiz-login-form">
+              <h4>เข้าสู่ระบบครู</h4>
+              <div class="registration-fields">
+                <label><span>อีเมล</span><input type="email" name="email" required></label>
+                <label><span>รหัสผ่าน</span><input type="password" name="password" required></label>
+              </div>
+              <div class="registration-actions quiz-auth-actions">
+                <button type="submit" class="registration-button registration-button-secondary">เข้าสู่ระบบ</button>
+                <button type="button" id="close-quiz-builder" class="registration-button registration-button-close">ปิด</button>
+              </div>
+              <div class="quiz-status error-message d-none" role="alert"></div>
+            </form>
+          </div>
+          <form id="quiz-upload-form" class="registration-form d-none">
+            <h4>อัปโหลดข้อสอบ</h4>
+            <div class="registration-fields">
+              <label><span>ชื่อเรื่อง</span><input name="title" required></label>
+              <label><span>เวลาสอบ (นาที)</span><input type="number" name="duration" min="1" max="180" value="30" required></label>
+              <label><span>เปิดสอบ</span><input type="datetime-local" name="openAt" required></label>
+              <label><span>ปิดสอบ</span><input type="datetime-local" name="closeAt" required></label>
+              <label><span>จำนวนข้อที่สุ่ม</span><input type="number" name="questionCount" min="1" required></label>
+              <label><span>สอบได้กี่ครั้ง</span><input type="number" name="attemptsAllowed" min="1" value="1" required></label>
+              <label><span>ช่วงสอบ</span>
+                <select name="phase" required>
+                  <option value="pre-test">ก่อนเรียน</option>
+                  <option value="post-test">หลังเรียน</option>
+                  <option value="score">สอบเก็บคะแนน</option>
+                  <option value="midterm">สอบกลางภาค</option>
+                  <option value="final">สอบปลายภาค</option>
+                </select>
+              </label>
+            </div>
+            <label class="quiz-source"><span>ไฟล์ Excel หรือ CSV</span><input type="file" id="quiz-file" accept=".xlsx,.xls,.csv"></label>
+            <label class="quiz-source"><span>หรือ URL Google Sheet ที่เปิดให้ดูได้</span><input type="url" name="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/.../edit"></label>
+            <p class="quiz-hint">คอลัมน์: A คำถาม, B-E ตัวเลือก 1-4, F เฉลยเป็น 1-4, G คำอธิบาย (ถ้ามี)</p>
+            <label class="quiz-source"><span>หรือวางข้อมูล CSV</span><textarea name="csv" rows="5" placeholder="คำถาม,ตัวเลือก 1,ตัวเลือก 2,ตัวเลือก 3,ตัวเลือก 4,เฉลย,คำอธิบาย"></textarea></label>
+            <div class="registration-actions"><button type="submit" class="registration-button">สร้างแบบทดสอบ</button><button type="button" id="teacher-logout" class="registration-button registration-button-close">ออกจากระบบ</button></div>
+            <div class="quiz-status error-message d-none" role="alert"></div>
+            <div class="quiz-status sent-message d-none" role="status"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz-exam" class="registration registration-modal d-none">
+      <div class="container">
+        <div class="section-title">
+          <h2 id="exam-title">แบบทดสอบ</h2>
+          <div><span id="exam-phase"></span></div>
+        </div>
+        <div class="registration-card">
+          <form id="exam-start-form" class="registration-form">
+            <div class="registration-fields">
+              <label><span>เลขประจำตัว</span><input id="exam-student-id" inputmode="numeric" required></label>
+              <label><span>ช่วงสอบ</span>
+                <select id="exam-phase-select" required>
+                  <option value="pre-test">ก่อนเรียน</option>
+                  <option value="post-test">หลังเรียน</option>
+                  <option value="score">สอบเก็บคะแนน</option>
+                  <option value="midterm">สอบกลางภาค</option>
+                  <option value="final">สอบปลายภาค</option>
+                </select>
+              </label>
+            </div>
+            <div class="registration-actions">
+              <button type="submit" class="registration-button">เข้าห้องสอบ</button>
+              <button type="button" id="exam-close" class="registration-button registration-button-close">ปิด</button>
+            </div>
+            <div class="exam-status error-message d-none" role="alert"></div>
+          </form>
+          <form id="exam-answer-form" class="registration-form d-none">
+            <div id="exam-timer" class="quiz-timer" aria-live="polite"></div>
+            <div id="exam-questions"></div>
+            <div class="registration-actions">
+              <button type="button" id="exam-next" class="registration-button">ข้อถัดไป</button>
+              <button type="submit" id="exam-submit" class="registration-button d-none">ส่งคำตอบ</button>
+            </div>
+            <div class="exam-status error-message d-none" role="alert"></div>
+          </form>
+          <div id="exam-student-info" class="registration-result d-none" aria-live="polite"></div>
+          <div id="exam-start-actions" class="registration-actions d-none">
+            <button type="button" id="exam-begin" class="registration-button">เริ่มสอบ</button>
+          </div>
+          <div id="exam-result" class="quiz-result" aria-live="polite"></div>
+          <div id="exam-result-table" class="quiz-result-table" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <div id="exam-timeout-popup" class="registration-popup d-none" role="alertdialog" aria-modal="true">
+      <div class="registration-popup-card">
+        <i class="bi bi-clock-history registration-popup-icon" aria-hidden="true"></i>
+        <h3>หมดเวลา</h3>
+        <p>หมดเวลาทำข้อสอบแล้ว กรุณากดส่งคำตอบ</p>
+        <button type="button" id="exam-timeout-submit" class="registration-popup-button">ส่งคำตอบ</button>
+      </div>
+    </div>
+
+    <section id="score-results" class="registration registration-modal d-none">
+      <div class="container">
+        <div class="section-title" data-aos="fade-up">
+          <h2>ผลสอบ</h2>
+          <div><span>ก่อนเรียน</span> <span class="description-title">หลังเรียน</span> <span class="description-title">คะแนนประเมินความรู้</span></div>
+        </div>
+        <div class="registration-card" data-aos="fade-up" data-aos-delay="100">
+          <div class="registration-card-header">
+            <span class="registration-icon"><i class="bi bi-clipboard-data"></i></span>
+            <div>
+              <h3>ค้นหาผลสอบจากเลขประจำตัวประชาชน</h3>
+            </div>
+          </div>
+
+          <form id="score-search-form" class="registration-form">
+            <div class="registration-fields">
+              <label><span>เลขประจำตัวประชาชน 13 หลัก</span><input id="score-search-student-id" type="text" inputmode="numeric" pattern="[0-9]{13}" maxlength="13" minlength="13" required></label>
+            </div>
+            <div class="registration-actions">
+              <button type="submit" class="registration-button">ค้นหา</button>
+              <button type="button" id="score-result-close" class="registration-button registration-button-close">ปิด</button>
+            </div>
+            <div id="score-search-status" class="exam-status error-message d-none" role="alert"></div>
+          </form>
+
+          <div id="score-result-data" class="score-result-data d-none" aria-live="polite">
+            <div id="score-result-table" class="score-result-table"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <style>
+      .score-result-data {
+        margin-top: 1.5rem;
+      }
+
+      .score-lookup-summary {
+        display: grid;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        border: 1px solid #dfe6ee;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #f8fbff 0%, #eef5ff 100%);
+      }
+
+      .score-lookup-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed #d6dfeb;
+        padding-bottom: 0.5rem;
+      }
+
+      .score-lookup-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+
+      .score-lookup-row span {
+        color: #4b5d7a;
+        font-weight: 600;
+      }
+
+      .score-lookup-row strong {
+        text-align: right;
+        color: #172033;
+      }
+
+      .score-result-table table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0.5rem;
+        overflow: hidden;
+        border-radius: 12px;
+        box-shadow: 0 10px 22px rgba(17, 25, 40, 0.08);
+      }
+
+      .score-result-table th,
+      .score-result-table td {
+        padding: 0.8rem 0.9rem;
+        border: 1px solid #e4ebf3;
+        text-align: center;
+        font-size: 0.96rem;
+      }
+
+      .score-result-table thead th {
+        background: linear-gradient(135deg, #1b6ca8, #2a8dde);
+        color: #ffffff;
+        font-weight: 700;
+      }
+
+      .score-result-table tbody tr:nth-child(odd) {
+        background: rgba(42, 141, 222, 0.04);
+      }
+
+      .success-message {
+        color: #198754 !important;
+        font-weight: 700;
+      }
+
+      @media (max-width: 576px) {
+        .score-lookup-row {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .score-lookup-row strong {
+          text-align: left;
+        }
+      }
+    </style>
+
   </main>
   <div id="registration-popup" class="registration-popup d-none" role="alertdialog"
     aria-modal="true" aria-labelledby="registration-popup-title">
@@ -631,6 +700,12 @@
       <h3 id="registration-popup-title">แจ้งเตือน</h3>
       <p id="registration-popup-message"></p>
       <button type="button" class="registration-popup-button">ตกลง</button>
+    </div>
+  </div>
+  <div id="quiz-loading-overlay" class="quiz-loading-overlay d-none" role="status" aria-live="polite" aria-label="กำลังดำเนินการ">
+    <div class="quiz-loading-card">
+      <span class="quiz-loading-spinner" aria-hidden="true"></span>
+      <span>กำลังดำเนินการ...</span>
     </div>
   </div>
   <footer id="footer" class="footer dark-background  ">
@@ -719,11 +794,14 @@
   <script src="assets/vendor/aos/aos.js"></script>
   <script src="assets/vendor/glightbox/js/glightbox.min.js"></script>
   <script src="assets/vendor/purecounter/purecounter_vanilla.js"></script>
-  <script src="assets/vendor/swiper/swiper-bundle.min.js"></script>
+  <script src="assets/swiper/swiper-bundle.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 
   <!-- Google Sheets form handler -->
   <script src="assets/js/google-sheet-form.js?v=20260918-separate-forms"></script>
-  <script src="assets/js/attendance-registration.js?v=20260918-close-fix"></script>
+  <script src="assets/js/attendance-registration.js?v=20260928-close-beside-save"></script>
+  <script src="assets/js/quiz-builder.js?v=20260922"></script>
+  <script src="assets/js/exam.js?v=20260924"></script>
 
   <!-- Main JS File -->
   <script src="assets/js/main.js"></script>
