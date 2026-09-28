@@ -462,6 +462,8 @@
       renderStudentInfo(data.student || student);
       pendingQuestions = data.questions;
       answerForm.dataset.duration = data.duration || 30;
+      answerForm.dataset.passType = data.passType || 'percent';
+      answerForm.dataset.passValue = data.passValue ?? data.passScore ?? 70;
       answerForm.dataset.passScore = data.passScore || 70;
       startForm.classList.add('d-none');
       startActions.classList.remove('d-none');
@@ -494,7 +496,9 @@
       const score = Number(data.score || 0);
       const total = Number(data.total || 0);
       const percentage = total ? (score / total) * 100 : 0;
-      const passed = passType === 'count' ? score >= passValue : percentage >= passValue;
+      const passed = typeof data.passed === 'boolean'
+        ? data.passed
+        : (passType === 'count' ? score >= passValue : percentage >= passValue);
       const thresholdText = passType === 'count' ? `${passValue} ข้อ` : `${passValue}%`;
       resultBox.innerHTML = `
         <strong>ผลคะแนน ${formatPhaseLabel(data.phase)}:</strong>

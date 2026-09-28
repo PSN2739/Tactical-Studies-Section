@@ -1,0 +1,16 @@
+{
+  "scriptId": "1t7nUOEQZOkzDkJxApLp8K6pB_hn90lYQSkCtwj5q0G0koYeiPwIAJHP6",
+  "rootDir": ".appsscript-deploy-temp",
+  "scriptExtensions": [
+    ".js",
+    ".gs"
+  ],
+  "htmlExtensions": [
+    ".html"
+  ],
+  "jsonExtensions": [
+    ".json"
+  ],
+  "filePushOrder": [],
+  "skipSubdirectories": false
+}
