@@ -20,9 +20,12 @@
   const downloadTemplateButton = document.getElementById('download-quiz-template');
   const currentTeacherEmail = document.getElementById('current-teacher-email');
   const tokenKey = 'tacticalTeacherToken';
-  const teacherEmail = 'pinshatpitsanu@gmail.com';
 
-  if (currentTeacherEmail) currentTeacherEmail.textContent = `ชื่อผู้ใช้งานขณะนี้: ${teacherEmail}`;
+  function setCurrentTeacherEmail(email) {
+    if (currentTeacherEmail) currentTeacherEmail.textContent = email
+      ? `ชื่อผู้ใช้งานขณะนี้: ${email}`
+      : 'ชื่อผู้ใช้งานขณะนี้: -';
+  }
 
   function syncPassingControls() {
     const countMode = uploadForm.elements.passType.value === 'count';
@@ -56,6 +59,7 @@
 
   function clearBuilderState() {
     localStorage.removeItem(tokenKey);
+    setCurrentTeacherEmail('');
     applicationForm.reset();
     loginForm.reset();
     uploadForm.reset();
@@ -343,6 +347,7 @@
         formName: 'teacher-login', email: formData.get('email'), password: formData.get('password')
       }) });
       localStorage.setItem(tokenKey, data.token);
+      setCurrentTeacherEmail(String(formData.get('email') || '').trim());
       applicationForm.classList.add('d-none');
       loginForm.classList.add('quiz-login-complete');
       closeButton.classList.add('d-none');
