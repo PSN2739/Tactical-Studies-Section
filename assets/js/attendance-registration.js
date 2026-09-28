@@ -17,9 +17,13 @@
   const formNameField = document.getElementById('attendance-form-name');
   const popup = document.getElementById('registration-popup');
   const popupMessage = document.getElementById('registration-popup-message');
+  const loadingOverlay = document.getElementById('quiz-loading-overlay');
 
-  if (closeButton && details && details.contains(closeButton)) {
-    lookupActions.appendChild(closeButton);
+  function setGlobalLoading(isLoading) {
+    if (loadingOverlay) loadingOverlay.classList.toggle('d-none', !isLoading);
+    form.querySelectorAll('button, input, select').forEach((control) => {
+      control.disabled = isLoading;
+    });
   }
 
   function parseResponse(text) {
@@ -99,6 +103,7 @@
 
   lookupButton.addEventListener('click', async () => {
     try {
+      setGlobalLoading(true);
       const registrationId = validateStudentId();
       resultBox.innerHTML = '<div class="registration-result loading-result">กำลังค้นหาข้อมูล...</div>';
       const response = await fetch(`${endpoint}?action=attendance-lookup&registrationId=${encodeURIComponent(registrationId)}`);
@@ -110,6 +115,8 @@
       setMessage('error-message', '');
     } catch (error) {
       resultBox.innerHTML = `<div class="registration-result registration-result-error">${escapeHtml(error.message)}</div>`;
+    } finally {
+      setGlobalLoading(false);
     }
   });
 
@@ -118,6 +125,7 @@
     const submitButton = form.querySelector('button[type="submit"]');
     const loading = form.querySelector('.loading');
     try {
+      setGlobalLoading(true);
       const registrationId = validateStudentId();
       const attendanceFormName = formNameField.value;
       if (!attendanceFormName) throw new Error('กรุณาเลือกครั้งที่ 1-4');
@@ -146,6 +154,7 @@
     } catch (error) {
       setMessage('error-message', error.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
     } finally {
+      setGlobalLoading(false);
       if (loading) loading.classList.add('d-none');
       if (submitButton) submitButton.disabled = false;
     }
