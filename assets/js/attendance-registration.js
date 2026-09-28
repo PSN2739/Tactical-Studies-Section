@@ -26,6 +26,10 @@
     });
   }
 
+  if (closeButton && details && details.contains(closeButton)) {
+    lookupActions.appendChild(closeButton);
+  }
+
   function parseResponse(text) {
     try {
       return JSON.parse(text);
