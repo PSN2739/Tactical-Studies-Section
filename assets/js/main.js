@@ -133,6 +133,18 @@
 
   window.addEventListener("load", initSwiper);
 
+  window.addEventListener('pagehide', () => {
+    document.querySelectorAll('form').forEach((form) => form.reset());
+    document.querySelectorAll('.registration-modal').forEach((modal) => {
+      modal.classList.add('d-none');
+    });
+    document.querySelectorAll('.registration-popup, #quiz-loading-overlay').forEach((element) => {
+      element.classList.add('d-none');
+    });
+    document.body.classList.remove('registration-modal-open', 'mobile-nav-active');
+    localStorage.removeItem('tacticalTeacherToken');
+  });
+
   /**
    * Frequently Asked Questions Toggle
    */

@@ -445,4 +445,6 @@
     closeButton.classList.add('d-none');
     uploadForm.classList.remove('d-none');
   }
+
+  window.addEventListener('pagehide', clearBuilderState);
 })();
