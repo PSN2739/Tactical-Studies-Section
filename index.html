@@ -482,7 +482,7 @@
             <form id="teacher-login-form" class="registration-form quiz-login-form">
               <h4>เข้าสู่ระบบครู</h4>
               <div class="registration-fields">
-                <label><span>อีเมล</span><input type="email" name="email" required></label>
+                <label><span>อีเมล</span><input type="email" name="email" value="pinshatpitsanu@gmail.com" required></label>
                 <label><span>รหัสผ่าน</span><input type="password" name="password" required></label>
               </div>
               <div class="registration-actions quiz-auth-actions">
@@ -494,6 +494,7 @@
           </div>
           <form id="quiz-upload-form" class="registration-form d-none">
             <h4>อัปโหลดข้อสอบ</h4>
+            <p id="current-teacher-email" class="quiz-current-user">ชื่อผู้ใช้งานขณะนี้: pinshatpitsanu@gmail.com</p>
             <div class="registration-fields">
               <label><span>ชื่อเรื่อง</span><input name="title" required></label>
               <label><span>เวลาสอบ (นาที)</span><input type="number" name="duration" min="1" max="180" value="30" required></label>
@@ -522,7 +523,7 @@
                   <option value="count">จำนวนข้อ</option>
                 </select>
               </label>
-              <label><span>ค่าเกณฑ์ผ่าน</span><input type="number" name="passValue" min="0" value="70" required></label>
+              <label><span id="quiz-pass-value-label">เกณฑ์ผ่าน (%)</span><input type="number" name="passValue" min="0" max="100" value="70" required></label>
             </div>
             <label class="quiz-source"><span>ไฟล์ Excel หรือ CSV</span><input type="file" id="quiz-file" accept=".xlsx,.xls,.csv"></label>
             <label class="quiz-source"><span>หรือ URL Google Sheet ที่เปิดให้ดูได้</span><input type="url" name="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/.../edit"></label>
@@ -845,7 +846,7 @@
   <!-- Google Sheets form handler -->
   <script src="assets/js/google-sheet-form.js?v=20260918-separate-forms"></script>
   <script src="assets/js/attendance-registration.js?v=20260918-close-fix"></script>
-  <script src="assets/js/quiz-builder.js?v=20260922"></script>
+  <script src="assets/js/quiz-builder.js?v=20260929-passing-count"></script>
   <script src="assets/js/exam.js?v=20260924"></script>
 
   <!-- Main JS File -->

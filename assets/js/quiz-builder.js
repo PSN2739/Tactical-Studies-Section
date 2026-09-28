@@ -18,7 +18,31 @@
   const loadingOverlay = document.getElementById('quiz-loading-overlay');
   const previewBox = document.getElementById('quiz-preview-box');
   const downloadTemplateButton = document.getElementById('download-quiz-template');
+  const currentTeacherEmail = document.getElementById('current-teacher-email');
   const tokenKey = 'tacticalTeacherToken';
+  const teacherEmail = 'pinshatpitsanu@gmail.com';
+
+  if (currentTeacherEmail) currentTeacherEmail.textContent = `ชื่อผู้ใช้งานขณะนี้: ${teacherEmail}`;
+
+  function syncPassingControls() {
+    const countMode = uploadForm.elements.passType.value === 'count';
+    const questionCount = Number(uploadForm.elements.questionCount.value) || 0;
+    const passValue = uploadForm.elements.passValue;
+    const passLabel = document.getElementById('quiz-pass-value-label');
+
+    if (passLabel) passLabel.textContent = countMode ? 'จำนวนข้อที่ต้องผ่าน' : 'เกณฑ์ผ่าน (%)';
+    passValue.min = countMode ? '1' : '0';
+    passValue.max = countMode ? (questionCount > 0 ? String(questionCount) : '') : '100';
+    passValue.step = '1';
+
+    if (countMode) {
+      passValue.value = questionCount > 0
+        ? String(Math.min(Number(passValue.value) || questionCount, questionCount))
+        : '';
+    }
+
+    uploadForm.elements.attemptsAllowed.disabled = countMode;
+  }
 
   function showModal() {
     modal.classList.remove('d-none');
@@ -35,6 +59,7 @@
     applicationForm.reset();
     loginForm.reset();
     uploadForm.reset();
+    syncPassingControls();
     if (previewBox) {
       previewBox.classList.add('d-none');
       previewBox.innerHTML = '';
@@ -72,6 +97,7 @@
         control.disabled = isLoading;
       });
     });
+    syncPassingControls();
   }
 
   async function request(parameters) {
@@ -341,7 +367,7 @@
       if (passType === 'percent' && (passValue < 0 || passValue > 100)) {
         throw new Error('เกณฑ์ผ่านแบบเปอร์เซ็นต์ต้องอยู่ระหว่าง 0 ถึง 100');
       }
-      if (passType === 'count' && (passValue > questionCount || passValue > 999)) {
+      if (passType === 'count' && (passValue < 1 || passValue > questionCount || passValue > 999)) {
         throw new Error('จำนวนข้อเกณฑ์ผ่านต้องไม่เกินจำนวนข้อที่สุ่ม');
       }
 
@@ -361,6 +387,7 @@
         questions: JSON.stringify(questions)
       }) });
       uploadForm.reset();
+      syncPassingControls();
       if (previewBox) {
         previewBox.classList.add('d-none');
         previewBox.innerHTML = '';
@@ -382,6 +409,11 @@
   if (downloadTemplateButton) {
     downloadTemplateButton.addEventListener('click', downloadTemplateCsv);
   }
+
+  uploadForm.elements.passType.addEventListener('change', syncPassingControls);
+  uploadForm.elements.questionCount.addEventListener('input', syncPassingControls);
+  uploadForm.elements.questionCount.addEventListener('change', syncPassingControls);
+  syncPassingControls();
 
   uploadForm.elements.questionType.addEventListener('change', async () => {
     try {
