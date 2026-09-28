@@ -18,6 +18,24 @@
   const loadingOverlay = document.getElementById('quiz-loading-overlay');
   const tokenKey = 'tacticalTeacherToken';
 
+  function syncPassingControls() {
+    const countMode = uploadForm.elements.passType.value === 'count';
+    const questionCount = Number(uploadForm.elements.questionCount.value) || 0;
+    const passValue = uploadForm.elements.passValue;
+    const passLabel = document.getElementById('quiz-pass-value-label');
+
+    if (passLabel) passLabel.textContent = countMode ? 'จำนวนข้อที่ต้องผ่าน' : 'เกณฑ์ผ่าน (%)';
+    passValue.min = countMode ? '1' : '0';
+    passValue.max = countMode ? (questionCount > 0 ? String(questionCount) : '') : '100';
+    passValue.step = '1';
+    if (countMode) {
+      passValue.value = questionCount > 0
+        ? String(Math.min(Number(passValue.value) || questionCount, questionCount))
+        : '';
+    }
+    uploadForm.elements.attemptsAllowed.disabled = countMode;
+  }
+
   function showModal() {
     modal.classList.remove('d-none');
     document.body.classList.add('registration-modal-open');
@@ -33,6 +51,7 @@
     applicationForm.reset();
     loginForm.reset();
     uploadForm.reset();
+    syncPassingControls();
     setStatus(applicationForm, 'error-message', '');
     setStatus(applicationForm, 'sent-message', '');
     setStatus(loginForm, 'error-message', '');
@@ -66,6 +85,7 @@
         control.disabled = isLoading;
       });
     });
+    syncPassingControls();
   }
 
   async function request(parameters) {
@@ -192,6 +212,14 @@
   uploadForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
+      const passType = uploadForm.elements.passType.value;
+      const passValue = Number(uploadForm.elements.passValue.value);
+      const questionCount = Number(uploadForm.elements.questionCount.value || 0);
+      if (!Number.isFinite(passValue) || passValue < 0
+        || (passType === 'percent' && passValue > 100)
+        || (passType === 'count' && (passValue < 1 || passValue > questionCount))) {
+        throw new Error('ตรวจสอบค่าเกณฑ์ผ่านให้ถูกต้อง');
+      }
       setLoading(true);
       const questions = await getQuestions(uploadForm);
       if (!questions.length) throw new Error('ไม่พบข้อสอบในข้อมูลที่นำเข้า');
@@ -202,9 +230,13 @@
         questionCount: uploadForm.elements.questionCount.value,
         attemptsAllowed: uploadForm.elements.attemptsAllowed.value,
         phase: uploadForm.elements.phase.value,
+        passType: passType,
+        passValue: String(passValue),
+        passScore: String(passValue),
         questions: JSON.stringify(questions)
       }) });
       uploadForm.reset();
+      syncPassingControls();
       showQuizSuccessPopup('สร้างแบบทดสอบสำเร็จ');
     } catch (error) {
       setStatus(uploadForm, 'error-message', error.message);
@@ -217,6 +249,11 @@
     clearBuilderState();
     hideModal();
   });
+
+  uploadForm.elements.passType.addEventListener('change', syncPassingControls);
+  uploadForm.elements.questionCount.addEventListener('input', syncPassingControls);
+  uploadForm.elements.questionCount.addEventListener('change', syncPassingControls);
+  syncPassingControls();
 
   if (registrationPopupButton) {
     registrationPopupButton.addEventListener('click', () => {

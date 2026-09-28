@@ -512,6 +512,13 @@
                   <option value="final">สอบปลายภาค</option>
                 </select>
               </label>
+              <label><span>เกณฑ์ผ่าน</span>
+                <select name="passType" required>
+                  <option value="percent">เปอร์เซ็นต์ (%)</option>
+                  <option value="count">จำนวนข้อ</option>
+                </select>
+              </label>
+              <label><span id="quiz-pass-value-label">เกณฑ์ผ่าน (%)</span><input type="number" name="passValue" min="0" max="100" value="70" required></label>
             </div>
             <label class="quiz-source"><span>ไฟล์ Excel หรือ CSV</span><input type="file" id="quiz-file" accept=".xlsx,.xls,.csv"></label>
             <label class="quiz-source"><span>หรือ URL Google Sheet ที่เปิดให้ดูได้</span><input type="url" name="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/.../edit"></label>
