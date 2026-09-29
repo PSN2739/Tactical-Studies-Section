@@ -64,16 +64,24 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  const data = (e && e.parameter) || {};
+  const formName = normalizeValue_(data.formName);
+  if (formName === 'teacher-login') {
+    try {
+      return teacherLogin_(data);
+    } catch (error) {
+      return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
+    }
+  }
+
   const lock = LockService.getScriptLock();
 
   try {
     lock.waitLock(30000);
-    const data = (e && e.parameter) || {};
     const lookupId = normalizeValue_(data.lookupId);
     const registrationId = normalizeValue_(data.registrationId);
     const email = normalizeValue_(data.email);
     const episode = normalizeValue_(data.episode);
-    const formName = normalizeValue_(data.formName);
 
     if (formName === 'teacher-application') {
       return submitTeacherApplication_(data);
@@ -282,9 +290,8 @@ function approveTeacherByEmail(email) {
 function teacherLogin_(data) {
   const email = normalizeValue_(data.email).toLowerCase();
   const password = normalizeValue_(data.password);
-  const sheet = getOrCreateSheet_(getRegistrationSpreadsheet_(), CONFIG.teachersSheetName, [
-    'teacher_id', 'approved_at', 'teacher_name', 'email', 'password_hash', 'status'
-  ]);
+  const sheet = getRegistrationSpreadsheet_().getSheetByName(CONFIG.teachersSheetName);
+  if (!sheet) return jsonResponse_({ ok: false, message: 'ยังไม่มีข้อมูลบัญชีครูในระบบ' });
   const rows = sheet.getDataRange().getDisplayValues();
   for (let index = 1; index < rows.length; index += 1) {
     const row = rows[index];
