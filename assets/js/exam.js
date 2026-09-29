@@ -150,24 +150,45 @@
         }
       });
 
+      const quizGroups = new Map();
       latestQuizzes.forEach((quiz) => {
-        const existingLink = Array.from(quizMenu.querySelectorAll('[data-quiz-title][data-quiz-phase]'))
-          .find((link) => normalizeTitle(link.dataset.quizTitle) === normalizeTitle(quiz.title)
-            && link.dataset.quizPhase === quiz.phase);
-        if (existingLink) {
-          existingLink.dataset.quizId = quiz.quizId;
-          return;
+        const titleKey = normalizeTitle(quiz.title);
+        if (!quizGroups.has(titleKey)) quizGroups.set(titleKey, { title: quiz.title, phases: new Map() });
+        quizGroups.get(titleKey).phases.set(quiz.phase, quiz);
+      });
+
+      quizGroups.forEach((group) => {
+        const preTest = group.phases.get('pre-test');
+        if (preTest) {
+          group.phases.set('post-test', { ...preTest, phase: 'post-test' });
         }
 
         const item = document.createElement('li');
-        item.className = 'quiz-menu-generated';
-        const link = document.createElement('a');
-        link.href = '#';
-        link.dataset.quizTitle = quiz.title;
-        link.dataset.quizPhase = quiz.phase;
-        link.dataset.quizId = quiz.quizId;
-        link.textContent = `${quiz.title} (${formatPhaseLabel(quiz.phase)})`;
-        item.appendChild(link);
+        item.className = 'dropdown quiz-menu-generated';
+        const titleLink = document.createElement('a');
+        titleLink.href = '#';
+        const titleText = document.createElement('span');
+        titleText.textContent = group.title;
+        const toggleIcon = document.createElement('i');
+        toggleIcon.className = 'bi bi-chevron-down toggle-dropdown';
+        titleLink.append(titleText, document.createTextNode(' '), toggleIcon);
+        item.appendChild(titleLink);
+
+        const phaseMenu = document.createElement('ul');
+        ['pre-test', 'post-test', 'score', 'midterm', 'final'].forEach((phase) => {
+          const quiz = group.phases.get(phase);
+          if (!quiz) return;
+          const phaseItem = document.createElement('li');
+          const phaseLink = document.createElement('a');
+          phaseLink.href = '#';
+          phaseLink.dataset.quizTitle = group.title;
+          phaseLink.dataset.quizPhase = phase;
+          phaseLink.dataset.quizId = quiz.quizId;
+          phaseLink.textContent = formatPhaseLabel(phase);
+          phaseItem.appendChild(phaseLink);
+          phaseMenu.appendChild(phaseItem);
+        });
+        item.appendChild(phaseMenu);
         quizMenu.appendChild(item);
       });
     } catch (error) {
@@ -466,6 +487,15 @@
     modal.classList.remove('d-none');
     document.body.classList.add('registration-modal-open');
     studentIdInput.focus();
+  });
+  quizMenu?.addEventListener('click', (event) => {
+    const toggle = event.target.closest('.quiz-menu-generated .toggle-dropdown');
+    if (!toggle) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const item = toggle.closest('li.dropdown');
+    item?.classList.toggle('active');
+    item?.querySelector(':scope > ul')?.classList.toggle('dropdown-active');
   });
   window.addEventListener('quiz-list-updated', refreshQuizMenu);
   refreshQuizMenu();
