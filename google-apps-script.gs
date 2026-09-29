@@ -1123,11 +1123,16 @@ function submitTacticalScores_(data) {
 
   const sheet = getTacticalScoreSheet_();
   const lastSheetRow = sheet.getLastRow();
-  const recordedIds = new Set();
+  const studentRows = new Map();
   if (lastSheetRow > 1) {
-    sheet.getRange(2, 1, lastSheetRow - 1, 1).getDisplayValues().forEach((row) => {
-      const recordedId = normalizeValue_(row[0]);
-      if (recordedId) recordedIds.add(recordedId);
+    sheet.getRange(2, 1, lastSheetRow - 1, 29).getDisplayValues().forEach((row, index) => {
+      const existingId = normalizeValue_(row[0]);
+      if (existingId) {
+        studentRows.set(existingId, {
+          rowNumber: index + 2,
+          hasScores: row.slice(3).some((value) => normalizeValue_(value) !== '')
+        });
+      }
     });
   }
 
@@ -1138,7 +1143,8 @@ function submitTacticalScores_(data) {
     if (!/^\d{4}$/.test(lookupId) || seenIds.has(lookupId)) {
       return jsonResponse_({ ok: false, message: 'เลขที่ต้องเป็นตัวเลข 4 หลักและห้ามซ้ำกัน' });
     }
-    if (recordedIds.has(lookupId)) {
+    const existing = studentRows.get(lookupId);
+    if (existing && existing.hasScores) {
       return jsonResponse_({ ok: false, message: 'เลขที่ ' + lookupId + ' มีบันทึกคะแนนแล้ว ไม่สามารถบันทึกซ้ำได้' });
     }
     seenIds.add(lookupId);
@@ -1167,7 +1173,11 @@ function submitTacticalScores_(data) {
       return jsonResponse_({ ok: false, message: 'คะแนนรวมของเลขที่ ' + lookupId + ' ต้องไม่เกิน 200 คะแนน' });
     }
 
-    rows.push([lookupId, student.columns[1].value, student.columns[2].value].concat(scores, [total]));
+    rows.push({
+      lookupId: lookupId,
+      existingRow: existing ? existing.rowNumber : null,
+      values: [lookupId, student.columns[1].value, student.columns[2].value].concat(scores, [total])
+    });
   }
 
   let lastDataRow = 1;
@@ -1180,9 +1190,16 @@ function submitTacticalScores_(data) {
       }
     }
   }
-  const firstRow = lastDataRow + 1;
-  sheet.getRange(firstRow, 1, rows.length, 1).setNumberFormat('@');
-  sheet.getRange(firstRow, 1, rows.length, 29).setValues(rows);
+  let nextRow = lastDataRow + 1;
+  rows.forEach((entry) => {
+    if (entry.existingRow) {
+      sheet.getRange(entry.existingRow, 4, 1, 26).setValues([entry.values.slice(3)]);
+      return;
+    }
+    sheet.getRange(nextRow, 1, 1, 1).setNumberFormat('@');
+    sheet.getRange(nextRow, 1, 1, 29).setValues([entry.values]);
+    nextRow += 1;
+  });
   return jsonResponse_({ ok: true, saved: rows.length, message: 'บันทึกคะแนนเรียบร้อยแล้ว' });
 }
 
