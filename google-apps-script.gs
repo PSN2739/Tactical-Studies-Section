@@ -1121,12 +1121,25 @@ function submitTacticalScores_(data) {
     return jsonResponse_({ ok: false, message: 'กรุณากรอกข้อมูลตั้งแต่ 1 ถึง 12 คน' });
   }
 
+  const sheet = getTacticalScoreSheet_();
+  const lastSheetRow = sheet.getLastRow();
+  const recordedIds = new Set();
+  if (lastSheetRow > 1) {
+    sheet.getRange(2, 1, lastSheetRow - 1, 1).getDisplayValues().forEach((row) => {
+      const recordedId = normalizeValue_(row[0]);
+      if (recordedId) recordedIds.add(recordedId);
+    });
+  }
+
   const seenIds = new Set();
   const rows = [];
   for (const entry of entries) {
     const lookupId = normalizeValue_(entry && entry.lookupId);
     if (!/^\d{4}$/.test(lookupId) || seenIds.has(lookupId)) {
       return jsonResponse_({ ok: false, message: 'เลขที่ต้องเป็นตัวเลข 4 หลักและห้ามซ้ำกัน' });
+    }
+    if (recordedIds.has(lookupId)) {
+      return jsonResponse_({ ok: false, message: 'เลขที่ ' + lookupId + ' มีบันทึกคะแนนแล้ว ไม่สามารถบันทึกซ้ำได้' });
     }
     seenIds.add(lookupId);
 
@@ -1157,8 +1170,6 @@ function submitTacticalScores_(data) {
     rows.push([lookupId, student.columns[1].value, student.columns[2].value].concat(scores, [total]));
   }
 
-  const sheet = getTacticalScoreSheet_();
-  const lastSheetRow = sheet.getLastRow();
   let lastDataRow = 1;
   if (lastSheetRow > 1) {
     const ids = sheet.getRange(2, 1, lastSheetRow - 1, 1).getDisplayValues();
