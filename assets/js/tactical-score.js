@@ -247,9 +247,7 @@
         accessCode,
         entries: JSON.stringify(entries)
       });
-      scoreForm.reset();
-      buildTable();
-      setStatus(scoreStatus, result.message || 'บันทึกคะแนนเรียบร้อยแล้ว', true);
+      closeModal();
     } catch (error) {
       const message = error.message || 'บันทึกคะแนนไม่สำเร็จ';
       if (message.includes('รหัสการใช้งาน')) {
