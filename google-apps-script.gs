@@ -95,6 +95,12 @@ function doPost(e) {
     if (formName === 'submit-quiz') {
       return submitQuiz_(data);
     }
+    if (formName === 'validate-score-code') {
+      return validateTacticalScoreCode_(data.accessCode);
+    }
+    if (formName === 'submit-tactical-scores') {
+      return submitTacticalScores_(data);
+    }
 
     if (formName === 'attendance-registration') {
       return saveAttendance_(data);
@@ -1029,6 +1035,144 @@ function lookupStudentQuizResults_(studentId) {
         { label: 'คะแนนเก็บ', value: student.score || '-', column: 'L' }]
     }
   });
+}
+
+function setupTacticalScoreSystem() {
+  const spreadsheet = getRegistrationSpreadsheet_();
+  const sheet = spreadsheet.getSheetByName('ScooreT');
+  if (!sheet) throw new Error('ไม่พบชีต ScooreT ใน Spreadsheet ที่ตั้งค่าไว้');
+  ensureSheetColumns_(sheet, 30);
+  const headers = sheet.getRange(1, 1, 1, 29).getDisplayValues()[0];
+  if (headers.every((value) => !normalizeValue_(value))) {
+    const scoreHeaders = ['เลขที่', 'ชื่อ', 'สังกัด'];
+    for (let index = 1; index <= 25; index += 1) scoreHeaders.push('คะแนน ' + index);
+    scoreHeaders.push('รวมคะแนน');
+    sheet.getRange(1, 1, 1, scoreHeaders.length).setValues([scoreHeaders]).setFontWeight('bold');
+  }
+
+  ScriptApp.getProjectTriggers()
+    .filter((trigger) => trigger.getHandlerFunction() === 'rotateTacticalScoreAccessCode')
+    .forEach((trigger) => ScriptApp.deleteTrigger(trigger));
+  ScriptApp.newTrigger('rotateTacticalScoreAccessCode').timeBased().everyDays(1).create();
+  writeNewTacticalScoreAccessCode_();
+  return 'Tactical score entry is ready.';
+}
+
+function rotateTacticalScoreAccessCode() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    writeNewTacticalScoreAccessCode_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getTacticalScoreSheet_() {
+  const sheet = getRegistrationSpreadsheet_().getSheetByName('ScooreT');
+  if (!sheet) throw new Error('ไม่พบชีต ScooreT ใน Spreadsheet ที่ตั้งค่าไว้');
+  ensureSheetColumns_(sheet, 30);
+  return sheet;
+}
+
+function writeNewTacticalScoreAccessCode_() {
+  const sheet = getTacticalScoreSheet_();
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  sheet.getRange('AD2').setNumberFormat('@').setValue(code);
+  PropertiesService.getScriptProperties().setProperty('TACTICAL_SCORE_CODE_CREATED_AT', String(Date.now()));
+  return code;
+}
+
+function getCurrentTacticalScoreAccessCode_() {
+  const properties = PropertiesService.getScriptProperties();
+  const createdAt = Number(properties.getProperty('TACTICAL_SCORE_CODE_CREATED_AT') || 0);
+  if (!createdAt || Date.now() - createdAt >= 24 * 60 * 60 * 1000) {
+    return writeNewTacticalScoreAccessCode_();
+  }
+
+  const code = normalizeValue_(getTacticalScoreSheet_().getRange('AD2').getDisplayValue());
+  if (!/^\d{6}$/.test(code)) return writeNewTacticalScoreAccessCode_();
+  return code;
+}
+
+function validateTacticalScoreCode_(submittedCode) {
+  const code = normalizeValue_(submittedCode);
+  const currentCode = getCurrentTacticalScoreAccessCode_();
+  if (!/^\d{6}$/.test(code) || code !== currentCode) {
+    return jsonResponse_({ ok: false, message: 'รหัสการใช้งานไม่ถูกต้อง กรุณาตรวจสอบรหัสแล้วลองอีกครั้ง' });
+  }
+  return jsonResponse_({ ok: true, message: 'ยืนยันรหัสเรียบร้อยแล้ว' });
+}
+
+function submitTacticalScores_(data) {
+  const submittedCode = normalizeValue_(data.accessCode);
+  const currentCode = getCurrentTacticalScoreAccessCode_();
+  if (!/^\d{6}$/.test(submittedCode) || submittedCode !== currentCode) {
+    return jsonResponse_({ ok: false, message: 'รหัสการใช้งานไม่ถูกต้องหรือหมดอายุ กรุณาเริ่มใหม่' });
+  }
+
+  let entries;
+  try {
+    entries = JSON.parse(data.entries || '[]');
+  } catch (error) {
+    entries = null;
+  }
+  if (!Array.isArray(entries) || entries.length < 1 || entries.length > 12) {
+    return jsonResponse_({ ok: false, message: 'กรุณากรอกข้อมูลตั้งแต่ 1 ถึง 12 คน' });
+  }
+
+  const seenIds = new Set();
+  const rows = [];
+  for (const entry of entries) {
+    const lookupId = normalizeValue_(entry && entry.lookupId);
+    if (!/^\d{4}$/.test(lookupId) || seenIds.has(lookupId)) {
+      return jsonResponse_({ ok: false, message: 'เลขที่ต้องเป็นตัวเลข 4 หลักและห้ามซ้ำกัน' });
+    }
+    seenIds.add(lookupId);
+
+    const student = findStudentRecord_(lookupId);
+    if (!student) return jsonResponse_({ ok: false, message: 'ไม่พบเลขที่ ' + lookupId + ' ในชีต Data' });
+    if (!Array.isArray(entry.scores) || entry.scores.length !== 25) {
+      return jsonResponse_({ ok: false, message: 'ข้อมูลคะแนนต้องมี 25 ช่องต่อคน' });
+    }
+
+    let total = 0;
+    const scores = [];
+    for (const rawScore of entry.scores) {
+      if (rawScore === '' || rawScore === null || rawScore === undefined) {
+        scores.push('');
+        continue;
+      }
+      const score = Number(rawScore);
+      if (!Number.isFinite(score) || score < 0) {
+        return jsonResponse_({ ok: false, message: 'คะแนนต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป' });
+      }
+      total += score;
+      scores.push(score);
+    }
+    if (total > 200) {
+      return jsonResponse_({ ok: false, message: 'คะแนนรวมของเลขที่ ' + lookupId + ' ต้องไม่เกิน 200 คะแนน' });
+    }
+
+    rows.push([lookupId, student.columns[1].value, student.columns[2].value].concat(scores, [total]));
+  }
+
+  const sheet = getTacticalScoreSheet_();
+  const lastSheetRow = sheet.getLastRow();
+  let lastDataRow = 1;
+  if (lastSheetRow > 1) {
+    const ids = sheet.getRange(2, 1, lastSheetRow - 1, 1).getDisplayValues();
+    for (let index = ids.length - 1; index >= 0; index -= 1) {
+      if (normalizeValue_(ids[index][0])) {
+        lastDataRow = index + 2;
+        break;
+      }
+    }
+  }
+  const firstRow = lastDataRow + 1;
+  sheet.getRange(firstRow, 1, rows.length, 1).setNumberFormat('@');
+  sheet.getRange(firstRow, 1, rows.length, 29).setValues(rows);
+  return jsonResponse_({ ok: true, saved: rows.length, message: 'บันทึกคะแนนเรียบร้อยแล้ว' });
 }
 
 function lookupStudent_(studentId) {

@@ -83,7 +83,7 @@
               <!-- <li><a href="#">เรื่อง การรบในพื้นที่สิ่งปลูกสร้าง</a></li> -->
               <!-- <li><a href="#">เรื่อง ตั้งรับ</a></li> -->
               <!-- <li><a href="#">เรื่อง ระเบียบนำหน่วย คำสั่งฯ</a></li> -->
-              <li><a href="#">เรื่อง รบด้วยวิธีรุก-ตีกลางวัน</a></li>
+              <li><a href="#tactical-score-entry" id="open-tactical-score-entry">เรื่อง รบด้วยวิธีรุก-ตีกลางวัน</a></li>
               <!-- <li><a href="#">เรื่อง ป้อมสนาม</a></li> -->
               <!-- <li><a href="#">เรื่อง ถอนตัว</a></li> -->
               <!-- <li><a href="#">เรื่อง เครื่องกีดขวาง</a></li> -->
@@ -588,6 +588,44 @@
       </div>
     </section>
 
+    <section id="tactical-score-entry" class="registration registration-modal d-none" role="dialog" aria-modal="true" aria-labelledby="tactical-score-title">
+      <div class="container">
+        <div class="section-title">
+          <h2 id="tactical-score-title">บันทึกคะแนนกิจเฉพาะ</h2>
+          <div><span>เรื่อง รบด้วยวิธีรุก-ตีกลางวัน</span></div>
+        </div>
+        <div class="registration-card">
+          <div class="registration-card-header">
+            <span class="registration-icon"><i class="bi bi-clipboard-check"></i></span>
+            <div><h3>บันทึกคะแนน</h3></div>
+          </div>
+          <form id="tactical-score-code-form" class="registration-form">
+            <div class="registration-fields">
+              <label><span>รหัสการใช้งาน 6 หลัก</span><input id="tactical-score-access-code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label>
+            </div>
+            <div class="registration-actions">
+              <button type="submit" class="registration-button">ตรวจสอบรหัส</button>
+              <button type="button" id="tactical-score-close" class="registration-button registration-button-close">ปิด</button>
+            </div>
+            <div id="tactical-score-code-status" class="exam-status error-message d-none" role="alert"></div>
+          </form>
+          <form id="tactical-score-form" class="registration-form d-none">
+            <div class="tactical-score-table-wrap">
+              <table id="tactical-score-table" class="tactical-score-table">
+                <thead></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="registration-actions">
+              <button type="submit" class="registration-button">บันทึกคะแนน</button>
+              <button type="button" id="tactical-score-entry-close" class="registration-button registration-button-close">ปิด</button>
+            </div>
+            <div id="tactical-score-status" class="exam-status error-message d-none" role="status" aria-live="polite"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
     <style>
       .score-result-data {
         margin-top: 1.5rem;
@@ -809,6 +847,7 @@
   <script src="assets/js/attendance-registration.js?v=20260918-close-fix"></script>
   <script src="assets/js/quiz-builder.js?v=20260929-dynamic-exam-menu"></script>
   <script src="assets/js/exam.js?v=20260929-posttest-80-retake"></script>
+  <script src="assets/js/tactical-score.js?v=20260930-score-entry"></script>
 
   <!-- Main JS File -->
   <script src="assets/js/main.js"></script>
