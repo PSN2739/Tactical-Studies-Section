@@ -24,8 +24,10 @@
   const phaseBox = document.getElementById('exam-phase');
   const closeButton = document.getElementById('exam-close');
   const loadingOverlay = document.getElementById('quiz-loading-overlay');
+  const quizMenu = document.getElementById('quiz-test-menu');
   let selectedTitle = '';
   let selectedPhase = '';
+  let selectedQuizId = '';
   let activeQuizId = '';
   let attemptToken = '';
   let timerId;
@@ -128,6 +130,49 @@
       'final': 'สอบปลายภาค'
     };
     return labels[String(phase || '')] || String(phase || '');
+  }
+
+  function normalizeTitle(title) {
+    return String(title || '').replace(/^เรื่อง\s*/i, '').replace(/\s+/g, '').toLowerCase();
+  }
+
+  async function refreshQuizMenu() {
+    if (!quizMenu) return;
+    try {
+      const data = await request('?action=quiz-list');
+      const quizzes = Array.isArray(data.quizzes) ? data.quizzes : [];
+      quizMenu.querySelectorAll(':scope > .quiz-menu-generated').forEach((item) => item.remove());
+
+      const latestQuizzes = new Map();
+      quizzes.forEach((quiz) => {
+        if (quiz.quizId && quiz.title && quiz.phase) {
+          latestQuizzes.set(`${normalizeTitle(quiz.title)}:${quiz.phase}`, quiz);
+        }
+      });
+
+      latestQuizzes.forEach((quiz) => {
+        const existingLink = Array.from(quizMenu.querySelectorAll('[data-quiz-title][data-quiz-phase]'))
+          .find((link) => normalizeTitle(link.dataset.quizTitle) === normalizeTitle(quiz.title)
+            && link.dataset.quizPhase === quiz.phase);
+        if (existingLink) {
+          existingLink.dataset.quizId = quiz.quizId;
+          return;
+        }
+
+        const item = document.createElement('li');
+        item.className = 'quiz-menu-generated';
+        const link = document.createElement('a');
+        link.href = '#';
+        link.dataset.quizTitle = quiz.title;
+        link.dataset.quizPhase = quiz.phase;
+        link.dataset.quizId = quiz.quizId;
+        link.textContent = `${quiz.title} (${formatPhaseLabel(quiz.phase)})`;
+        item.appendChild(link);
+        quizMenu.appendChild(item);
+      });
+    } catch (error) {
+      console.error('ไม่สามารถโหลดรายการแบบทดสอบได้', error);
+    }
   }
 
   async function findQuizId() {
@@ -334,6 +379,9 @@
       studentInfoBox.classList.add('d-none');
     }
     setError('');
+    selectedQuizId = '';
+    activeQuizId = '';
+    if (phaseSelect) phaseSelect.disabled = false;
     modal.classList.add('d-none');
     document.body.classList.remove('registration-modal-open');
   }
@@ -397,18 +445,30 @@
     if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
   }
 
-  document.querySelectorAll('[data-quiz-title][data-quiz-phase]').forEach((link) => {
-    link.addEventListener('click', (event) => {
-      event.preventDefault();
-      selectedTitle = link.dataset.quizTitle;
-      selectedPhase = link.dataset.quizPhase;
-      titleBox.textContent = selectedTitle;
-      syncPhaseSelector(selectedPhase);
-      modal.classList.remove('d-none');
-      document.body.classList.add('registration-modal-open');
-      studentIdInput.focus();
-    });
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('[data-quiz-title][data-quiz-phase]');
+    if (!link) return;
+    event.preventDefault();
+    if (document.body.classList.contains('mobile-nav-active')) {
+      document.body.classList.remove('mobile-nav-active');
+      const mobileNavToggle = document.querySelector('.mobile-nav-toggle');
+      if (mobileNavToggle) {
+        mobileNavToggle.classList.add('bi-list');
+        mobileNavToggle.classList.remove('bi-x');
+      }
+    }
+    selectedTitle = link.dataset.quizTitle;
+    selectedPhase = link.dataset.quizPhase;
+    selectedQuizId = link.dataset.quizId || '';
+    if (phaseSelect) phaseSelect.disabled = Boolean(selectedQuizId);
+    titleBox.textContent = selectedTitle;
+    syncPhaseSelector(selectedPhase);
+    modal.classList.remove('d-none');
+    document.body.classList.add('registration-modal-open');
+    studentIdInput.focus();
   });
+  window.addEventListener('quiz-list-updated', refreshQuizMenu);
+  refreshQuizMenu();
 
   if (phaseSelect) {
     phaseSelect.addEventListener('change', () => {
@@ -451,7 +511,7 @@
       const student = await loadStudentInfo(studentId);
       renderStudentInfo(student);
       resultTableBox.innerHTML = '';
-      activeQuizId = await findQuizId();
+      activeQuizId = selectedQuizId || await findQuizId();
       const data = await request(`?action=get-quiz&quizId=${encodeURIComponent(activeQuizId)}&phase=${encodeURIComponent(selectedPhase)}&studentId=${encodeURIComponent(studentId)}`);
       activeQuizId = data.quizId || activeQuizId;
       attemptToken = data.attemptToken;

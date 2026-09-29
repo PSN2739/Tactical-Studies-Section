@@ -367,6 +367,8 @@
       const passType = uploadForm.elements.passType.value;
       const passValue = Number(uploadForm.elements.passValue.value);
       const questionCount = Number(uploadForm.elements.questionCount.value || 0);
+      const quizTitle = uploadForm.elements.title.value.trim();
+      const quizPhase = uploadForm.elements.phase.value;
 
       if (!Number.isFinite(passValue) || passValue < 0) {
         throw new Error('ค่าเกณฑ์ผ่านต้องเป็นจำนวนที่ถูกต้อง');
@@ -382,7 +384,7 @@
       const questions = await getQuestions(uploadForm);
       const data = await request({ method: 'POST', body: new URLSearchParams({
         formName: 'create-quiz', token: localStorage.getItem(tokenKey) || '',
-        title: uploadForm.elements.title.value.trim(), duration: uploadForm.elements.duration.value,
+        title: quizTitle, duration: uploadForm.elements.duration.value,
         openAt: uploadForm.elements.openAt.value, closeAt: uploadForm.elements.closeAt.value,
         questionCount: uploadForm.elements.questionCount.value,
         attemptsAllowed: uploadForm.elements.attemptsAllowed.value,
@@ -393,6 +395,9 @@
         passScore: String(passValue),
         questions: JSON.stringify(questions)
       }) });
+      window.dispatchEvent(new CustomEvent('quiz-list-updated', {
+        detail: { quizId: data.quizId, title: quizTitle, phase: quizPhase }
+      }));
       uploadForm.reset();
       syncPassingControls();
       if (previewBox) {
