@@ -430,15 +430,19 @@ function getQuiz_(quizId, studentId, phase, title) {
   const rows = sheet.getDataRange().getDisplayValues().slice(1)
     .map((row, index) => ({ rowNumber: index + 2, row: row }))
     .filter((item) => item.row[7] !== 'FALSE');
-  const selected = shuffleServer_(rows).slice(0, Math.min(quiz.questionCount, rows.length));
+  const resolvedQuizId = quiz.quizId || normalizeValue_(quizId);
+  const questionOrder = requestedPhase === 'pre-test' || requestedPhase === 'post-test'
+    ? shuffleForSeed_(rows, `${resolvedQuizId}:${normalizeValue_(studentId)}:pre-post`)
+    : shuffleServer_(rows);
+  const selected = questionOrder.slice(0, Math.min(quiz.questionCount, rows.length));
   const attemptToken = Utilities.getUuid();
   CacheService.getScriptCache().put('quiz-attempt:' + attemptToken, JSON.stringify({
-    quizId: normalizeValue_(quizId), studentId: normalizeValue_(studentId), phase: requestedPhase,
+    quizId: resolvedQuizId, studentId: normalizeValue_(studentId), phase: requestedPhase,
     questionIds: selected.map((item) => item.rowNumber)
   }), Math.max(300, quiz.duration * 60 + 300));
   const passType = unlimitedUntilPass ? 'percent' : (quiz.passType || 'percent');
   const passValue = unlimitedUntilPass ? 80 : Number(quiz.passValue ?? quiz.passScore ?? 70);
-  return jsonResponse_({ ok: true, quizId: quiz.quizId || normalizeValue_(quizId), attemptToken: attemptToken, duration: quiz.duration,
+  return jsonResponse_({ ok: true, quizId: resolvedQuizId, attemptToken: attemptToken, duration: quiz.duration,
     attemptsAllowed: unlimitedUntilPass ? 0 : quiz.attemptsAllowed, attemptsUsed: quizAttemptCount, remainingAttempts: attemptsRemaining, student: student.examInfo,
     passType: passType, passValue: passValue, passScore: passValue,
     questions: selected.map((item) => ({ id: item.rowNumber, question: item.row[0], choices: item.row.slice(1, 5) })) });
@@ -806,6 +810,21 @@ function normalizeQuizTitle_(title) {
 
 function shuffleServer_(items) {
   return items.sort(() => Math.random() - 0.5);
+}
+
+function shuffleForSeed_(items, seedText) {
+  const shuffled = items.slice();
+  let seed = 2166136261;
+  for (let index = 0; index < seedText.length; index += 1) {
+    seed ^= seedText.charCodeAt(index);
+    seed = Math.imul(seed, 16777619) >>> 0;
+  }
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const swapIndex = seed % (index + 1);
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
 }
 
 function getOrCreateSheet_(spreadsheet, name, headers) {
