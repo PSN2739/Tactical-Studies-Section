@@ -417,8 +417,12 @@ function getQuiz_(quizId, studentId, phase, title) {
   const student = findRegistrationRecord_(normalizeValue_(studentId));
   if (!student) return jsonResponse_({ ok: false, message: 'ไม่พบข้อมูลผู้เข้าสอบในชีต Registration' });
   const quizAttemptCount = countQuizAttempts_(studentId, quiz.quizId || normalizeValue_(quizId), requestedPhase);
-  const attemptsRemaining = Math.max(0, Number(quiz.attemptsAllowed || 1) - quizAttemptCount);
-  if (hasQuizAttempt_(studentId, quiz.quizId || normalizeValue_(quizId), requestedPhase, quiz.attemptsAllowed)) {
+  const unlimitedUntilPass = requestedPhase === 'post-test';
+  const attemptsRemaining = unlimitedUntilPass ? -1 : Math.max(0, Number(quiz.attemptsAllowed || 1) - quizAttemptCount);
+  if (unlimitedUntilPass && hasPassedPostTest_(studentId, quiz.quizId || normalizeValue_(quizId))) {
+    return jsonResponse_({ ok: false, message: 'ท่านสอบหลังเรียนผ่านเกณฑ์ 80% แล้ว ไม่สามารถสอบซ้ำได้', remainingAttempts: 0, attemptsUsed: quizAttemptCount });
+  }
+  if (!unlimitedUntilPass && hasQuizAttempt_(studentId, quiz.quizId || normalizeValue_(quizId), requestedPhase, quiz.attemptsAllowed)) {
     return jsonResponse_({ ok: false, message: `คุณได้ใช้สิทธิ์สอบ${formatPhaseLabel_(requestedPhase)}ครบแล้ว ไม่สามารถสอบซ้ำได้`, remainingAttempts: 0, attemptsAllowed: quiz.attemptsAllowed, attemptsUsed: quizAttemptCount });
   }
   const sheet = getRegistrationSpreadsheet_().getSheetByName(quiz.sheetName);
@@ -432,9 +436,11 @@ function getQuiz_(quizId, studentId, phase, title) {
     quizId: normalizeValue_(quizId), studentId: normalizeValue_(studentId), phase: requestedPhase,
     questionIds: selected.map((item) => item.rowNumber)
   }), Math.max(300, quiz.duration * 60 + 300));
+  const passType = unlimitedUntilPass ? 'percent' : (quiz.passType || 'percent');
+  const passValue = unlimitedUntilPass ? 80 : Number(quiz.passValue ?? quiz.passScore ?? 70);
   return jsonResponse_({ ok: true, quizId: quiz.quizId || normalizeValue_(quizId), attemptToken: attemptToken, duration: quiz.duration,
-    attemptsAllowed: quiz.attemptsAllowed, attemptsUsed: quizAttemptCount, remainingAttempts: attemptsRemaining, student: student.examInfo,
-    passType: quiz.passType || 'percent', passValue: Number(quiz.passValue ?? quiz.passScore ?? 70), passScore: Number(quiz.passValue ?? quiz.passScore ?? 70),
+    attemptsAllowed: unlimitedUntilPass ? 0 : quiz.attemptsAllowed, attemptsUsed: quizAttemptCount, remainingAttempts: attemptsRemaining, student: student.examInfo,
+    passType: passType, passValue: passValue, passScore: passValue,
     questions: selected.map((item) => ({ id: item.rowNumber, question: item.row[0], choices: item.row.slice(1, 5) })) });
 }
 
@@ -452,7 +458,11 @@ function submitQuiz_(data) {
   if (!quiz || !isQuizOpen_(quiz)) return jsonResponse_({ ok: false, message: 'แบบทดสอบยังไม่เปิดหรือปิดแล้ว' });
   if (!studentId) return jsonResponse_({ ok: false, message: 'กรุณาระบุเลขประจำตัว' });
   const resultsSheet = getOrCreateQuizResultsSheet_();
-  if (hasQuizAttempt_(studentId, quizId, phase, quiz.attemptsAllowed)) {
+  const unlimitedUntilPass = phase === 'post-test';
+  if (unlimitedUntilPass && hasPassedPostTest_(studentId, quizId)) {
+    return jsonResponse_({ ok: false, message: 'ท่านสอบหลังเรียนผ่านเกณฑ์ 80% แล้ว ไม่สามารถสอบซ้ำได้' });
+  }
+  if (!unlimitedUntilPass && hasQuizAttempt_(studentId, quizId, phase, quiz.attemptsAllowed)) {
     return jsonResponse_({ ok: false, message: 'ผู้เข้าสอบใช้สิทธิ์ช่วงนี้ครบแล้ว' });
   }
   let answers;
@@ -468,17 +478,19 @@ function submitQuiz_(data) {
     if (normalizeValue_(answers[String(item.id)]).toLowerCase() === normalizeValue_(item.row[5]).toLowerCase()) score += 1;
   });
   const student = findRegistrationRecord_(studentId);
+  const resultPassType = unlimitedUntilPass ? 'percent' : (quiz.passType || 'percent');
+  const resultPassValue = unlimitedUntilPass ? 80 : Number(quiz.passValue ?? quiz.passScore ?? 70);
   const resultPayload = {
     result_id: 'R' + String(Date.now()),
     submitted_at: new Date(),
     student_id: studentId,
     quiz_id: quizId,
     phase: phase,
-    pass_type: quiz.passType || 'percent',
-    pass_value: Number(quiz.passValue ?? quiz.passScore ?? 70),
-    passed: (quiz.passType || 'percent') === 'count'
-      ? score >= Number(quiz.passValue ?? quiz.passScore ?? 70)
-      : (rows.length > 0 && (score / rows.length) * 100 >= Number(quiz.passValue ?? quiz.passScore ?? 70)),
+    pass_type: resultPassType,
+    pass_value: resultPassValue,
+    passed: resultPassType === 'count'
+      ? score >= resultPassValue
+      : (rows.length > 0 && (score / rows.length) * 100 >= resultPassValue),
     pre_score: phase === 'pre-test' ? score : '',
     post_score: phase === 'post-test' ? score : '',
     score: score,
@@ -489,13 +501,17 @@ function submitQuiz_(data) {
     email: student ? student.examInfo.email : '',
     episode: student ? student.examInfo.formName : ''
   };
+  appendQuizAttemptHistory_(resultPayload);
   appendQuizResult_(resultsSheet, resultPayload);
   CacheService.getScriptCache().remove('quiz-attempt:' + attemptToken);
   const summary = getQuizPhaseSummary_(studentId, quizId);
   return jsonResponse_({ ok: true, score: score, total: rows.length, phase: phase,
     passType: resultPayload.pass_type, passValue: resultPayload.pass_value, passScore: resultPayload.pass_value,
     passed: resultPayload.passed,
-    student: student ? student.examInfo : null, phaseSummary: summary, message: 'ส่งคำตอบเรียบร้อยแล้ว' });
+    student: student ? student.examInfo : null, phaseSummary: summary,
+    message: unlimitedUntilPass && !resultPayload.passed
+      ? 'ท่านไม่ผ่านเกณฑ์ 80% สามารถเข้าสอบใหม่ได้'
+      : 'ส่งคำตอบเรียบร้อยแล้ว' });
 }
 
 function getQuizPhaseSummary_(studentId, quizId) {
@@ -579,33 +595,63 @@ function getQuizResultHeaders_(sheet) {
 }
 
 function countQuizAttempts_(studentId, quizId, phase) {
-  const sheet = getOrCreateQuizResultsSheet_();
-  const headers = getQuizResultHeaders_(sheet);
+  return getQuizAttemptHistoryRows_(studentId, quizId, phase).length;
+}
+
+function hasPassedPostTest_(studentId, quizId) {
+  return getQuizAttemptHistoryRows_(studentId, quizId, 'post-test').some((row) => {
+    const score = Number(row.score);
+    const total = Number(row.total);
+    return total > 0 && score / total >= 0.8;
+  });
+}
+
+function getQuizAttemptHistoryRows_(studentId, quizId, phase) {
+  const sheet = getOrCreateQuizAttemptHistorySheet_();
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
   const rows = sheet.getDataRange().getDisplayValues().slice(1);
   const studentIndex = headers.indexOf('student_id');
-  const lookupIndex = headers.indexOf('เลขที่กองกัน');
+  const lookupIndex = headers.indexOf('lookup_id');
+  const quizIndex = headers.indexOf('quiz_id');
+  const phaseIndex = headers.indexOf('phase');
   const normalizedStudentId = normalizeValue_(studentId);
   const normalizedLookupId = normalizeLookupId_(studentId);
-  const phaseColumnMap = {
-    'pre-test': 'pre_score',
-    'post-test': 'post_score',
-    'score': 'score',
-    'midterm': 'score',
-    'final': 'score'
-  };
-  const targetColumn = phaseColumnMap[phase] || 'score';
-
-  let count = 0;
-  rows.forEach((row) => {
+  return rows.filter((row) => {
     const rowStudentId = normalizeValue_(row[studentIndex] || '');
     const rowLookupId = normalizeLookupId_(row[lookupIndex] || '');
-    const matchesStudent = !normalizedStudentId || rowStudentId === normalizedStudentId || rowLookupId === normalizedLookupId;
-    if (!matchesStudent) return;
-    const cellValue = normalizeValue_(row[headers.indexOf(targetColumn)] || '');
-    if (cellValue !== '') count += 1;
+    return row[quizIndex] === normalizeValue_(quizId)
+      && row[phaseIndex] === normalizePhase_(phase)
+      && (!normalizedStudentId || rowStudentId === normalizedStudentId || rowLookupId === normalizedLookupId);
   });
+}
 
-  return count;
+function getOrCreateQuizAttemptHistorySheet_() {
+  const headers = ['attempt_id', 'submitted_at', 'student_id', 'lookup_id', 'quiz_id', 'phase', 'score', 'total', 'passed'];
+  const sheet = getOrCreateSheet_(getRegistrationSpreadsheet_(), 'QuizAttemptHistory', headers);
+  if (sheet.getLastRow() === 1) {
+    const resultSheet = getOrCreateQuizResultsSheet_();
+    const resultHeaders = getQuizResultHeaders_(resultSheet);
+    const resultRows = resultSheet.getDataRange().getDisplayValues().slice(1);
+    const indexOf = (name) => resultHeaders.indexOf(name);
+    const legacyRows = resultRows.filter((row) => row[indexOf('quiz_id')] && row[indexOf('phase')])
+      .map((row) => [
+        row[indexOf('result_id')], row[indexOf('submitted_at')], row[indexOf('student_id')],
+        row[indexOf('เลขที่กองกัน')], row[indexOf('quiz_id')], row[indexOf('phase')],
+        row[indexOf('score')], row[indexOf('total')], row[indexOf('passed')]
+      ]);
+    if (legacyRows.length) sheet.getRange(2, 1, legacyRows.length, headers.length).setValues(legacyRows);
+  }
+  return sheet;
+}
+
+function appendQuizAttemptHistory_(result) {
+  const sheet = getOrCreateQuizAttemptHistorySheet_();
+  const student = findRegistrationRecord_(result.student_id || '');
+  const lookupId = student ? normalizeLookupId_(student.examInfo.lookupId) : normalizeLookupId_(result.lookup_id || '');
+  sheet.appendRow([
+    result.result_id, result.submitted_at, result.student_id, lookupId, result.quiz_id,
+    result.phase, result.score, result.total, result.passed ? 'TRUE' : 'FALSE'
+  ]);
 }
 
 function hasQuizAttempt_(studentId, quizId, phase, attemptsAllowed) {

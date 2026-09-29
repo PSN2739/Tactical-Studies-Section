@@ -16,6 +16,7 @@
   const studentInfoBox = document.getElementById('exam-student-info');
   const startActions = document.getElementById('exam-start-actions');
   const beginButton = document.getElementById('exam-begin');
+  const retryButton = document.getElementById('exam-retry');
   const nextButton = document.getElementById('exam-next');
   const submitButton = document.getElementById('exam-submit');
   const timeoutPopup = document.getElementById('exam-timeout-popup');
@@ -36,6 +37,7 @@
   let currentQuestionIndex = 0;
   let collectedAnswers = {};
   let examTimedOut = false;
+  let retryPostTestAutomatically = false;
 
   function syncPhaseSelector(phase) {
     if (!phaseSelect) return;
@@ -391,7 +393,9 @@
     currentQuestionIndex = 0;
     collectedAnswers = {};
     examTimedOut = false;
+    retryPostTestAutomatically = false;
     timeoutPopup.classList.add('d-none');
+    retryButton.classList.add('d-none');
     resultBox.textContent = '';
     resultBox.classList.remove('registration-result');
     resultTableBox.innerHTML = '';
@@ -556,8 +560,17 @@
       answerForm.dataset.passValue = data.passValue ?? data.passScore ?? 70;
       answerForm.dataset.passScore = data.passScore || 70;
       startForm.classList.add('d-none');
-      startActions.classList.remove('d-none');
+      if (retryPostTestAutomatically) {
+        retryPostTestAutomatically = false;
+        beginExam();
+      } else {
+        startActions.classList.remove('d-none');
+      }
     } catch (error) {
+      if (retryPostTestAutomatically) {
+        retryPostTestAutomatically = false;
+        startForm.classList.remove('d-none');
+      }
       setError(error.message);
     } finally {
       setLoading(false);
@@ -590,12 +603,15 @@
         ? data.passed
         : (passType === 'count' ? score >= passValue : percentage >= passValue);
       const thresholdText = passType === 'count' ? `${passValue} ข้อ` : `${passValue}%`;
+      const canRetryPostTest = selectedPhase === 'post-test' && !passed;
       resultBox.innerHTML = `
         <strong>ผลคะแนน ${formatPhaseLabel(data.phase)}:</strong>
         ${score}/${total} คะแนน
         <span class="${passed ? 'success-message' : 'error-message'}">(${passed ? 'ผ่าน' : 'ไม่ผ่าน'} - เกณฑ์ ${thresholdText})</span>
+        ${canRetryPostTest ? '<p>ท่านไม่ผ่านเกณฑ์ 80% สามารถเข้าสอบใหม่ได้</p>' : ''}
       `;
       resultBox.classList.add('registration-result');
+      retryButton.classList.toggle('d-none', !canRetryPostTest);
       resultTableBox.innerHTML = '';
       answerForm.classList.add('d-none');
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -604,6 +620,17 @@
     } finally {
       setLoading(false);
     }
+  });
+
+  retryButton.addEventListener('click', () => {
+    retryPostTestAutomatically = true;
+    retryButton.classList.add('d-none');
+    resultBox.textContent = '';
+    resultBox.classList.remove('registration-result');
+    answerForm.reset();
+    startActions.classList.add('d-none');
+    startForm.classList.remove('d-none');
+    startForm.requestSubmit();
   });
 
 })();
