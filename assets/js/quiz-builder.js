@@ -147,6 +147,8 @@
       if (/^(2|ไม่ได้|no|n)$/i.test(value)) return '2';
       return value;
     }
+    const optionMatch = value.match(/^(?:ตัวเลือก|ข้อ|choice)\s*([1-4])$/i);
+    if (optionMatch) return optionMatch[1];
     if (/^[1-4]$/.test(value)) return value;
     return value;
   }
