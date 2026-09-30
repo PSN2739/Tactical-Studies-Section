@@ -1128,10 +1128,16 @@ function submitTacticalScores_(data) {
     sheet.getRange(2, 1, lastSheetRow - 1, 29).getDisplayValues().forEach((row, index) => {
       const existingId = normalizeValue_(row[0]);
       if (existingId) {
-        studentRows.set(existingId, {
-          rowNumber: index + 2,
-          hasScores: row.slice(3).some((value) => normalizeValue_(value) !== '')
-        });
+        const existing = studentRows.get(existingId);
+        const hasSavedTotal = normalizeValue_(row[28]) !== '';
+        if (existing) {
+          existing.hasSavedTotal = existing.hasSavedTotal || hasSavedTotal;
+        } else {
+          studentRows.set(existingId, {
+            rowNumber: index + 2,
+            hasSavedTotal: hasSavedTotal
+          });
+        }
       }
     });
   }
@@ -1144,7 +1150,7 @@ function submitTacticalScores_(data) {
       return jsonResponse_({ ok: false, message: 'เลขที่ต้องเป็นตัวเลข 4 หลักและห้ามซ้ำกัน' });
     }
     const existing = studentRows.get(lookupId);
-    if (existing && existing.hasScores) {
+    if (existing && existing.hasSavedTotal) {
       return jsonResponse_({ ok: false, message: 'เลขที่ ' + lookupId + ' มีบันทึกคะแนนแล้ว ไม่สามารถบันทึกซ้ำได้' });
     }
     seenIds.add(lookupId);
