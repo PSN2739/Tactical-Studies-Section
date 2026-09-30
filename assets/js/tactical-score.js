@@ -17,6 +17,7 @@
   const codeCloseButton = document.getElementById('tactical-score-close');
   const entryCloseButton = document.getElementById('tactical-score-entry-close');
   let accessCode = '';
+  let lastPromptedScores = '';
 
   function setStatus(element, message, isSuccess) {
     element.textContent = message || '';
@@ -37,6 +38,7 @@
   }
 
   function buildTable() {
+    lastPromptedScores = '';
     const headerRow = document.createElement('tr');
     ['ลำดับ', 'เลขที่', 'ชื่อ', 'สังกัด'].forEach((label) => {
       const cell = document.createElement('th');
@@ -204,7 +206,10 @@
     if (event.target.matches('[data-lookup-id]')) lookupStudent(event.target.closest('tr'));
   });
   scoreBody.addEventListener('input', (event) => {
-    if (event.target.matches('[data-score-index]')) updateRowTotal(event.target.closest('tr'));
+    if (!event.target.matches('[data-score-index]')) return;
+    const row = event.target.closest('tr');
+    updateRowTotal(row);
+    if (row === scoreBody.querySelector('tr')) confirmAndCopyFirstRowScores();
   });
 
   function confirmAndCopyFirstRowScores() {
@@ -219,12 +224,14 @@
     }
 
     const firstScores = firstInputs.map((input) => input.value);
+    const scoreSignature = JSON.stringify(firstScores);
     const remainingRows = rows.slice(1);
     const alreadyCopied = remainingRows.every((row) =>
       Array.from(row.querySelectorAll('[data-score-index]')).every((input, index) => input.value === firstScores[index])
     );
-    if (alreadyCopied) return true;
+    if (alreadyCopied || lastPromptedScores === scoreSignature) return true;
 
+    lastPromptedScores = scoreSignature;
     const shouldCopy = window.confirm('คะแนนแถวแรกกรอกถึงช่อง 24 แล้ว ต้องการคัดลอกคะแนนไปยังอีก 11 แถวหรือไม่? ช่องคะแนน 25 เว้นว่างได้');
     if (!shouldCopy) {
       closeModal();
