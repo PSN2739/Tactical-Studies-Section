@@ -217,19 +217,15 @@
     const firstRow = rows[0];
     if (!firstRow) return true;
 
-    const firstLookupId = firstRow.querySelector('[data-lookup-id]').value.trim();
     const firstInputs = Array.from(firstRow.querySelectorAll('[data-score-index]'));
-    if (!/^\d{4}$/.test(firstLookupId) || !firstInputs.slice(0, 24).every((input) => input.value !== '')) {
+    if (!firstInputs.slice(0, 24).every((input) => input.value !== '')) {
       return true;
     }
 
     const firstScores = firstInputs.map((input) => input.value);
     const targetRows = rows.slice(1).filter((row) => /^\d{4}$/.test(row.querySelector('[data-lookup-id]').value.trim()));
-    const copyRequestSignature = JSON.stringify({ scores: firstScores, lookupIds: targetRows.map((row) => row.querySelector('[data-lookup-id]').value.trim()) });
-    const alreadyCopied = targetRows.length > 0 && targetRows.every((row) =>
-      Array.from(row.querySelectorAll('[data-score-index]')).every((input, index) => input.value === firstScores[index])
-    );
-    if (alreadyCopied || lastPromptedCopyRequest === copyRequestSignature) return true;
+    const copyRequestSignature = JSON.stringify({ scores: firstScores.slice(0, 24), lookupIds: targetRows.map((row) => row.querySelector('[data-lookup-id]').value.trim()) });
+    if (lastPromptedCopyRequest === copyRequestSignature) return true;
 
     lastPromptedCopyRequest = copyRequestSignature;
     const shouldCopy = window.confirm('คะแนนแถวแรกกรอกถึงช่อง 24 แล้ว ต้องการคัดลอกคะแนนไปยังแถวที่กรอกเลขที่แล้วหรือไม่? แถวที่เลขที่ว่างจะข้าม และช่องคะแนน 25 เว้นว่างได้');
