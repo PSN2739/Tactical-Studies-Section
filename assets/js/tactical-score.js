@@ -22,16 +22,15 @@
 
   function createCopyConfirmation() {
     const overlay = document.createElement('div');
-    overlay.className = 'registration-popup d-none';
+    overlay.className = 'registration-popup tactical-score-copy-popup d-none';
     overlay.setAttribute('role', 'alertdialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'tactical-score-copy-title');
-    overlay.setAttribute('aria-describedby', 'tactical-score-copy-message');
 
     const card = document.createElement('div');
-    card.className = 'registration-popup-card';
+    card.className = 'registration-popup-card tactical-score-copy-card';
     const icon = document.createElement('span');
-    icon.className = 'registration-popup-icon';
+    icon.className = 'registration-popup-icon tactical-score-copy-icon';
     icon.setAttribute('aria-hidden', 'true');
     const iconGlyph = document.createElement('i');
     iconGlyph.className = 'bi bi-clipboard-check';
@@ -39,14 +38,10 @@
 
     const title = document.createElement('h3');
     title.id = 'tactical-score-copy-title';
-    title.textContent = 'คัดลอกคะแนน';
-    const message = document.createElement('p');
-    message.id = 'tactical-score-copy-message';
-    message.textContent = 'ต้องการคัดลอกคะแนนแถวแรกไปยังแถวที่กรอกเลขที่ครบ 4 หลักหรือไม่? แถวที่เลขที่ว่างจะข้าม และคะแนน 25 จะกรอกภายหลังก็ได้';
+    title.textContent = 'คัดลอกคะแนนไปยังแถวอื่นหรือไม่?';
 
     const actions = document.createElement('div');
-    actions.className = 'registration-actions';
-    actions.style.justifyContent = 'center';
+    actions.className = 'tactical-score-copy-actions';
     const yesButton = document.createElement('button');
     yesButton.type = 'button';
     yesButton.className = 'registration-button';
@@ -56,7 +51,7 @@
     noButton.className = 'registration-button registration-button-close';
     noButton.textContent = 'ไม่ใช่';
     actions.append(yesButton, noButton);
-    card.append(icon, title, message, actions);
+    card.append(icon, title, actions);
     overlay.appendChild(card);
     document.body.appendChild(overlay);
 

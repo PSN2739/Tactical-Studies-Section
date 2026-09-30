@@ -400,12 +400,53 @@ body.teaching-management-open { overflow: hidden; }
   font-size: 25px;
   line-height: 1;
 }
+.tactical-score-copy-popup {
+  z-index: 10000;
+  padding: 24px;
+  background: rgba(13, 30, 24, 0.52);
+  backdrop-filter: blur(6px);
+}
+.tactical-score-copy-card {
+  width: min(420px, 100%);
+  padding: 32px 30px 28px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 20px;
+  box-shadow: 0 24px 72px rgba(10, 28, 22, 0.28);
+}
+.tactical-score-copy-icon {
+  width: 58px;
+  height: 58px;
+  margin-bottom: 16px;
+  font-size: 28px;
+}
+.tactical-score-copy-card h3 {
+  margin-bottom: 10px;
+  font-size: 22px;
+}
+.tactical-score-copy-card p {
+  margin-bottom: 0;
+  line-height: 1.75;
+}
+.tactical-score-copy-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 26px;
+}
+.tactical-score-copy-actions .registration-button {
+  min-width: 104px;
+  border-radius: 12px;
+}
 @keyframes registration-popup-in {
   from { opacity: 0; transform: translateY(8px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .registration-form .error-message { color: #b42318; }
 .registration-form .sent-message { color: #087443; }
+@media (max-width: 480px) {
+  .tactical-score-copy-card { padding: 28px 22px 24px; }
+  .tactical-score-copy-actions .registration-button { min-width: 0; flex: 1; }
+}
 .quiz-login-form { margin-top: 32px; padding-top: 28px; border-top: 1px solid color-mix(in srgb, var(--default-color), transparent 85%); }
 .quiz-login-complete h4, .quiz-login-complete .registration-fields, .quiz-login-complete > .registration-actions button[type="submit"], .quiz-login-complete > .quiz-status { display: none; }
 .quiz-source { display: grid; gap: 8px; margin-top: 20px; color: var(--heading-color); font-weight: 600; }
