@@ -101,7 +101,7 @@
               <li><a href="#">ผลคะแนนรายวิชา(เรื่อง)</a>
               </li>
                <li><a href="#score-results" id="open-score-results">ผลสอบก่อนเรียน-หลังเรียน-คะแนนเก็บ</a></li>
-                <li><a href="#">ผลคะแนนเกรดเฉลี่ย</a></li>
+                <li><a href="#teaching-management" id="open-teaching-management" aria-haspopup="dialog" aria-controls="teaching-management" aria-expanded="false">ข้อมูลการจัดการเรียนการสอน</a></li>
               </ul>
               
               
@@ -588,6 +588,108 @@
       </div>
     </section>
 
+    <section id="teaching-management" class="teaching-management-shell d-none" role="dialog" aria-modal="true" aria-labelledby="teaching-login-title">
+      <div id="teaching-login-view" class="teaching-login-view">
+        <aside class="teaching-login-brand">
+          <img src="assets/img/logo.png" alt="ตราสัญลักษณ์ Tactical Studies Section">
+          <p class="teaching-management-kicker">TACTICAL STUDIES SECTION</p>
+          <h1>ข้อมูลการจัดการเรียนการสอน</h1>
+          <p>ระบบข้อมูลสำหรับครูและผู้ดูแลการเรียนการสอน</p>
+        </aside>
+        <div class="teaching-login-content">
+          <button type="button" id="teaching-login-home" class="teaching-back-button"><i class="bi bi-arrow-left" aria-hidden="true"></i> กลับหน้าเว็บไซต์</button>
+          <form id="teaching-login-form" class="teaching-login-form">
+            <span class="teaching-login-form-icon" aria-hidden="true"><i class="bi bi-person-lock"></i></span>
+            <p class="teaching-management-kicker">สำหรับผู้ใช้งานที่ได้รับอนุมัติ</p>
+            <h2 id="teaching-login-title">เข้าสู่ระบบ</h2>
+            <label for="teaching-login-email">อีเมล</label>
+            <input id="teaching-login-email" name="email" type="email" autocomplete="username" required>
+            <label for="teaching-login-password">รหัสผ่าน</label>
+            <input id="teaching-login-password" name="password" type="password" autocomplete="current-password" required>
+            <div id="teaching-login-status" class="teaching-login-status d-none" role="alert"></div>
+            <button id="teaching-login-submit" type="submit" class="teaching-login-submit">เข้าสู่ระบบ</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="teaching-app-view" class="teaching-app-view d-none">
+        <aside class="teaching-sidebar" aria-label="เมนูระบบ">
+          <a class="teaching-sidebar-brand" href="#teaching-management" aria-label="ข้อมูลการจัดการเรียนการสอน">
+            <img src="assets/img/logo.png" alt="">
+            <span><strong>Tactical Studies</strong><small>Management</small></span>
+          </a>
+          <div class="teaching-sidebar-section-label">เมนูหลัก</div>
+          <nav class="teaching-sidebar-nav">
+            <a href="#teaching-dashboard" class="teaching-sidebar-link active" aria-current="page">
+              <i class="bi bi-journal-bookmark" aria-hidden="true"></i>
+              <span>ข้อมูลการจัดการเรียนการสอน</span>
+            </a>
+          </nav>
+          <div class="teaching-sidebar-footer">
+            <div class="teaching-user-summary">
+              <span class="teaching-user-avatar" aria-hidden="true"><i class="bi bi-person"></i></span>
+              <span><strong id="teaching-user-name">ผู้ใช้งาน</strong><small>ครู/อาจารย์</small></span>
+            </div>
+            <button type="button" id="teaching-logout" class="teaching-sidebar-action"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span>ออกจากระบบ</span></button>
+            <button type="button" id="teaching-app-home" class="teaching-sidebar-action"><i class="bi bi-house" aria-hidden="true"></i><span>กลับหน้าเว็บไซต์</span></button>
+          </div>
+        </aside>
+
+        <main id="teaching-dashboard" class="teaching-dashboard-main">
+          <header class="teaching-topbar">
+            <div>
+              <span class="teaching-topbar-label">Tactical Studies Section</span>
+              <h1 id="teaching-dashboard-title">ข้อมูลการจัดการเรียนการสอน</h1>
+            </div>
+            <span id="teaching-connection-state" class="teaching-connection-state"><i aria-hidden="true"></i> ข้อมูลล่าสุด</span>
+          </header>
+          <div class="teaching-dashboard-content">
+            <section class="teaching-profile-section" aria-labelledby="teaching-profile-title">
+              <div class="teaching-section-heading">
+                <div><h2 id="teaching-profile-title">ข้อมูลส่วนที่ 1 · ข้อมูลผู้เรียน</h2><p>ข้อมูลจากชีต Attendance</p></div>
+              </div>
+              <dl class="teaching-profile-grid">
+                <div><dt>เลขประจำตัวประชาชน</dt><dd id="teaching-profile-id">—</dd></div>
+                <div><dt>เข้าเรียน / วันที่ลงทะเบียน</dt><dd id="teaching-profile-attendance">—</dd></div>
+                <div><dt>เลขที่กองพัน</dt><dd id="teaching-profile-battalion">—</dd></div>
+                <div><dt>ชื่อ-สกุล</dt><dd id="teaching-profile-name">—</dd></div>
+                <div><dt>อีเมล</dt><dd id="teaching-profile-email">—</dd></div>
+                <div><dt>ตอนที่</dt><dd id="teaching-profile-episode">—</dd></div>
+              </dl>
+            </section>
+
+            <section class="teaching-learning-section" aria-labelledby="teaching-learning-title">
+              <div class="teaching-section-heading">
+                <div><h2 id="teaching-learning-title">ข้อมูลส่วนที่ 2 · ข้อมูลการเรียน</h2><p>คะแนนตามข้อมูลที่มีในระบบ</p></div>
+              </div>
+              <div class="teaching-score-grid">
+                <article class="teaching-score-item teaching-score-attitude">
+                  <span class="teaching-score-icon" aria-hidden="true"><i class="bi bi-heart-pulse"></i></span>
+                  <div><span>คะแนนเจตคติ</span><strong id="teaching-score-attitude">ยังไม่ระบุแหล่งข้อมูล</strong></div>
+                </article>
+                <article class="teaching-score-item">
+                  <span class="teaching-score-icon" aria-hidden="true"><i class="bi bi-journal-arrow-down"></i></span>
+                  <div><span>ก่อนเรียน</span><strong id="teaching-score-pre">—</strong></div>
+                </article>
+                <article class="teaching-score-item">
+                  <span class="teaching-score-icon" aria-hidden="true"><i class="bi bi-journal-check"></i></span>
+                  <div><span>หลังเรียน</span><strong id="teaching-score-post">—</strong></div>
+                </article>
+                <article class="teaching-score-item">
+                  <span class="teaching-score-icon" aria-hidden="true"><i class="bi bi-mortarboard"></i></span>
+                  <div><span>ประเมินความรู้</span><strong id="teaching-score-knowledge">—</strong></div>
+                </article>
+                <article class="teaching-score-item">
+                  <span class="teaching-score-icon" aria-hidden="true"><i class="bi bi-clipboard-data"></i></span>
+                  <div><span>กิจเฉพาะ</span><strong id="teaching-score-special">—</strong></div>
+                </article>
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+    </section>
+
     <section id="tactical-score-entry" class="registration registration-modal d-none" role="dialog" aria-modal="true" aria-labelledby="tactical-score-title">
       <div class="container">
         <div class="section-title">
@@ -848,6 +950,7 @@
   <script src="assets/js/quiz-builder.js?v=20260929-dynamic-exam-menu"></script>
   <script src="assets/js/exam.js?v=20260929-posttest-80-retake"></script>
   <script src="assets/js/tactical-score.js?v=20260930-close-after-save"></script>
+  <script src="assets/js/teaching-management.js?v=20260930-attendance-login"></script>
 
   <!-- Main JS File -->
   <script src="assets/js/main.js"></script>
