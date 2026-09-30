@@ -50,10 +50,6 @@ function doGet(e) {
     if (String(params.action || '').toLowerCase() === 'lookup') {
       return lookupStudent_(params.lookupId || params.studentId || '');
     }
-    if (String(params.action || '').toLowerCase() === 'student-score-results') {
-      return lookupStudentQuizResults_(params.studentId || '');
-    }
-
     return jsonResponse_({
       ok: true,
       message: 'Tactical Studies Section API is running.'
@@ -996,52 +992,6 @@ function buildApprovalEmailHtml_(applicationId, teacherName, email, approvalUrl)
         </div>
       </div>
     </div>`;
-}
-
-function lookupStudentQuizResults_(studentId) {
-  const requestedId = normalizeValue_(studentId);
-  if (!/^\d{13}$/.test(requestedId)) {
-    return jsonResponse_({
-      ok: false,
-      message: 'กรุณากรอกเลขประจำตัวประชาชนให้ครบ 13 หลัก'
-    });
-  }
-
-  const sheet = getOrCreateQuizResultsSheet_();
-  const headers = getQuizResultHeaders_(sheet);
-  const rows = sheet.getDataRange().getDisplayValues();
-  const studentIndex = headers.indexOf('student_id');
-  if (studentIndex === -1) {
-    return jsonResponse_({ ok: false, message: 'ยังไม่มีข้อมูลผลสอบใน QuizResults' });
-  }
-
-  const match = rows.slice(1).reverse().find((row) => normalizeValue_(row[studentIndex]) === requestedId);
-  if (!match) {
-    return jsonResponse_({ ok: false, message: 'ไม่พบข้อมูลผลสอบของเลขประจำตัวนี้ใน QuizResults' });
-  }
-
-  const student = {
-    student_id: normalizeValue_(match[studentIndex] || ''),
-    lookup_id: normalizeValue_(match[headers.indexOf('เลขที่กองกัน')] || ''),
-    rank_name: normalizeValue_(match[headers.indexOf('ยศ-ชื่อ-สกุล')] || ''),
-    affiliation: normalizeValue_(match[headers.indexOf('สังกัด')] || ''),
-    email: normalizeValue_(match[headers.indexOf('อีเมล')] || ''),
-    episode: normalizeValue_(match[headers.indexOf('ตอนที่')] || ''),
-    pre_score: normalizeValue_(match[headers.indexOf('pre_score')] || ''),
-    post_score: normalizeValue_(match[headers.indexOf('post_score')] || ''),
-    score: normalizeValue_(match[headers.indexOf('score')] || ''),
-    total: normalizeValue_(match[headers.indexOf('total')] || '')
-  };
-
-  return jsonResponse_({
-    ok: true,
-    data: {
-      student: student,
-      summary: [{ label: 'ก่อนเรียน', value: student.pre_score || '-', column: 'D' },
-        { label: 'หลังเรียน', value: student.post_score || '-', column: 'E' },
-        { label: 'คะแนนเก็บ', value: student.score || '-', column: 'L' }]
-    }
-  });
 }
 
 function setupTacticalScoreSystem() {

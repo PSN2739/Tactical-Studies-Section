@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
   <title>Tactical Studies Section</title>
-  <meta name="description" content="แผนกวิชายุทธวิธี กองการศึกษา โรงเรียนนายสิบทหารบก - ระบบลงทะเบียน แบบทดสอบ และตรวจสอบผลคะแนน">
+  <meta name="description" content="แผนกวิชายุทธวิธี กองการศึกษา โรงเรียนนายสิบทหารบก - ระบบลงทะเบียน แบบทดสอบ และข้อมูลการเรียน">
   <meta name="keywords" content="Tactical Studies Section, โรงเรียนนายสิบทหารบก, ลงทะเบียน, แบบทดสอบ, กองการศึกษา">
 
   <!-- Favicons -->
@@ -92,16 +92,10 @@
             </ul>
           </li>
 
-          <!-- <li><a href="#team">ตรวจสอบผลคะแนน</a></li> -->
-          <li class="dropdown"><a href="#"><span>ตรวจสอบผลคะแนน</span> <i
+          <li class="dropdown"><a href="#"><span>ข้อมูลการเรียน</span> <i
                 class="bi bi-chevron-down toggle-dropdown"></i></a>
             <ul>
-              <li><a href="#">ผลคะแนนกิจเฉพาะ</a>
-              </li>             
-              <li><a href="#">ผลคะแนนรายวิชา(เรื่อง)</a>
-              </li>
-               <li><a href="#score-results" id="open-score-results">ผลสอบก่อนเรียน-หลังเรียน-คะแนนเก็บ</a></li>
-                <li><a href="#teaching-management" id="open-teaching-management" aria-haspopup="dialog" aria-controls="teaching-management" aria-expanded="false">ข้อมูลการจัดการเรียนการสอน</a></li>
+              <li><a href="#teaching-management" id="open-teaching-management" aria-haspopup="dialog" aria-controls="teaching-management" aria-expanded="false">ข้อมูลการเรียน</a></li>
               </ul>
               
               
@@ -542,7 +536,6 @@
           <div class="registration-actions">
             <button type="button" id="exam-retry" class="registration-button d-none">เข้าสอบใหม่</button>
           </div>
-          <div id="exam-result-table" class="quiz-result-table" aria-live="polite"></div>
         </div>
       </div>
     </section>
@@ -556,44 +549,12 @@
       </div>
     </div>
 
-    <section id="score-results" class="registration registration-modal d-none">
-      <div class="container">
-        <div class="section-title" data-aos="fade-up">
-          <h2>ผลสอบ</h2>
-          <div><span>ก่อนเรียน</span> <span class="description-title">หลังเรียน</span> <span class="description-title">คะแนนประเมินความรู้</span></div>
-        </div>
-        <div class="registration-card" data-aos="fade-up" data-aos-delay="100">
-          <div class="registration-card-header">
-            <span class="registration-icon"><i class="bi bi-clipboard-data"></i></span>
-            <div>
-              <h3>ค้นหาผลสอบจากเลขประจำตัวประชาชน</h3>
-            </div>
-          </div>
-
-          <form id="score-search-form" class="registration-form">
-            <div class="registration-fields">
-              <label><span>เลขประจำตัวประชาชน 13 หลัก</span><input id="score-search-student-id" type="text" inputmode="numeric" pattern="[0-9]{13}" maxlength="13" minlength="13" required></label>
-            </div>
-            <div class="registration-actions">
-              <button type="submit" class="registration-button">ค้นหา</button>
-              <button type="button" id="score-result-close" class="registration-button registration-button-close">ปิด</button>
-            </div>
-            <div id="score-search-status" class="exam-status error-message d-none" role="alert"></div>
-          </form>
-
-          <div id="score-result-data" class="score-result-data d-none" aria-live="polite">
-            <div id="score-result-table" class="score-result-table"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <section id="teaching-management" class="teaching-management-shell d-none" role="dialog" aria-modal="true" aria-labelledby="teaching-login-title">
       <div id="teaching-login-view" class="teaching-login-view">
         <aside class="teaching-login-brand">
           <img src="assets/img/logo.png" alt="ตราสัญลักษณ์ Tactical Studies Section">
           <p class="teaching-management-kicker">TACTICAL STUDIES SECTION</p>
-          <h1>ข้อมูลการจัดการเรียนการสอน</h1>
+          <h1>ข้อมูลการเรียน</h1>
           <p>ระบบข้อมูลสำหรับครูและผู้ดูแลการเรียนการสอน</p>
         </aside>
         <div class="teaching-login-content">
@@ -614,7 +575,7 @@
 
       <div id="teaching-app-view" class="teaching-app-view d-none">
         <aside class="teaching-sidebar" aria-label="เมนูระบบ">
-          <a class="teaching-sidebar-brand" href="#teaching-management" aria-label="ข้อมูลการจัดการเรียนการสอน">
+          <a class="teaching-sidebar-brand" href="#teaching-management" aria-label="ข้อมูลการเรียน">
             <img src="assets/img/logo.png" alt="">
             <span><strong>Tactical Studies</strong><small>Management</small></span>
           </a>
@@ -622,7 +583,7 @@
           <nav class="teaching-sidebar-nav">
             <a href="#teaching-dashboard" class="teaching-sidebar-link active" aria-current="page">
               <i class="bi bi-journal-bookmark" aria-hidden="true"></i>
-              <span>ข้อมูลการจัดการเรียนการสอน</span>
+              <span>ข้อมูลการเรียน</span>
             </a>
           </nav>
           <div class="teaching-sidebar-footer">
@@ -639,7 +600,7 @@
           <header class="teaching-topbar">
             <div>
               <span class="teaching-topbar-label">Tactical Studies Section</span>
-              <h1 id="teaching-dashboard-title">ข้อมูลการจัดการเรียนการสอน</h1>
+              <h1 id="teaching-dashboard-title">ข้อมูลการเรียน</h1>
             </div>
             <span id="teaching-connection-state" class="teaching-connection-state"><i aria-hidden="true"></i> ข้อมูลล่าสุด</span>
           </header>

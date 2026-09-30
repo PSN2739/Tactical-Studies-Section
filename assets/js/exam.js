@@ -12,7 +12,6 @@
   const questionsBox = document.getElementById('exam-questions');
   const timerBox = document.getElementById('exam-timer');
   const resultBox = document.getElementById('exam-result');
-  const resultTableBox = document.getElementById('exam-result-table');
   const studentInfoBox = document.getElementById('exam-student-info');
   const startActions = document.getElementById('exam-start-actions');
   const beginButton = document.getElementById('exam-begin');
@@ -45,58 +44,6 @@
     phaseSelect.value = resolved;
     selectedPhase = resolved;
     phaseBox.textContent = formatPhaseLabel(selectedPhase);
-  }
-
-  function renderPhaseSummaryTable(summary) {
-    if (!resultTableBox) return;
-    const rows = [
-      { key: 'pre-test', label: 'ก่อนเรียน' },
-      { key: 'post-test', label: 'หลังเรียน' },
-      { key: 'score', label: 'สอบเก็บคะแนน' },
-      { key: 'midterm', label: 'สอบกลางภาค' },
-      { key: 'final', label: 'สอบปลายภาค' }
-    ];
-    const values = summary && typeof summary === 'object' ? summary : {};
-    const hasRealData = rows.some((row) => {
-      const item = values[row.key] || {};
-      return !!(item.score !== undefined && item.score !== '-' && item.score !== ''
-        || item.total !== undefined && item.total !== '-' && item.total !== '');
-    });
-
-    if (!hasRealData) {
-      resultTableBox.innerHTML = '';
-      return;
-    }
-
-    const cells = rows
-      .filter((row) => {
-        const item = values[row.key] || {};
-        return !!(item.score !== undefined && item.score !== '-' && item.score !== ''
-          || item.total !== undefined && item.total !== '-' && item.total !== '');
-      })
-      .map((row) => {
-        const item = values[row.key] || {};
-        const score = item.score ?? '-';
-        const total = item.total ?? '-';
-        return `
-          <tr>
-            <td>${row.label}</td>
-            <td>${score}</td>
-            <td>${total}</td>
-          </tr>`;
-      }).join('');
-
-    resultTableBox.innerHTML = `
-      <table class="quiz-result-summary-table">
-        <thead>
-          <tr>
-            <th>ช่วงสอบ</th>
-            <th>คะแนน</th>
-            <th>เต็ม</th>
-          </tr>
-        </thead>
-        <tbody>${cells}</tbody>
-      </table>`;
   }
 
   function setLoading(isLoading) {
@@ -257,131 +204,6 @@
     studentInfoBox.classList.remove('d-none');
   }
 
-  const scoreLookupModal = document.getElementById('score-results');
-  const scoreLookupOpen = document.getElementById('open-score-results');
-  const scoreLookupForm = document.getElementById('score-search-form');
-  const scoreLookupInput = document.getElementById('score-search-student-id');
-  const scoreLookupStatus = document.getElementById('score-search-status');
-  const scoreLookupData = document.getElementById('score-result-data');
-  const scoreLookupTable = document.getElementById('score-result-table');
-  const scoreLookupClose = document.getElementById('score-result-close');
-
-  function closeScoreLookup() {
-    if (!scoreLookupModal) return;
-    scoreLookupModal.classList.add('d-none');
-    document.body.classList.remove('registration-modal-open');
-    if (scoreLookupForm) scoreLookupForm.reset();
-    if (scoreLookupStatus) {
-      scoreLookupStatus.textContent = '';
-      scoreLookupStatus.classList.add('d-none');
-    }
-    if (scoreLookupData) scoreLookupData.classList.add('d-none');
-    if (scoreLookupTable) scoreLookupTable.innerHTML = '';
-  }
-
-  function renderScoreLookupRow(data) {
-    if (!scoreLookupTable || !data || !data.student) return;
-    const student = data.student;
-    const rows = [
-      { label: 'เลขที่กองกัน', value: student.lookup_id || '-' },
-      { label: 'ยศ-ชื่อ-สกุล', value: student.rank_name || '-' },
-      { label: 'สังกัด', value: student.affiliation || '-' },
-      { label: 'อีเมล', value: student.email || '-' },
-      { label: 'ตอนที่', value: student.episode || '-' }
-    ];
-
-    const scoreRows = [
-      { label: 'ก่อนเรียน', value: student.pre_score || '-' },
-      { label: 'หลังเรียน', value: student.post_score || '-' },
-      { label: 'คะแนนเก็บ', value: student.score || '-' }
-    ];
-
-    scoreLookupTable.innerHTML = `
-      <div class="score-lookup-summary">
-        ${rows.map((row) => `<div class="score-lookup-row"><span>${row.label}</span><strong>${escapeHtml(row.value)}</strong></div>`).join('')}
-      </div>
-      <table class="quiz-result-summary-table">
-        <thead>
-          <tr>
-            <th>ช่วงสอบ</th>
-            <th>คะแนน</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${scoreRows.map((row) => `
-            <tr>
-              <td>${row.label}</td>
-              <td>${escapeHtml(row.value)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
-    if (scoreLookupData) scoreLookupData.classList.remove('d-none');
-  }
-
-  if (scoreLookupOpen) {
-    scoreLookupOpen.addEventListener('click', (event) => {
-      event.preventDefault();
-      if (scoreLookupModal) {
-        scoreLookupModal.classList.remove('d-none');
-        document.body.classList.add('registration-modal-open');
-      }
-      if (scoreLookupInput) scoreLookupInput.focus();
-    });
-  }
-
-  if (scoreLookupClose) {
-    scoreLookupClose.addEventListener('click', closeScoreLookup);
-  }
-
-  if (scoreLookupModal) {
-    scoreLookupModal.addEventListener('click', (event) => {
-      if (event.target === scoreLookupModal) closeScoreLookup();
-    });
-  }
-
-  if (scoreLookupForm) {
-    scoreLookupForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const studentId = (scoreLookupInput ? scoreLookupInput.value.trim() : '');
-      if (!studentId) {
-        if (scoreLookupStatus) {
-          scoreLookupStatus.textContent = 'กรุณากรอกเลขประจำตัวประชาชน';
-          scoreLookupStatus.classList.remove('d-none');
-        }
-        return;
-      }
-      try {
-        setLoading(true);
-        if (scoreLookupStatus) {
-          scoreLookupStatus.textContent = 'กำลังค้นหาผลสอบ...';
-          scoreLookupStatus.classList.remove('d-none');
-        }
-        const data = await request(`?action=student-score-results&studentId=${encodeURIComponent(studentId)}`);
-        if (!data || !data.ok || !data.data || !data.data.student) {
-          throw new Error(data && data.message ? data.message : 'ไม่พบข้อมูลผลสอบ');
-        }
-        renderScoreLookupRow(data.data);
-        if (scoreLookupStatus) {
-          scoreLookupStatus.textContent = 'ค้นหาข้อมูลสำเร็จ';
-          scoreLookupStatus.classList.remove('d-none');
-          scoreLookupStatus.classList.add('success-message');
-        }
-      } catch (error) {
-        if (scoreLookupStatus) {
-          scoreLookupStatus.textContent = error.message || 'ไม่พบข้อมูล';
-          scoreLookupStatus.classList.remove('d-none');
-          scoreLookupStatus.classList.remove('success-message');
-        }
-        if (scoreLookupTable) scoreLookupTable.innerHTML = '';
-        if (scoreLookupData) scoreLookupData.classList.add('d-none');
-      } finally {
-        setLoading(false);
-      }
-    });
-  }
-
   function closeExam() {
     clearInterval(timerId);
     startForm.reset();
@@ -398,7 +220,6 @@
     retryButton.classList.add('d-none');
     resultBox.textContent = '';
     resultBox.classList.remove('registration-result');
-    resultTableBox.innerHTML = '';
     if (studentInfoBox) {
       studentInfoBox.innerHTML = '';
       studentInfoBox.classList.add('d-none');
@@ -544,7 +365,6 @@
       setError('');
       const student = await loadStudentInfo(studentId);
       renderStudentInfo(student);
-      resultTableBox.innerHTML = '';
       activeQuizId = selectedQuizId || await findQuizId();
       const data = await request(`?action=get-quiz&quizId=${encodeURIComponent(activeQuizId)}&phase=${encodeURIComponent(selectedPhase)}&studentId=${encodeURIComponent(studentId)}`);
       activeQuizId = data.quizId || activeQuizId;
@@ -612,7 +432,6 @@
       `;
       resultBox.classList.add('registration-result');
       retryButton.classList.toggle('d-none', !canRetryPostTest);
-      resultTableBox.innerHTML = '';
       answerForm.classList.add('d-none');
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     } catch (error) {
