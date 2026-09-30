@@ -207,8 +207,42 @@
     if (event.target.matches('[data-score-index]')) updateRowTotal(event.target.closest('tr'));
   });
 
+  function confirmAndCopyFirstRowScores() {
+    const rows = Array.from(scoreBody.querySelectorAll('tr'));
+    const firstRow = rows[0];
+    if (!firstRow) return true;
+
+    const firstLookupId = firstRow.querySelector('[data-lookup-id]').value.trim();
+    const firstInputs = Array.from(firstRow.querySelectorAll('[data-score-index]'));
+    if (!/^\d{4}$/.test(firstLookupId) || !firstInputs.slice(0, 24).every((input) => input.value !== '')) {
+      return true;
+    }
+
+    const firstScores = firstInputs.map((input) => input.value);
+    const remainingRows = rows.slice(1);
+    const alreadyCopied = remainingRows.every((row) =>
+      Array.from(row.querySelectorAll('[data-score-index]')).every((input, index) => input.value === firstScores[index])
+    );
+    if (alreadyCopied) return true;
+
+    const shouldCopy = window.confirm('คะแนนแถวแรกกรอกถึงช่อง 24 แล้ว ต้องการคัดลอกคะแนนไปยังอีก 11 แถวหรือไม่? ช่องคะแนน 25 เว้นว่างได้');
+    if (!shouldCopy) {
+      closeModal();
+      return false;
+    }
+
+    remainingRows.forEach((row) => {
+      const scoreInputs = Array.from(row.querySelectorAll('[data-score-index]'));
+      scoreInputs.forEach((input, index) => { input.value = firstScores[index]; });
+      updateRowTotal(row);
+    });
+    return true;
+  }
+
   scoreForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (!confirmAndCopyFirstRowScores()) return;
+
     const entries = [];
     const seenIds = new Set();
     for (const row of scoreBody.querySelectorAll('tr')) {
