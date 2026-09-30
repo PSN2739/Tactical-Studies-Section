@@ -18,6 +18,82 @@
   const entryCloseButton = document.getElementById('tactical-score-entry-close');
   let accessCode = '';
   let lastPromptedCopyRequest = '';
+  let pendingCopy = null;
+
+  function createCopyConfirmation() {
+    const overlay = document.createElement('div');
+    overlay.className = 'registration-popup d-none';
+    overlay.setAttribute('role', 'alertdialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'tactical-score-copy-title');
+    overlay.setAttribute('aria-describedby', 'tactical-score-copy-message');
+
+    const card = document.createElement('div');
+    card.className = 'registration-popup-card';
+    const icon = document.createElement('span');
+    icon.className = 'registration-popup-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    const iconGlyph = document.createElement('i');
+    iconGlyph.className = 'bi bi-clipboard-check';
+    icon.appendChild(iconGlyph);
+
+    const title = document.createElement('h3');
+    title.id = 'tactical-score-copy-title';
+    title.textContent = 'คัดลอกคะแนน';
+    const message = document.createElement('p');
+    message.id = 'tactical-score-copy-message';
+    message.textContent = 'ต้องการคัดลอกคะแนนแถวแรกไปยังแถวที่กรอกเลขที่ครบ 4 หลักหรือไม่? แถวที่เลขที่ว่างจะข้าม และคะแนน 25 จะกรอกภายหลังก็ได้';
+
+    const actions = document.createElement('div');
+    actions.className = 'registration-actions';
+    actions.style.justifyContent = 'center';
+    const yesButton = document.createElement('button');
+    yesButton.type = 'button';
+    yesButton.className = 'registration-button';
+    yesButton.textContent = 'ใช่';
+    const noButton = document.createElement('button');
+    noButton.type = 'button';
+    noButton.className = 'registration-button registration-button-close';
+    noButton.textContent = 'ไม่ใช่';
+    actions.append(yesButton, noButton);
+    card.append(icon, title, message, actions);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    yesButton.addEventListener('click', () => resolveCopyConfirmation(true));
+    noButton.addEventListener('click', () => resolveCopyConfirmation(false));
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) resolveCopyConfirmation(false);
+    });
+    overlay.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        resolveCopyConfirmation(false);
+      }
+    });
+    return { overlay, noButton };
+  }
+
+  const copyConfirmation = createCopyConfirmation();
+
+  function resolveCopyConfirmation(shouldCopy) {
+    const copy = pendingCopy;
+    pendingCopy = null;
+    copyConfirmation.overlay.classList.add('d-none');
+    if (!copy) return;
+    if (!shouldCopy) {
+      closeModal();
+      return;
+    }
+
+    copy.targetRows.forEach((row) => {
+      const scoreInputs = Array.from(row.querySelectorAll('[data-score-index]'));
+      scoreInputs.forEach((input, index) => { input.value = copy.firstScores[index]; });
+      updateRowTotal(row);
+    });
+    const score25Input = scoreBody.querySelector('tr [data-score-index="24"]');
+    if (score25Input && !score25Input.value) score25Input.focus();
+  }
 
   function setStatus(element, message, isSuccess) {
     element.textContent = message || '';
@@ -150,6 +226,8 @@
   }
 
   function closeModal() {
+    copyConfirmation.overlay.classList.add('d-none');
+    pendingCopy = null;
     modal.classList.add('d-none');
     document.body.classList.remove('registration-modal-open');
     codeForm.reset();
@@ -228,18 +306,10 @@
     if (lastPromptedCopyRequest === copyRequestSignature) return true;
 
     lastPromptedCopyRequest = copyRequestSignature;
-    const shouldCopy = window.confirm('คะแนนแถวแรกกรอกถึงช่อง 24 แล้ว ต้องการคัดลอกคะแนนไปยังแถวที่กรอกเลขที่แล้วหรือไม่? แถวที่เลขที่ว่างจะข้าม และช่องคะแนน 25 เว้นว่างได้');
-    if (!shouldCopy) {
-      closeModal();
-      return false;
-    }
-
-    targetRows.forEach((row) => {
-      const scoreInputs = Array.from(row.querySelectorAll('[data-score-index]'));
-      scoreInputs.forEach((input, index) => { input.value = firstScores[index]; });
-      updateRowTotal(row);
-    });
-    return true;
+    pendingCopy = { targetRows, firstScores };
+    copyConfirmation.overlay.classList.remove('d-none');
+    copyConfirmation.noButton.focus();
+    return false;
   }
 
   scoreForm.addEventListener('submit', async (event) => {
