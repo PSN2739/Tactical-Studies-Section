@@ -447,10 +447,19 @@ function getQuiz_(quizId, studentId, phase, title) {
     .map((row, index) => ({ rowNumber: index + 2, row: row }))
     .filter((item) => item.row[7] !== 'FALSE');
   const resolvedQuizId = quiz.quizId || normalizeValue_(quizId);
-  const questionOrder = requestedPhase === 'pre-test' || requestedPhase === 'post-test'
-    ? shuffleForSeed_(rows, `${resolvedQuizId}:${normalizeValue_(studentId)}:pre-post`)
-    : shuffleServer_(rows);
-  const selected = questionOrder.slice(0, Math.min(quiz.questionCount, rows.length));
+  const questionCount = Math.min(quiz.questionCount, rows.length);
+  let selected;
+  if (requestedPhase === 'pre-test' || requestedPhase === 'post-test') {
+    const stableQuestionSet = shuffleForSeed_(
+      rows,
+      `${resolvedQuizId}:${normalizeValue_(studentId)}:pre-post`
+    ).slice(0, questionCount);
+    selected = requestedPhase === 'post-test'
+      ? shuffleForSeed_(stableQuestionSet, Utilities.getUuid())
+      : stableQuestionSet;
+  } else {
+    selected = shuffleServer_(rows).slice(0, questionCount);
+  }
   const attemptToken = Utilities.getUuid();
   CacheService.getScriptCache().put('quiz-attempt:' + attemptToken, JSON.stringify({
     quizId: resolvedQuizId, studentId: normalizeValue_(studentId), phase: requestedPhase,
