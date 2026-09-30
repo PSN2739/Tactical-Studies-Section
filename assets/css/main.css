@@ -400,6 +400,45 @@ body.teaching-management-open { overflow: hidden; }
   font-size: 25px;
   line-height: 1;
 }
+.teacher-menu-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+}
+.teacher-menu-card {
+  display: grid;
+  gap: 12px;
+  width: min(420px, 100%);
+  padding: 28px;
+  border-radius: 16px;
+  background: var(--surface-color);
+  box-shadow: 0 18px 55px rgba(15, 23, 42, 0.22);
+}
+.teacher-menu-card h3 { margin: 0 0 6px; color: var(--heading-color); text-align: center; }
+.teacher-menu-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent-color), transparent 72%);
+  border-radius: 8px;
+  color: var(--heading-color);
+  background: var(--surface-color);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.teacher-menu-option:not(:disabled):hover { background: color-mix(in srgb, var(--accent-color), transparent 90%); }
+.teacher-menu-option:disabled { color: color-mix(in srgb, var(--default-color), transparent 25%); cursor: not-allowed; }
+.teacher-menu-option span { font-size: 13px; font-weight: 400; }
 .tactical-score-copy-popup {
   z-index: 10000;
   padding: 24px;

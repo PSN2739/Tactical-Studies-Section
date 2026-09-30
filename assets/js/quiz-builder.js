@@ -15,6 +15,8 @@
   const registrationPopup = document.getElementById('registration-popup');
   const registrationPopupMessage = document.getElementById('registration-popup-message');
   const registrationPopupButton = registrationPopup?.querySelector('.registration-popup-button');
+  const teacherMenuPopup = document.getElementById('teacher-menu-popup');
+  const teacherExamMenuButton = document.getElementById('teacher-exam-menu');
   const loadingOverlay = document.getElementById('quiz-loading-overlay');
   const previewBox = document.getElementById('quiz-preview-box');
   const downloadTemplateButton = document.getElementById('download-quiz-template');
@@ -57,6 +59,16 @@
     document.body.classList.remove('registration-modal-open');
   }
 
+  function showTeacherMenu() {
+    teacherMenuPopup.classList.remove('d-none');
+    teacherExamMenuButton.focus();
+  }
+
+  function enterExamManagement() {
+    teacherMenuPopup.classList.add('d-none');
+    uploadForm.classList.remove('d-none');
+  }
+
   function clearBuilderState() {
     localStorage.removeItem(tokenKey);
     setCurrentTeacherEmail('');
@@ -73,6 +85,7 @@
     setStatus(loginForm, 'error-message', '');
     setStatus(uploadForm, 'error-message', '');
     setStatus(uploadForm, 'sent-message', '');
+    teacherMenuPopup.classList.add('d-none');
     applicationForm.classList.remove('d-none');
     loginForm.classList.remove('quiz-login-complete');
     uploadForm.classList.add('d-none');
@@ -307,6 +320,7 @@
   openButton.addEventListener('click', (event) => {
     event.preventDefault();
     showModal();
+    if (localStorage.getItem(tokenKey) && uploadForm.classList.contains('d-none')) showTeacherMenu();
   });
   closeButton.addEventListener('click', () => {
     clearBuilderState();
@@ -315,6 +329,7 @@
   modal.addEventListener('click', (event) => {
     if (event.target === modal) hideModal();
   });
+  teacherExamMenuButton.addEventListener('click', enterExamManagement);
 
   applicationForm.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -353,7 +368,7 @@
       applicationForm.classList.add('d-none');
       loginForm.classList.add('quiz-login-complete');
       closeButton.classList.add('d-none');
-      uploadForm.classList.remove('d-none');
+      showTeacherMenu();
     } catch (error) {
       setStatus(loginForm, 'error-message', error.message);
     } finally {
@@ -455,7 +470,6 @@
     applicationForm.classList.add('d-none');
     loginForm.classList.add('quiz-login-complete');
     closeButton.classList.add('d-none');
-    uploadForm.classList.remove('d-none');
   }
 
   window.addEventListener('pagehide', clearBuilderState);
