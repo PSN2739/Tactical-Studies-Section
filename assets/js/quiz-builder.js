@@ -17,6 +17,7 @@
   const registrationPopupButton = registrationPopup?.querySelector('.registration-popup-button');
   const teacherMenuPopup = document.getElementById('teacher-menu-popup');
   const teacherExamMenuButton = document.getElementById('teacher-exam-menu');
+  const teacherMenuCloseButton = document.getElementById('teacher-menu-close');
   const loadingOverlay = document.getElementById('quiz-loading-overlay');
   const previewBox = document.getElementById('quiz-preview-box');
   const downloadTemplateButton = document.getElementById('download-quiz-template');
@@ -330,6 +331,10 @@
     if (event.target === modal) hideModal();
   });
   teacherExamMenuButton.addEventListener('click', enterExamManagement);
+  teacherMenuCloseButton.addEventListener('click', () => {
+    clearBuilderState();
+    hideModal();
+  });
 
   applicationForm.addEventListener('submit', async (event) => {
     event.preventDefault();
