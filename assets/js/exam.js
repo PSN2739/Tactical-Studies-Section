@@ -424,9 +424,10 @@
         : (passType === 'count' ? score >= passValue : percentage >= passValue);
       const thresholdText = passType === 'count' ? `${passValue} ข้อ` : `${passValue}%`;
       const canRetryPostTest = selectedPhase === 'post-test' && !passed;
+      const hideFailedPostTestScore = canRetryPostTest;
       resultBox.innerHTML = `
         <strong>ผลคะแนน ${formatPhaseLabel(data.phase)}:</strong>
-        ${score}/${total} คะแนน
+        ${hideFailedPostTestScore ? 'ไม่แสดงคะแนนเนื่องจากไม่ผ่านเกณฑ์' : `${score}/${total} คะแนน`}
         <span class="${passed ? 'success-message' : 'error-message'}">(${passed ? 'ผ่าน' : 'ไม่ผ่าน'} - เกณฑ์ ${thresholdText})</span>
         ${canRetryPostTest ? '<p>ท่านไม่ผ่านเกณฑ์ 80% สามารถเข้าสอบใหม่ได้</p>' : ''}
       `;

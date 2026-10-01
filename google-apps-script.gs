@@ -509,6 +509,10 @@ function submitQuiz_(data) {
   const student = findRegistrationRecord_(studentId);
   const resultPassType = unlimitedUntilPass ? 'percent' : (quiz.passType || 'percent');
   const resultPassValue = unlimitedUntilPass ? 80 : Number(quiz.passValue ?? quiz.passScore ?? 70);
+  const passed = resultPassType === 'count'
+    ? score >= resultPassValue
+    : (rows.length > 0 && (score / rows.length) * 100 >= resultPassValue);
+  const failedPostTest = phase === 'post-test' && !passed;
   const resultPayload = {
     result_id: 'R' + String(Date.now()),
     submitted_at: new Date(),
@@ -517,13 +521,11 @@ function submitQuiz_(data) {
     phase: phase,
     pass_type: resultPassType,
     pass_value: resultPassValue,
-    passed: resultPassType === 'count'
-      ? score >= resultPassValue
-      : (rows.length > 0 && (score / rows.length) * 100 >= resultPassValue),
+    passed: passed,
     pre_score: phase === 'pre-test' ? score : '',
-    post_score: phase === 'post-test' ? score : '',
-    score: score,
-    total: rows.length,
+    post_score: phase === 'post-test' && passed ? score : '',
+    score: failedPostTest ? '' : score,
+    total: failedPostTest ? '' : rows.length,
     lookup_id: student ? normalizeLookupId_(student.examInfo.lookupId) : '',
     rank_name: student ? student.examInfo.rankName : '',
     affiliation: student ? student.examInfo.affiliation : '',
@@ -534,7 +536,8 @@ function submitQuiz_(data) {
   appendQuizResult_(resultsSheet, resultPayload);
   CacheService.getScriptCache().remove('quiz-attempt:' + attemptToken);
   const summary = getQuizPhaseSummary_(studentId, quizId);
-  return jsonResponse_({ ok: true, score: score, total: rows.length, phase: phase,
+  return jsonResponse_({ ok: true, score: failedPostTest ? '' : score,
+    total: failedPostTest ? '' : rows.length, phase: phase,
     passType: resultPayload.pass_type, passValue: resultPayload.pass_value, passScore: resultPayload.pass_value,
     passed: resultPayload.passed,
     student: student ? student.examInfo : null, phaseSummary: summary,
@@ -683,6 +686,52 @@ function appendQuizAttemptHistory_(result) {
   ]);
 }
 
+function clearFailedPostTestScores() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const spreadsheet = getRegistrationSpreadsheet_();
+    const cleared = { quizResults: 0, attemptHistory: 0 };
+    const sheets = [
+      { name: 'QuizResults', resultKey: 'quizResults', scoreHeaders: ['post_score', 'score', 'total'] },
+      { name: 'QuizAttemptHistory', resultKey: 'attemptHistory', scoreHeaders: ['score', 'total'] }
+    ];
+
+    sheets.forEach((config) => {
+      const sheet = spreadsheet.getSheetByName(config.name);
+      if (!sheet || sheet.getLastRow() < 2) return;
+
+      const lastColumn = sheet.getLastColumn();
+      const rows = sheet.getRange(1, 1, sheet.getLastRow(), lastColumn).getDisplayValues();
+      const headers = rows[0].map(normalizeValue_);
+      const phaseIndex = headers.indexOf('phase');
+      const passedIndex = headers.indexOf('passed');
+      const scoreColumns = config.scoreHeaders.map((header) => headers.indexOf(header));
+      if (phaseIndex < 0 || passedIndex < 0 || scoreColumns.some((column) => column < 0)) {
+        throw new Error('โครงสร้างชีต ' + config.name + ' ไม่ถูกต้อง จึงไม่ได้ล้างข้อมูล');
+      }
+
+      rows.slice(1).forEach((row, index) => {
+        if (normalizePhase_(row[phaseIndex]) !== 'post-test'
+          || normalizeValue_(row[passedIndex]).toUpperCase() !== 'FALSE') return;
+
+        const rowNumber = index + 2;
+        let rowCleared = false;
+        scoreColumns.forEach((column) => {
+          if (normalizeValue_(row[column]) === '') return;
+          sheet.getRange(rowNumber, column + 1).clearContent();
+          rowCleared = true;
+        });
+        if (rowCleared) cleared[config.resultKey] += 1;
+      });
+    });
+
+    return cleared;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function hasQuizAttempt_(studentId, quizId, phase, attemptsAllowed) {
   return countQuizAttempts_(studentId, quizId, phase) >= Number(attemptsAllowed || 1);
 }
@@ -723,14 +772,16 @@ function appendQuizResult_(sheet, result) {
   row[headers.indexOf('pass_type')] = result.pass_type;
   row[headers.indexOf('pass_value')] = result.pass_value;
   row[headers.indexOf('passed')] = result.passed ? 'TRUE' : 'FALSE';
+  const failedPostTest = result.phase === 'post-test' && !result.passed;
   row[headers.indexOf('pre_score')] = result.pre_score !== '' && result.pre_score !== null && result.pre_score !== undefined
     ? result.pre_score
     : row[headers.indexOf('pre_score')] || '';
-  row[headers.indexOf('post_score')] = result.post_score !== '' && result.post_score !== null && result.post_score !== undefined
-    ? result.post_score
-    : row[headers.indexOf('post_score')] || '';
-  row[headers.indexOf('score')] = result.score ?? row[headers.indexOf('score')] ?? '';
-  row[headers.indexOf('total')] = result.total || row[headers.indexOf('total')] || '';
+  row[headers.indexOf('post_score')] = failedPostTest ? ''
+    : (result.post_score !== '' && result.post_score !== null && result.post_score !== undefined
+      ? result.post_score
+      : row[headers.indexOf('post_score')] || '');
+  row[headers.indexOf('score')] = failedPostTest ? '' : (result.score ?? row[headers.indexOf('score')] ?? '');
+  row[headers.indexOf('total')] = failedPostTest ? '' : (result.total || row[headers.indexOf('total')] || '');
   row[headers.indexOf('เลขที่กองกัน')] = lookupId || row[headers.indexOf('เลขที่กองกัน')] || '';
   row[headers.indexOf('ยศ-ชื่อ-สกุล')] = rankName || row[headers.indexOf('ยศ-ชื่อ-สกุล')] || '';
   row[headers.indexOf('สังกัด')] = affiliation || row[headers.indexOf('สังกัด')] || '';
@@ -1253,6 +1304,7 @@ function getTeachingScores_(spreadsheet, personalId, lookupId) {
     const studentIndex = headers.indexOf('student_id');
     const phaseIndex = headers.indexOf('phase');
     const scoreIndex = headers.indexOf('score');
+    const passedIndex = headers.indexOf('passed');
     for (let rowIndex = rows.length - 1; rowIndex > 0; rowIndex -= 1) {
       const row = rows[rowIndex];
       if (studentIndex < 0
@@ -1261,7 +1313,10 @@ function getTeachingScores_(spreadsheet, personalId, lookupId) {
       const score = scoreIndex >= 0 ? normalizeValue_(row[scoreIndex]) : '';
       if (!score) continue;
       if (phase === 'pre-test' && !scores.preTest) scores.preTest = score;
-      if (phase === 'post-test' && !scores.postTest) scores.postTest = score;
+      if (phase === 'post-test' && passedIndex >= 0
+        && normalizeValue_(row[passedIndex]).toUpperCase() === 'TRUE' && !scores.postTest) {
+        scores.postTest = score;
+      }
       if (phase === 'score' && !scores.knowledgeAssessment) scores.knowledgeAssessment = score;
     }
   }
@@ -1276,12 +1331,16 @@ function getTeachingScores_(spreadsheet, personalId, lookupId) {
     const postIndex = indexOf('post_score');
     const scoreIndex = indexOf('score');
     const phaseIndex = indexOf('phase');
+    const passedIndex = indexOf('passed');
 
     rows.slice(1).reverse().forEach((row) => {
       if (studentIndex < 0 || normalizeValue_(row[studentIndex]).replace(/^'/, '') !== normalizeValue_(personalId).replace(/^'/, '')) return;
       if (!scores.preTest && preIndex >= 0) scores.preTest = normalizeValue_(row[preIndex]);
-      if (!scores.postTest && postIndex >= 0) scores.postTest = normalizeValue_(row[postIndex]);
       const phase = phaseIndex >= 0 ? normalizePhase_(row[phaseIndex]) : '';
+      if (!scores.postTest && postIndex >= 0 && passedIndex >= 0 && phase === 'post-test'
+        && normalizeValue_(row[passedIndex]).toUpperCase() === 'TRUE') {
+        scores.postTest = normalizeValue_(row[postIndex]);
+      }
       if (!scores.knowledgeAssessment && scoreIndex >= 0 && phase === 'score') {
         scores.knowledgeAssessment = normalizeValue_(row[scoreIndex]);
       }
