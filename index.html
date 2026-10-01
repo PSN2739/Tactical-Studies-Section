@@ -319,7 +319,11 @@
             <div><h3>ระบบข้อสอบ</h3><p>คำขอสมัครครูจะรอการอนุมัติก่อนใช้งาน</p></div>
           </div>
           <div id="quiz-auth-panel">
-            <form id="teacher-application-form" class="registration-form">
+            <div id="teacher-auth-choice" class="quiz-auth-choice">
+              <button type="button" id="teacher-signup-choice" class="registration-button">สมัครใช้งาน</button>
+              <button type="button" id="teacher-login-choice" class="registration-button registration-button-secondary">ลงชื่อเข้าใช้งาน</button>
+            </div>
+            <form id="teacher-application-form" class="registration-form d-none">
               <h4>สมัครสมาชิกครู</h4>
               <div class="registration-fields">
                 <label><span>ชื่อครู</span><input name="teacherName" required></label>
@@ -327,11 +331,14 @@
                 <label><span>รหัสผ่านอย่างน้อย 8 ตัว</span><input type="password" name="password" minlength="8" required></label>
                 <label><span>ยืนยันรหัสผ่าน</span><input type="password" name="passwordConfirm" minlength="8" required></label>
               </div>
-              <div class="registration-actions"><button type="submit" class="registration-button">ส่งคำขอสมัคร</button></div>
+              <div class="registration-actions">
+                <button type="submit" class="registration-button">ส่งคำขอสมัคร</button>
+                <button type="button" class="registration-button registration-button-secondary" data-teacher-auth-back>กลับ</button>
+              </div>
               <div class="quiz-status error-message d-none" role="alert"></div>
               <div class="quiz-status sent-message d-none" role="status"></div>
             </form>
-            <form id="teacher-login-form" class="registration-form quiz-login-form">
+            <form id="teacher-login-form" class="registration-form quiz-login-form d-none">
               <h4>เข้าสู่ระบบครู</h4>
               <div class="registration-fields">
                 <label><span>อีเมล</span><input type="email" name="email" required></label>
@@ -339,10 +346,13 @@
               </div>
               <div class="registration-actions quiz-auth-actions">
                 <button type="submit" class="registration-button registration-button-secondary">เข้าสู่ระบบ</button>
-                <button type="button" id="close-quiz-builder" class="registration-button registration-button-close">ปิด</button>
+                <button type="button" class="registration-button registration-button-secondary" data-teacher-auth-back>กลับ</button>
               </div>
               <div class="quiz-status error-message d-none" role="alert"></div>
             </form>
+            <div class="registration-actions quiz-auth-close">
+              <button type="button" id="close-quiz-builder" class="registration-button registration-button-close">ปิด</button>
+            </div>
           </div>
           <form id="quiz-upload-form" class="registration-form d-none">
             <h4>อัปโหลดข้อสอบ</h4>

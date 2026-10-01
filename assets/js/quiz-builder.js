@@ -15,6 +15,9 @@
   const registrationPopup = document.getElementById('registration-popup');
   const registrationPopupMessage = document.getElementById('registration-popup-message');
   const registrationPopupButton = registrationPopup?.querySelector('.registration-popup-button');
+  const teacherAuthChoice = document.getElementById('teacher-auth-choice');
+  const teacherSignupChoice = document.getElementById('teacher-signup-choice');
+  const teacherLoginChoice = document.getElementById('teacher-login-choice');
   const teacherMenuPopup = document.getElementById('teacher-menu-popup');
   const teacherExamMenuButton = document.getElementById('teacher-exam-menu');
   const teacherInfoMenuButton = document.getElementById('teacher-info-menu');
@@ -62,6 +65,20 @@
   function hideModal() {
     modal.classList.add('d-none');
     document.body.classList.remove('registration-modal-open');
+  }
+
+  function showAuthChoice() {
+    teacherAuthChoice.classList.remove('d-none');
+    applicationForm.classList.add('d-none');
+    loginForm.classList.add('d-none');
+    closeButton.classList.remove('d-none');
+  }
+
+  function showAuthForm(form) {
+    teacherAuthChoice.classList.add('d-none');
+    applicationForm.classList.toggle('d-none', form !== applicationForm);
+    loginForm.classList.toggle('d-none', form !== loginForm);
+    form.querySelector('input')?.focus();
   }
 
   function showTeacherMenu() {
@@ -144,10 +161,9 @@
     setStatus(uploadForm, 'error-message', '');
     setStatus(uploadForm, 'sent-message', '');
     teacherMenuPopup.classList.add('d-none');
-    applicationForm.classList.remove('d-none');
+    showAuthChoice();
     loginForm.classList.remove('quiz-login-complete');
     uploadForm.classList.add('d-none');
-    closeButton.classList.remove('d-none');
   }
 
   function showQuizSuccessPopup(message) {
@@ -379,6 +395,7 @@
     event.preventDefault();
     showModal();
     if (localStorage.getItem(tokenKey) && uploadForm.classList.contains('d-none')) showTeacherMenu();
+    else showAuthChoice();
   });
   closeButton.addEventListener('click', () => {
     clearBuilderState();
@@ -386,6 +403,11 @@
   });
   modal.addEventListener('click', (event) => {
     if (event.target === modal) hideModal();
+  });
+  teacherSignupChoice.addEventListener('click', () => showAuthForm(applicationForm));
+  teacherLoginChoice.addEventListener('click', () => showAuthForm(loginForm));
+  document.querySelectorAll('[data-teacher-auth-back]').forEach((button) => {
+    button.addEventListener('click', showAuthChoice);
   });
   teacherExamMenuButton.addEventListener('click', enterExamManagement);
   teacherInfoMenuButton.addEventListener('click', () => {
@@ -420,6 +442,7 @@
       }) });
       setStatus(applicationForm, 'sent-message', data.message);
       applicationForm.reset();
+      showAuthChoice();
       hideModal();
     } catch (error) {
       setStatus(applicationForm, 'error-message', error.message);

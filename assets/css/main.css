@@ -619,7 +619,10 @@ body.teaching-management-open { overflow: hidden; }
   .tactical-score-copy-card { padding: 28px 22px 24px; }
   .tactical-score-copy-actions .registration-button { min-width: 0; flex: 1; }
 }
-.quiz-login-form { margin-top: 32px; padding-top: 28px; border-top: 1px solid color-mix(in srgb, var(--default-color), transparent 85%); }
+.quiz-auth-choice { display: flex; flex-wrap: wrap; gap: 12px; }
+.quiz-auth-choice .registration-button { min-width: 180px; }
+.quiz-auth-close { margin-top: 24px; }
+.quiz-login-form { margin-top: 0; }
 .quiz-login-complete h4, .quiz-login-complete .registration-fields, .quiz-login-complete > .registration-actions button[type="submit"], .quiz-login-complete > .quiz-status { display: none; }
 .quiz-source { display: grid; gap: 8px; margin-top: 20px; color: var(--heading-color); font-weight: 600; }
 .quiz-source textarea { width: 100%; padding: 13px 16px; border: 1px solid color-mix(in srgb, var(--default-color), transparent 75%); border-radius: 12px; color: var(--default-color); background: var(--background-color); }
