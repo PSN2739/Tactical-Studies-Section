@@ -439,6 +439,139 @@ body.teaching-management-open { overflow: hidden; }
 .teacher-menu-option:not(:disabled):hover { background: color-mix(in srgb, var(--accent-color), transparent 90%); }
 .teacher-menu-option:disabled { color: color-mix(in srgb, var(--default-color), transparent 25%); cursor: not-allowed; }
 .teacher-menu-option span { font-size: 13px; font-weight: 400; }
+.special-assessment-builder-card {
+  width: min(560px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  text-align: left;
+}
+.special-assessment-builder-card h3 { text-align: center; }
+.special-assessment-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.special-assessment-fields label { display: grid; gap: 6px; min-width: 0; }
+.special-assessment-fields label span,
+#special-assessment-code-form label span { color: var(--heading-color); font-weight: 600; }
+.special-assessment-fields input,
+.special-assessment-fields select,
+#special-assessment-code-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--default-color), transparent 72%);
+  border-radius: 8px;
+  color: var(--default-color);
+  background: var(--surface-color);
+  font: inherit;
+}
+.special-assessment-code-setting { grid-column: 1 / -1; }
+.special-assessment-entry-card {
+  width: min(1200px, 100%);
+  max-height: 92vh;
+  overflow: hidden;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+.special-assessment-entry-summary { margin: 0; color: var(--default-color); text-align: center; }
+.special-assessment-entry-card form { min-height: 0; }
+.special-assessment-table-wrap {
+  max-width: 100%;
+  max-height: 58vh;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--default-color), transparent 82%);
+  border-radius: 8px;
+}
+.special-assessment-table { width: max-content; min-width: 100%; border-collapse: collapse; }
+.special-assessment-table th,
+.special-assessment-table td {
+  padding: 7px;
+  border: 1px solid color-mix(in srgb, var(--default-color), transparent 86%);
+  text-align: center;
+  white-space: nowrap;
+}
+.special-assessment-table th { position: sticky; top: 0; z-index: 1; background: var(--surface-color); }
+.special-assessment-table input {
+  width: 82px;
+  min-height: 38px;
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, var(--default-color), transparent 75%);
+  border-radius: 6px;
+  color: var(--default-color);
+  background: var(--surface-color);
+}
+.special-assessment-table [data-lookup-id] { width: 76px; }
+.special-assessment-table .special-assessment-student-name,
+.special-assessment-table .special-assessment-student-affiliation { min-width: 130px; text-align: left; }
+.special-assessment-table .special-assessment-total { font-weight: 700; }
+.teacher-dashboard-panel {
+  display: grid;
+  gap: 18px;
+  width: min(900px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 24px;
+  border-radius: 12px;
+  background: var(--surface-color);
+  box-shadow: 0 18px 55px rgba(15, 23, 42, 0.22);
+}
+.teacher-dashboard-header,
+.teacher-dashboard-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.teacher-dashboard-header h3 { margin: 0; color: var(--heading-color); }
+.teacher-dashboard-profile {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--default-color), transparent 84%);
+}
+.teacher-dashboard-profile span:first-child { color: var(--heading-color); font-weight: 700; }
+.teacher-dashboard-profile span:last-child { color: var(--default-color); overflow-wrap: anywhere; }
+.teacher-dashboard-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 16px;
+  margin: 0;
+}
+.teacher-dashboard-summary > div {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 94px;
+  padding: 12px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--default-color), transparent 84%);
+}
+.teacher-dashboard-summary dt { color: var(--default-color); font-size: 14px; }
+.teacher-dashboard-summary dd { margin: 0; color: var(--heading-color); font-size: 26px; font-weight: 700; }
+.teacher-dashboard-assessments h4 { margin: 0 0 10px; color: var(--heading-color); font-size: 16px; }
+.teacher-dashboard-table-wrap { max-width: 100%; overflow-x: auto; }
+.teacher-dashboard-table-wrap table { width: 100%; border-collapse: collapse; }
+.teacher-dashboard-table-wrap th,
+.teacher-dashboard-table-wrap td {
+  padding: 10px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--default-color), transparent 84%);
+  text-align: left;
+}
+.teacher-dashboard-table-wrap th:last-child,
+.teacher-dashboard-table-wrap td:last-child { text-align: right; white-space: nowrap; }
+.teacher-dashboard-footer { color: color-mix(in srgb, var(--default-color), transparent 20%); font-size: 13px; }
+@media (max-width: 576px) {
+  .special-assessment-fields { grid-template-columns: minmax(0, 1fr); }
+  .special-assessment-code-setting { grid-column: auto; }
+  .special-assessment-builder-card,
+  .special-assessment-entry-card { padding: 20px 16px; }
+  .special-assessment-entry-card { display: flex; flex-direction: column; }
+  .special-assessment-table-wrap { max-height: 48vh; }
+  .teacher-dashboard-panel { gap: 14px; padding: 18px 16px; }
+  .teacher-dashboard-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+  .teacher-dashboard-summary dd { font-size: 22px; }
+  .teacher-dashboard-footer { align-items: flex-start; flex-direction: column; }
+}
 .tactical-score-copy-popup {
   z-index: 10000;
   padding: 24px;

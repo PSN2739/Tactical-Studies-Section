@@ -14,6 +14,7 @@ const CONFIG = {
   teachersSheetName: 'Teachers',
   quizIndexSheetName: 'Quizzes',
   quizSheetPrefix: 'Quiz_',
+  specialAssessmentIndexSheetName: 'SpecialAssessments',
   approvalEmail: 'nu2739@gmail.com',
   webAppUrl: 'https://script.google.com/macros/s/AKfycbylfNRFHqfE5QztOXuICj-NCqVD5U2zPfXUu16Z3-aqUm0D2u4mNEFojzk-6vKQxFQ/exec',
   lookupIdColumn: 3,
@@ -37,6 +38,9 @@ function doGet(e) {
     const params = (e && e.parameter) || {};
     if (String(params.action || '').toLowerCase() === 'quiz-list') {
       return listQuizzes_();
+    }
+    if (String(params.action || '').toLowerCase() === 'special-assessment-list') {
+      return listSpecialAssessments_();
     }
     if (String(params.action || '').toLowerCase() === 'get-quiz') {
       return getQuiz_(params.quizId || '', params.studentId || '', params.phase || 'pre-test', params.title || '');
@@ -92,6 +96,9 @@ function doPost(e) {
     if (formName === 'teacher-login') {
       return teacherLogin_(data);
     }
+    if (formName === 'teacher-dashboard') {
+      return getTeacherDashboard_(data.token);
+    }
     if (formName === 'create-quiz') {
       return createQuiz_(data);
     }
@@ -103,6 +110,15 @@ function doPost(e) {
     }
     if (formName === 'submit-tactical-scores') {
       return submitTacticalScores_(data);
+    }
+    if (formName === 'create-special-assessment') {
+      return createSpecialAssessment_(data);
+    }
+    if (formName === 'validate-special-assessment-code') {
+      return validateSpecialAssessmentCode_(data);
+    }
+    if (formName === 'submit-special-assessment') {
+      return submitSpecialAssessment_(data);
     }
 
     if (formName === 'attendance-registration') {
@@ -1155,6 +1171,255 @@ function submitTacticalScores_(data) {
     sheet.getRange(entry.existingRow, 4, 1, 26).setValues([entry.scores]);
   });
   return jsonResponse_({ ok: true, saved: rows.length, message: 'บันทึกคะแนนเรียบร้อยแล้ว' });
+}
+
+function getSpecialAssessmentHeaders_() {
+  return [
+    'assessment_id', 'created_at', 'title', 'sheet_name', 'record_count',
+    'score_count', 'max_total', 'requires_code', 'access_code', 'created_by', 'active'
+  ];
+}
+
+function getOrCreateSpecialAssessmentIndex_() {
+  return getOrCreateSheet_(
+    getRegistrationSpreadsheet_(),
+    CONFIG.specialAssessmentIndexSheetName,
+    getSpecialAssessmentHeaders_()
+  );
+}
+
+function listSpecialAssessments_() {
+  const rows = getOrCreateSpecialAssessmentIndex_().getDataRange().getDisplayValues().slice(1)
+    .filter((row) => row[10] !== 'FALSE')
+    .map((row) => ({
+      assessmentId: row[0],
+      title: row[2],
+      recordCount: Number(row[4]),
+      scoreCount: Number(row[5]),
+      maxTotal: Number(row[6]),
+      requiresCode: row[7] === 'TRUE'
+    }));
+  return jsonResponse_({ ok: true, assessments: rows });
+}
+
+function getTeacherDashboard_(token) {
+  const email = CacheService.getScriptCache().get('teacher:' + normalizeValue_(token));
+  if (!email) return jsonResponse_({ ok: false, message: 'กรุณาเข้าสู่ระบบครูใหม่' });
+
+  const spreadsheet = getRegistrationSpreadsheet_();
+  const teachersSheet = spreadsheet.getSheetByName(CONFIG.teachersSheetName);
+  const teacherRows = teachersSheet && teachersSheet.getLastRow() > 1
+    ? teachersSheet.getDataRange().getDisplayValues().slice(1)
+    : [];
+  const teacher = teacherRows.find((row) => normalizeValue_(row[3]).toLowerCase() === email.toLowerCase()
+    && normalizeValue_(row[5]).toUpperCase() === 'ACTIVE');
+  if (!teacher) return jsonResponse_({ ok: false, message: 'ไม่พบบัญชีครูที่ใช้งานอยู่ กรุณาเข้าสู่ระบบใหม่' });
+
+  const registrationSheet = spreadsheet.getSheetByName(CONFIG.registrationSheetName);
+  const registrationIds = registrationSheet && registrationSheet.getLastRow() > 1
+    ? registrationSheet.getRange(2, 1, registrationSheet.getLastRow() - 1, 1).getDisplayValues().flat()
+      .map(normalizeValue_).filter(Boolean)
+    : [];
+  const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
+  const attendanceIds = attendanceSheet && attendanceSheet.getLastRow() > 1
+    ? attendanceSheet.getRange(2, 1, attendanceSheet.getLastRow() - 1, 1).getDisplayValues().flat()
+      .map(normalizeValue_).filter(Boolean)
+    : [];
+
+  const historySheet = getOrCreateQuizAttemptHistorySheet_();
+  const historyRows = historySheet.getDataRange().getDisplayValues();
+  const historyHeaders = historyRows[0] || [];
+  const studentIndex = historyHeaders.indexOf('student_id');
+  const lookupIndex = historyHeaders.indexOf('lookup_id');
+  const phaseIndex = historyHeaders.indexOf('phase');
+  const uniqueStudentCount = (phase) => new Set(historyRows.slice(1)
+    .filter((row) => normalizePhase_(row[phaseIndex]) === phase)
+    .map((row) => normalizeValue_(row[studentIndex]) || normalizeLookupId_(row[lookupIndex]))
+    .filter(Boolean)).size;
+
+  const assessmentIndex = getOrCreateSpecialAssessmentIndex_();
+  const assessmentRows = assessmentIndex.getDataRange().getDisplayValues().slice(1)
+    .filter((row) => row[10] !== 'FALSE' && row[0] && row[3]);
+  const assessmentParticipants = new Map();
+  assessmentRows.forEach((row) => {
+    const assessmentSheet = spreadsheet.getSheetByName(row[3]);
+    const studentIds = assessmentSheet && assessmentSheet.getLastRow() > 1
+      ? assessmentSheet.getRange(2, 2, assessmentSheet.getLastRow() - 1, 1).getDisplayValues().flat()
+        .map(normalizeValue_).filter(Boolean)
+      : [];
+    assessmentParticipants.set(row[2], new Set(studentIds));
+  });
+
+  const legacyAssessmentTitle = 'รบด้วยวิธีรุก-ตีกลางวัน';
+  const legacyScoreSheet = spreadsheet.getSheetByName('ScooreT');
+  const legacyRows = legacyScoreSheet && legacyScoreSheet.getLastRow() > 1
+    ? legacyScoreSheet.getRange(2, 1, legacyScoreSheet.getLastRow() - 1, 29).getDisplayValues()
+    : [];
+  const legacyParticipants = new Set(legacyRows
+    .filter((row) => normalizeValue_(row[0]) && row.slice(3, 29).some((value) => normalizeValue_(value)))
+    .map((row) => normalizeLookupId_(row[0])));
+  const combinedLegacyParticipants = assessmentParticipants.get(legacyAssessmentTitle) || new Set();
+  legacyParticipants.forEach((studentId) => combinedLegacyParticipants.add(studentId));
+  assessmentParticipants.set(legacyAssessmentTitle, combinedLegacyParticipants);
+  const assessments = Array.from(assessmentParticipants.entries()).map(([title, studentIds]) => ({
+    title: title,
+    participantCount: studentIds.size
+  }));
+
+  return jsonResponse_({
+    ok: true,
+    teacher: { name: normalizeValue_(teacher[2]), email: email },
+    summary: {
+      departmentRegistrations: new Set(registrationIds).size,
+      attendanceRegistrations: new Set(attendanceIds).size,
+      preTestParticipants: uniqueStudentCount('pre-test'),
+      scoreTestParticipants: uniqueStudentCount('score')
+    },
+    assessments: assessments,
+    updatedAt: new Date().toISOString()
+  });
+}
+
+function findSpecialAssessment_(assessmentId) {
+  const rows = getOrCreateSpecialAssessmentIndex_().getDataRange().getDisplayValues();
+  for (let index = 1; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row[0] !== normalizeValue_(assessmentId) || row[10] === 'FALSE') continue;
+    return {
+      assessmentId: row[0],
+      title: row[2],
+      sheetName: row[3],
+      recordCount: Number(row[4]),
+      scoreCount: Number(row[5]),
+      maxTotal: Number(row[6]),
+      requiresCode: row[7] === 'TRUE',
+      accessCode: row[8]
+    };
+  }
+  return null;
+}
+
+function createSpecialAssessment_(data) {
+  const teacherEmail = CacheService.getScriptCache().get('teacher:' + normalizeValue_(data.token));
+  if (!teacherEmail) return jsonResponse_({ ok: false, message: 'กรุณาเข้าสู่ระบบครูใหม่' });
+
+  const title = normalizeValue_(data.title);
+  const recordCount = Number(data.recordCount);
+  const scoreCount = Number(data.scoreCount);
+  const maxTotal = Number(data.maxTotal);
+  const requiresCode = normalizeValue_(data.requiresCode).toLowerCase() === 'true';
+  if (!title || title.length > 100
+    || !Number.isInteger(recordCount) || recordCount < 1 || recordCount > 100
+    || !Number.isInteger(scoreCount) || scoreCount < 1 || scoreCount > 50
+    || !Number.isFinite(maxTotal) || maxTotal <= 0 || maxTotal > 100000) {
+    return jsonResponse_({ ok: false, message: 'กรุณาตรวจสอบชื่อเรื่อง จำนวนแถว จำนวนช่องคะแนน และคะแนนรวมสูงสุด' });
+  }
+
+  const indexSheet = getOrCreateSpecialAssessmentIndex_();
+  const existingTitles = indexSheet.getDataRange().getDisplayValues().slice(1)
+    .filter((row) => row[10] !== 'FALSE')
+    .map((row) => normalizeValue_(row[2]).toLowerCase());
+  if (existingTitles.includes(title.toLowerCase())) {
+    return jsonResponse_({ ok: false, message: 'มีแบบประเมินชื่อนี้อยู่แล้ว' });
+  }
+
+  const assessmentId = 'A' + String(Date.now());
+  const sheetName = 'Assessment_' + assessmentId;
+  const accessCode = requiresCode
+    ? String(Math.floor(100000 + Math.random() * 900000))
+    : '';
+  const spreadsheet = getRegistrationSpreadsheet_();
+  const sheet = spreadsheet.insertSheet(sheetName);
+  const headers = ['recorded_at', 'lookup_id', 'student_name', 'affiliation'];
+  for (let index = 1; index <= scoreCount; index += 1) headers.push('score_' + index);
+  headers.push('total');
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+  sheet.getRange(1, 2, sheet.getMaxRows(), 1).setNumberFormat('@');
+  sheet.setFrozenRows(1);
+
+  indexSheet.appendRow([
+    assessmentId, new Date(), title, sheetName, recordCount, scoreCount,
+    maxTotal, requiresCode ? 'TRUE' : 'FALSE', accessCode, teacherEmail, 'TRUE'
+  ]);
+  return jsonResponse_({
+    ok: true,
+    assessmentId: assessmentId,
+    title: title,
+    accessCode: accessCode,
+    message: 'สร้างแบบประเมินและชีตรองรับข้อมูลเรียบร้อยแล้ว'
+  });
+}
+
+function validateSpecialAssessmentCode_(data) {
+  const assessment = findSpecialAssessment_(data.assessmentId);
+  if (!assessment) return jsonResponse_({ ok: false, message: 'ไม่พบแบบประเมินนี้' });
+  if (assessment.requiresCode && normalizeValue_(data.accessCode) !== assessment.accessCode) {
+    return jsonResponse_({ ok: false, message: 'รหัสแบบประเมินไม่ถูกต้อง' });
+  }
+  return jsonResponse_({ ok: true, message: 'ยืนยันรหัสเรียบร้อยแล้ว' });
+}
+
+function submitSpecialAssessment_(data) {
+  const assessment = findSpecialAssessment_(data.assessmentId);
+  if (!assessment) return jsonResponse_({ ok: false, message: 'ไม่พบแบบประเมินนี้' });
+  if (assessment.requiresCode && normalizeValue_(data.accessCode) !== assessment.accessCode) {
+    return jsonResponse_({ ok: false, message: 'รหัสแบบประเมินไม่ถูกต้อง กรุณาเริ่มใหม่' });
+  }
+
+  let entries;
+  try {
+    entries = JSON.parse(data.entries || '[]');
+  } catch (error) {
+    entries = null;
+  }
+  if (!Array.isArray(entries) || entries.length < 1 || entries.length > assessment.recordCount) {
+    return jsonResponse_({ ok: false, message: 'จำนวนรายการที่บันทึกไม่ถูกต้อง' });
+  }
+
+  const spreadsheet = getRegistrationSpreadsheet_();
+  const sheet = spreadsheet.getSheetByName(assessment.sheetName);
+  if (!sheet) return jsonResponse_({ ok: false, message: 'ไม่พบชีตรองรับแบบประเมิน' });
+  const existingIds = sheet.getLastRow() > 1
+    ? new Set(sheet.getRange(2, 2, sheet.getLastRow() - 1, 1).getDisplayValues().flat())
+    : new Set();
+  const seenIds = new Set();
+  const rows = [];
+
+  for (const entry of entries) {
+    const lookupId = normalizeValue_(entry && entry.lookupId);
+    if (!/^\d{4}$/.test(lookupId) || seenIds.has(lookupId)) {
+      return jsonResponse_({ ok: false, message: 'เลขที่ต้องเป็นตัวเลข 4 หลักและห้ามซ้ำกัน' });
+    }
+    if (existingIds.has(lookupId)) {
+      return jsonResponse_({ ok: false, message: 'เลขที่ ' + lookupId + ' มีบันทึกในแบบประเมินนี้แล้ว' });
+    }
+    if (!Array.isArray(entry.scores) || entry.scores.length !== assessment.scoreCount) {
+      return jsonResponse_({ ok: false, message: 'จำนวนช่องคะแนนไม่ตรงกับแบบประเมิน' });
+    }
+    const student = findStudentRecord_(lookupId);
+    if (!student) return jsonResponse_({ ok: false, message: 'ไม่พบเลขที่ ' + lookupId + ' ในชีต Data' });
+
+    let total = 0;
+    const scores = entry.scores.map((rawScore) => {
+      if (rawScore === '' || rawScore === null || rawScore === undefined) return '';
+      const score = Number(rawScore);
+      if (!Number.isFinite(score) || score < 0) throw new Error('คะแนนต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป');
+      total += score;
+      return score;
+    });
+    if (total > assessment.maxTotal) {
+      return jsonResponse_({ ok: false, message: 'คะแนนรวมของเลขที่ ' + lookupId + ' ต้องไม่เกิน ' + assessment.maxTotal });
+    }
+
+    seenIds.add(lookupId);
+    rows.push([
+      new Date(), lookupId, student.columns[1].value, student.columns[2].value,
+      ...scores, total
+    ]);
+  }
+
+  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+  return jsonResponse_({ ok: true, saved: rows.length, message: 'บันทึกผลแบบประเมินเรียบร้อยแล้ว' });
 }
 
 function lookupStudent_(studentId) {

@@ -17,7 +17,11 @@
   const registrationPopupButton = registrationPopup?.querySelector('.registration-popup-button');
   const teacherMenuPopup = document.getElementById('teacher-menu-popup');
   const teacherExamMenuButton = document.getElementById('teacher-exam-menu');
+  const teacherInfoMenuButton = document.getElementById('teacher-info-menu');
   const teacherMenuCloseButton = document.getElementById('teacher-menu-close');
+  const teacherDashboardPopup = document.getElementById('teacher-dashboard-popup');
+  const teacherDashboardStatus = document.getElementById('teacher-dashboard-status');
+  const teacherDashboardAssessmentRows = document.getElementById('teacher-dashboard-assessment-rows');
   const loadingOverlay = document.getElementById('quiz-loading-overlay');
   const previewBox = document.getElementById('quiz-preview-box');
   const downloadTemplateButton = document.getElementById('download-quiz-template');
@@ -68,6 +72,59 @@
   function enterExamManagement() {
     teacherMenuPopup.classList.add('d-none');
     uploadForm.classList.remove('d-none');
+  }
+
+  function renderTeacherDashboard(data) {
+    document.getElementById('teacher-dashboard-name').textContent = data.teacher.name || 'ครู/อาจารย์';
+    document.getElementById('teacher-dashboard-email').textContent = data.teacher.email || '';
+    document.getElementById('teacher-dashboard-registration-count').textContent = Number(data.summary.departmentRegistrations || 0).toLocaleString('th-TH');
+    document.getElementById('teacher-dashboard-attendance-count').textContent = Number(data.summary.attendanceRegistrations || 0).toLocaleString('th-TH');
+    document.getElementById('teacher-dashboard-pretest-count').textContent = Number(data.summary.preTestParticipants || 0).toLocaleString('th-TH');
+    document.getElementById('teacher-dashboard-score-count').textContent = Number(data.summary.scoreTestParticipants || 0).toLocaleString('th-TH');
+    teacherDashboardAssessmentRows.replaceChildren();
+
+    if (!data.assessments || data.assessments.length === 0) {
+      const row = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.colSpan = 2;
+      cell.textContent = 'ยังไม่มีข้อมูลการประเมิน';
+      row.appendChild(cell);
+      teacherDashboardAssessmentRows.appendChild(row);
+    } else {
+      data.assessments.forEach((assessment) => {
+        const row = document.createElement('tr');
+        const titleCell = document.createElement('td');
+        titleCell.textContent = assessment.title;
+        const countCell = document.createElement('td');
+        countCell.textContent = Number(assessment.participantCount || 0).toLocaleString('th-TH');
+        row.append(titleCell, countCell);
+        teacherDashboardAssessmentRows.appendChild(row);
+      });
+    }
+
+    const updatedAt = document.getElementById('teacher-dashboard-updated-at');
+    updatedAt.textContent = data.updatedAt
+      ? 'อัปเดต ' + new Date(data.updatedAt).toLocaleString('th-TH')
+      : '';
+  }
+
+  async function loadTeacherDashboard() {
+    const refreshButton = document.getElementById('teacher-dashboard-refresh');
+    refreshButton.disabled = true;
+    teacherDashboardStatus.textContent = 'กำลังโหลดข้อมูล...';
+    teacherDashboardStatus.classList.remove('d-none', 'error-message');
+    try {
+      const data = await request({ method: 'POST', body: new URLSearchParams({
+        formName: 'teacher-dashboard', token: localStorage.getItem(tokenKey) || ''
+      }) });
+      renderTeacherDashboard(data);
+      teacherDashboardStatus.classList.add('d-none');
+    } catch (error) {
+      teacherDashboardStatus.textContent = error.message || 'โหลดแดชบอร์ดไม่สำเร็จ';
+      teacherDashboardStatus.classList.add('error-message');
+    } finally {
+      refreshButton.disabled = false;
+    }
   }
 
   function clearBuilderState() {
@@ -331,6 +388,17 @@
     if (event.target === modal) hideModal();
   });
   teacherExamMenuButton.addEventListener('click', enterExamManagement);
+  teacherInfoMenuButton.addEventListener('click', () => {
+    teacherMenuPopup.classList.add('d-none');
+    teacherDashboardPopup.classList.remove('d-none');
+    loadTeacherDashboard();
+  });
+  document.getElementById('teacher-dashboard-close').addEventListener('click', () => {
+    teacherDashboardPopup.classList.add('d-none');
+    teacherMenuPopup.classList.remove('d-none');
+    teacherInfoMenuButton.focus();
+  });
+  document.getElementById('teacher-dashboard-refresh').addEventListener('click', loadTeacherDashboard);
   teacherMenuCloseButton.addEventListener('click', () => {
     clearBuilderState();
     hideModal();

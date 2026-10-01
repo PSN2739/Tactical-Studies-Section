@@ -75,7 +75,7 @@
           <!-- <li><a href="#gallery">แบบประเมินกิจเฉพาะ</a></li> -->
           <li class="dropdown"><a href="#"><span>แบบประเมินกิจเฉพาะ</span> <i
                 class="bi bi-chevron-down toggle-dropdown"></i></a>
-            <ul>
+            <ul id="special-assessment-menu">
               <!-- <li><a href="#">เรื่อง ทัศนสัญาณ</a></li> -->
               <!-- <li><a href="#">เรื่อง รูปขบวน หมู่ ปล.</a></li> -->
               <!-- <li><a href="#">เรื่อง แบบฝึก หมู่ ปล.</a></li> -->
@@ -714,9 +714,96 @@
     <div class="teacher-menu-card">
       <h3 id="teacher-menu-title">เมนูครูอาจารย์</h3>
       <button type="button" id="teacher-exam-menu" class="teacher-menu-option">การจัดการข้อสอบ</button>
-      <button type="button" class="teacher-menu-option" disabled>การประเมิน</button>
-      <button type="button" class="teacher-menu-option" disabled>ข้อมูลวิชา/เรื่อง</button>
+      <button type="button" id="teacher-assessment-menu" class="teacher-menu-option">การประเมิน</button>
+      <button type="button" id="teacher-info-menu" class="teacher-menu-option">ข้อมูลวิชา/เรื่อง</button>
       <button type="button" id="teacher-menu-close" class="registration-button registration-button-close">ปิด</button>
+    </div>
+  </div>
+  <div id="teacher-dashboard-popup" class="teacher-menu-popup d-none" role="dialog"
+    aria-modal="true" aria-labelledby="teacher-dashboard-title">
+    <section class="teacher-dashboard-panel">
+      <header class="teacher-dashboard-header">
+        <h3 id="teacher-dashboard-title">ข้อมูลวิชา/เรื่อง</h3>
+        <button type="button" id="teacher-dashboard-close" class="registration-button registration-button-close">ปิด</button>
+      </header>
+      <div class="teacher-dashboard-profile">
+        <span id="teacher-dashboard-name">กำลังโหลดข้อมูลครู...</span>
+        <span id="teacher-dashboard-email"></span>
+      </div>
+      <dl class="teacher-dashboard-summary">
+        <div><dt>ผู้ลงทะเบียนแผนกยุทธวิธี</dt><dd id="teacher-dashboard-registration-count">-</dd></div>
+        <div><dt>ผู้ลงทะเบียนเข้าเรียน</dt><dd id="teacher-dashboard-attendance-count">-</dd></div>
+        <div><dt>ผู้ทำแบบทดสอบก่อนเรียน</dt><dd id="teacher-dashboard-pretest-count">-</dd></div>
+        <div><dt>ผู้ทำแบบทดสอบเก็บคะแนน</dt><dd id="teacher-dashboard-score-count">-</dd></div>
+      </dl>
+      <section class="teacher-dashboard-assessments" aria-labelledby="teacher-dashboard-assessments-title">
+        <h4 id="teacher-dashboard-assessments-title">ผู้เข้ารับการประเมินรายเรื่อง</h4>
+        <div class="teacher-dashboard-table-wrap">
+          <table>
+            <thead><tr><th scope="col">ชื่อเรื่อง</th><th scope="col">จำนวนผู้รับการประเมิน</th></tr></thead>
+            <tbody id="teacher-dashboard-assessment-rows"></tbody>
+          </table>
+        </div>
+      </section>
+      <div class="teacher-dashboard-footer">
+        <span id="teacher-dashboard-updated-at"></span>
+        <button type="button" id="teacher-dashboard-refresh" class="registration-button registration-button-secondary">รีเฟรชข้อมูล</button>
+      </div>
+      <div id="teacher-dashboard-status" class="quiz-status d-none" role="status" aria-live="polite"></div>
+    </section>
+  </div>
+  <div id="special-assessment-builder-popup" class="teacher-menu-popup d-none" role="dialog"
+    aria-modal="true" aria-labelledby="special-assessment-builder-title">
+    <div class="teacher-menu-card special-assessment-builder-card">
+      <h3 id="special-assessment-builder-title">สร้างแบบประเมิน</h3>
+      <form id="special-assessment-builder-form">
+        <div class="special-assessment-fields">
+          <label><span>ชื่อเรื่อง</span><input name="title" maxlength="100" required></label>
+          <label><span>จำนวนการบันทึก (แถว)</span><input type="number" name="recordCount" min="1" max="100" value="12" required></label>
+          <label><span>จำนวนช่องคะแนน</span><input type="number" name="scoreCount" min="1" max="50" value="25" required></label>
+          <label><span>คะแนนรวมสูงสุด</span><input type="number" name="maxTotal" min="1" max="100000" value="200" required></label>
+          <label class="special-assessment-code-setting"><span>รหัสแบบประเมิน</span>
+            <select name="requiresCode">
+              <option value="true" selected>มีรหัสสุ่ม 6 หลัก</option>
+              <option value="false">ไม่มีรหัส</option>
+            </select>
+          </label>
+        </div>
+        <div id="special-assessment-create-status" class="quiz-status d-none" role="status" aria-live="polite"></div>
+        <div class="registration-actions">
+          <button type="submit" class="registration-button">สร้างแบบประเมิน</button>
+          <button type="button" id="special-assessment-builder-close" class="registration-button registration-button-close">ปิด</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div id="special-assessment-entry-popup" class="teacher-menu-popup d-none" role="dialog"
+    aria-modal="true" aria-labelledby="special-assessment-entry-title">
+    <div class="teacher-menu-card special-assessment-entry-card">
+      <h3 id="special-assessment-entry-title"></h3>
+      <p id="special-assessment-entry-summary" class="special-assessment-entry-summary"></p>
+      <form id="special-assessment-code-form" class="registration-form">
+        <label><span>รหัสแบบประเมิน 6 หลัก</span><input id="special-assessment-access-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label>
+        <div class="registration-actions">
+          <button type="submit" class="registration-button">ตรวจสอบรหัส</button>
+          <button type="button" id="special-assessment-code-close" class="registration-button registration-button-close">ปิด</button>
+        </div>
+        <div id="special-assessment-code-status" class="quiz-status d-none" role="alert"></div>
+      </form>
+      <form id="special-assessment-entry-form" class="registration-form d-none">
+        <div class="special-assessment-table-wrap">
+          <table id="special-assessment-table" class="special-assessment-table">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="registration-actions">
+          <button type="button" id="special-assessment-copy-first-row" class="registration-button registration-button-secondary">คัดลอกคะแนนแถวแรก</button>
+          <button type="submit" class="registration-button">บันทึกผล</button>
+          <button type="button" id="special-assessment-entry-close" class="registration-button registration-button-close">ปิด</button>
+        </div>
+        <div id="special-assessment-entry-status" class="quiz-status d-none" role="status" aria-live="polite"></div>
+      </form>
     </div>
   </div>
   <div id="quiz-loading-overlay" class="quiz-loading-overlay d-none" role="status" aria-live="polite" aria-label="กำลังดำเนินการ">
@@ -817,9 +904,10 @@
   <!-- Google Sheets form handler -->
   <script src="assets/js/google-sheet-form.js?v=20260918-separate-forms"></script>
   <script src="assets/js/attendance-registration.js?v=20260918-close-fix"></script>
-  <script src="assets/js/quiz-builder.js?v=20260929-dynamic-exam-menu"></script>
+  <script src="assets/js/quiz-builder.js?v=20261001-teacher-dashboard"></script>
   <script src="assets/js/exam.js?v=20260929-posttest-80-retake"></script>
   <script src="assets/js/tactical-score.js?v=20260930-centered-copy-prompt"></script>
+  <script src="assets/js/special-assessment.js?v=20261001-special-assessment"></script>
   <script src="assets/js/teaching-management.js?v=20260930-attendance-login"></script>
 
   <!-- Main JS File -->
