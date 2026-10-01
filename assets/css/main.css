@@ -546,13 +546,6 @@ body.teaching-management-open { overflow: hidden; }
   .registration-card { padding: 24px 18px; }
   .registration-fields, .registration-result dl { grid-template-columns: 1fr; }
   .registration-actions .registration-button { width: 100%; }
-  .teaching-profile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .teaching-profile-grid > div { padding: 12px 10px; border-top: 1px solid #e7eaf0; border-left: 0; }
-  .teaching-profile-grid > div:nth-child(-n + 2) { border-top: 0; }
-  .teaching-profile-grid > div:nth-child(even) { border-left: 1px solid #e7eaf0; }
-  .teaching-score-grid { grid-template-columns: 1fr; gap: 8px; }
-  .teaching-score-item { min-height: 76px; padding: 11px; }
-  .teaching-dashboard-content { padding: 18px 14px; }
   .teaching-topbar { min-height: 72px; padding: 13px 14px; }
   .teaching-topbar h1 { font-size: 17px; }
   .teaching-topbar-label { font-size: 10px; }
@@ -584,6 +577,19 @@ body.teaching-management-open { overflow: hidden; }
   .teaching-profile-grid > div:nth-child(3) { border-left: 0; }
   .teaching-profile-grid > div:nth-child(n + 3) { border-top: 1px solid #e7eaf0; }
   .teaching-score-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 575px) {
+  .teaching-profile-grid { grid-template-columns: minmax(0, 1fr); }
+  .teaching-profile-grid > div { padding: 13px 14px; border-left: 0; }
+  .teaching-profile-grid > div:first-child { border-top: 0; }
+  .teaching-profile-grid dd { line-height: 1.55; }
+  .teaching-score-grid { grid-template-columns: minmax(0, 1fr); }
+  .teaching-score-item { min-height: 76px; padding: 12px 14px; }
+  .teaching-dashboard-content { padding: 20px 14px; }
+  .teaching-section-heading { margin-bottom: 15px; }
+  .teaching-profile-section, .teaching-learning-section { margin-bottom: 22px; }
+  .teaching-topbar { gap: 8px; padding-right: 14px; padding-left: 14px; }
 }
 
 @media (min-width: 576px) and (max-width: 900px) {
