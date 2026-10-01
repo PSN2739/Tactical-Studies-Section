@@ -723,8 +723,12 @@ function appendQuizResult_(sheet, result) {
   row[headers.indexOf('pass_type')] = result.pass_type;
   row[headers.indexOf('pass_value')] = result.pass_value;
   row[headers.indexOf('passed')] = result.passed ? 'TRUE' : 'FALSE';
-  row[headers.indexOf('pre_score')] = result.pre_score || row[headers.indexOf('pre_score')] || '';
-  row[headers.indexOf('post_score')] = result.post_score || row[headers.indexOf('post_score')] || '';
+  row[headers.indexOf('pre_score')] = result.pre_score !== '' && result.pre_score !== null && result.pre_score !== undefined
+    ? result.pre_score
+    : row[headers.indexOf('pre_score')] || '';
+  row[headers.indexOf('post_score')] = result.post_score !== '' && result.post_score !== null && result.post_score !== undefined
+    ? result.post_score
+    : row[headers.indexOf('post_score')] || '';
   row[headers.indexOf('score')] = result.score ?? row[headers.indexOf('score')] ?? '';
   row[headers.indexOf('total')] = result.total || row[headers.indexOf('total')] || '';
   row[headers.indexOf('เลขที่กองกัน')] = lookupId || row[headers.indexOf('เลขที่กองกัน')] || '';
@@ -1228,7 +1232,8 @@ function attendanceStudentLogin_(data) {
     data: {
       student: {
         personalId: normalizeValue_(row[0]).replace(/^'/, ''),
-        attendanceDate: normalizeValue_(row[1]),
+        registrationDate: normalizeValue_(row[1]),
+        attendanceSession: normalizeValue_(row[9]),
         battalionNumber: normalizeValue_(row[2]),
         fullName: normalizeValue_(row[4]),
         email: normalizeValue_(row[7]),
@@ -1241,6 +1246,26 @@ function attendanceStudentLogin_(data) {
 
 function getTeachingScores_(spreadsheet, personalId, lookupId) {
   const scores = { attitude: '', preTest: '', postTest: '', knowledgeAssessment: '', specialTask: '' };
+  const attemptHistory = spreadsheet.getSheetByName('QuizAttemptHistory');
+  if (attemptHistory && attemptHistory.getLastRow() > 1) {
+    const rows = attemptHistory.getDataRange().getDisplayValues();
+    const headers = rows[0].map(normalizeValue_);
+    const studentIndex = headers.indexOf('student_id');
+    const phaseIndex = headers.indexOf('phase');
+    const scoreIndex = headers.indexOf('score');
+    for (let rowIndex = rows.length - 1; rowIndex > 0; rowIndex -= 1) {
+      const row = rows[rowIndex];
+      if (studentIndex < 0
+        || normalizeValue_(row[studentIndex]).replace(/^'/, '') !== normalizeValue_(personalId).replace(/^'/, '')) continue;
+      const phase = phaseIndex >= 0 ? normalizePhase_(row[phaseIndex]) : '';
+      const score = scoreIndex >= 0 ? normalizeValue_(row[scoreIndex]) : '';
+      if (!score) continue;
+      if (phase === 'pre-test' && !scores.preTest) scores.preTest = score;
+      if (phase === 'post-test' && !scores.postTest) scores.postTest = score;
+      if (phase === 'score' && !scores.knowledgeAssessment) scores.knowledgeAssessment = score;
+    }
+  }
+
   const resultsSheet = spreadsheet.getSheetByName('QuizResults');
   if (resultsSheet && resultsSheet.getLastRow() > 1) {
     const rows = resultsSheet.getDataRange().getDisplayValues();

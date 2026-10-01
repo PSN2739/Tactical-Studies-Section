@@ -22,7 +22,8 @@
 
   function setValue(id, value, fallback) {
     const element = document.getElementById(id);
-    if (element) element.textContent = value || fallback || '—';
+    const hasValue = value !== null && value !== undefined && value !== '';
+    if (element) element.textContent = hasValue ? String(value) : (fallback || '—');
   }
 
   function setLoginStatus(message, isSuccess) {
@@ -47,7 +48,8 @@
     const scores = person.scores || {};
     if (userName) userName.textContent = person.fullName || 'ผู้เรียน';
     setValue('teaching-profile-id', person.personalId);
-    setValue('teaching-profile-attendance', person.attendanceDate);
+    setValue('teaching-profile-registration-date', person.registrationDate);
+    setValue('teaching-profile-attendance-session', person.attendanceSession);
     setValue('teaching-profile-battalion', person.battalionNumber);
     setValue('teaching-profile-name', person.fullName);
     setValue('teaching-profile-email', person.email);
@@ -92,8 +94,8 @@
         connectionState.innerHTML = '<i aria-hidden="true"></i> รอเชื่อมข้อมูล';
         connectionState.classList.remove('is-connected');
       }
-      ['teaching-profile-id', 'teaching-profile-attendance', 'teaching-profile-battalion',
-        'teaching-profile-name', 'teaching-profile-email', 'teaching-profile-episode',
+      ['teaching-profile-id', 'teaching-profile-registration-date', 'teaching-profile-attendance-session',
+        'teaching-profile-battalion', 'teaching-profile-name', 'teaching-profile-email', 'teaching-profile-episode',
         'teaching-score-pre', 'teaching-score-post', 'teaching-score-knowledge', 'teaching-score-special']
         .forEach((id) => setValue(id, ''));
       setValue('teaching-score-attitude', '', 'ยังไม่ระบุแหล่งข้อมูล');
