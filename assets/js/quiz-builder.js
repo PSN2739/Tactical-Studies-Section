@@ -292,12 +292,34 @@
     });
   }
 
+  let xlsxLoadingPromise = null;
+
+  function loadXlsxLibrary() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    if (!xlsxLoadingPromise) {
+      xlsxLoadingPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+        script.onload = () => {
+          if (window.XLSX) resolve(window.XLSX);
+          else reject(new Error('โหลดตัวอ่านไฟล์ Excel ไม่สำเร็จ'));
+        };
+        script.onerror = () => reject(new Error('โหลดตัวอ่านไฟล์ Excel ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่'));
+        document.head.appendChild(script);
+      }).catch((error) => {
+        xlsxLoadingPromise = null;
+        throw error;
+      });
+    }
+    return xlsxLoadingPromise;
+  }
+
   async function readFile(file, questionType = 'multiple-choice') {
     if (file.name.toLowerCase().endsWith('.csv')) return rowsFromCells(parseCsv(await file.text()), questionType);
-    if (!window.XLSX) throw new Error('ไม่พบตัวอ่านไฟล์ Excel');
-    const workbook = window.XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const xlsx = await loadXlsxLibrary();
+    const workbook = xlsx.read(await file.arrayBuffer(), { type: 'array' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    return rowsFromCells(window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' }), questionType);
+    return rowsFromCells(xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' }), questionType);
   }
 
   async function readGoogleSheet(url, questionType = 'multiple-choice') {
