@@ -412,6 +412,7 @@ body.teaching-management-open { overflow: hidden; }
   background: #07111f;
 }
 body.announcement-gallery-open { overflow: hidden; }
+body.announcement-dashboard-open { overflow: hidden; }
 .announcement-gallery-close {
   position: absolute;
   top: 16px;
@@ -495,6 +496,61 @@ body.announcement-gallery-open { overflow: hidden; }
   .announcement-gallery-controls button { min-width: 40px; padding: 7px 9px; font-size: 13px; }
   .announcement-gallery-controls span { min-width: 58px; font-size: 13px; }
 }
+.announcement-dashboard-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 11000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(7, 17, 31, 0.76);
+  backdrop-filter: blur(4px);
+}
+.announcement-dashboard-card {
+  display: grid;
+  gap: 20px;
+  width: min(760px, 100%);
+  min-height: min(460px, 80vh);
+  padding: clamp(20px, 4vw, 36px);
+  border-radius: 18px;
+  color: var(--default-color);
+  background: var(--surface-color);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
+}
+.announcement-dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.announcement-dashboard-header h2 {
+  margin: 0;
+  color: var(--heading-color);
+  font-size: clamp(22px, 3vw, 30px);
+}
+.announcement-dashboard-close,
+.announcement-dashboard-add {
+  min-height: 42px;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--accent-color);
+}
+.announcement-dashboard-actions { display: flex; justify-content: flex-end; }
+.announcement-dashboard-add:disabled { cursor: not-allowed; opacity: 0.55; }
+.announcement-dashboard-empty {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 220px;
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  color: var(--default-color);
+  text-align: center;
+}
+.announcement-dashboard-empty i { color: var(--accent-color); font-size: 42px; }
+.announcement-dashboard-empty p { margin: 12px 0 0; font-size: 18px; }
 .teacher-menu-popup {
   position: fixed;
   inset: 0;

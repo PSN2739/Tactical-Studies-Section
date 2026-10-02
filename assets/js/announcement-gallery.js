@@ -1,6 +1,33 @@
 (function () {
   'use strict';
 
+  const dashboardOpenButton = document.getElementById('open-announcement-dashboard');
+  const dashboardPopup = document.getElementById('announcement-dashboard-popup');
+  const dashboardCloseButton = document.getElementById('announcement-dashboard-close');
+  if (dashboardOpenButton && dashboardPopup && dashboardCloseButton) {
+    function closeDashboard() {
+      dashboardPopup.classList.add('d-none');
+      document.body.classList.remove('announcement-dashboard-open');
+      dashboardOpenButton.setAttribute('aria-expanded', 'false');
+      dashboardOpenButton.focus();
+    }
+
+    dashboardOpenButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      dashboardPopup.classList.remove('d-none');
+      document.body.classList.add('announcement-dashboard-open');
+      dashboardOpenButton.setAttribute('aria-expanded', 'true');
+      dashboardCloseButton.focus();
+    });
+    dashboardCloseButton.addEventListener('click', closeDashboard);
+    dashboardPopup.addEventListener('click', (event) => {
+      if (event.target === dashboardPopup) closeDashboard();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (!dashboardPopup.classList.contains('d-none') && event.key === 'Escape') closeDashboard();
+    });
+  }
+
   const openButton = document.getElementById('open-announcement-gallery');
   const popup = document.getElementById('announcement-gallery-popup');
   if (!openButton || !popup) return;
@@ -60,12 +87,14 @@
     stopAutoplay();
     popup.classList.add('d-none');
     document.body.classList.remove('announcement-gallery-open');
+    openButton.setAttribute('aria-expanded', 'false');
     openButton.focus();
   }
 
   async function openGallery() {
     popup.classList.remove('d-none');
     document.body.classList.add('announcement-gallery-open');
+    openButton.setAttribute('aria-expanded', 'true');
     closeButton.focus();
     imageElement.classList.add('d-none');
     counter.textContent = '';

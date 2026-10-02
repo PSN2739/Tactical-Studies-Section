@@ -27,7 +27,7 @@
   <link href="assets/swiper/swiper-bundle.min.css" rel="stylesheet">
 
   <!-- Main CSS File -->
-  <link href="assets/css/main.css?v=20260917-close-buttons-only" rel="stylesheet">
+  <link href="assets/css/main.css?v=20261002-announcement-dashboard" rel="stylesheet">
 
   <!-- =======================================================
   * Template Name: Bootslander
@@ -163,10 +163,11 @@
             <h1>Army Non Commissioned Officer School <span>Tactical Studies Section</span></h1>
             <p>แผนกวิชายุทธวิธี กองการศึกษา โรงเรียนนายสิบทหารบก</p>
             <div class="d-flex">
-              <a href="#announcement-gallery-popup" id="open-announcement-gallery" class="btn-get-started">ประกาศ-ประชาสัมพันธ์</a>
-              <a href="https://youtu.be/mUxKtktJNiQ?si=KZQUhbBXxr_e1AfX"
-                class="glightbox btn-watch-video d-flex align-items-center"><i class="bi bi-play-circle"></i><span>Video
-                  Tactical Studies Section</span></a>
+              <a href="#announcement-dashboard-popup" id="open-announcement-dashboard" aria-haspopup="dialog"
+                aria-controls="announcement-dashboard-popup" aria-expanded="false" class="btn-get-started">ประกาศ-ประชาสัมพันธ์</a>
+              <a href="#announcement-gallery-popup" id="open-announcement-gallery" aria-haspopup="dialog"
+                aria-controls="announcement-gallery-popup" aria-expanded="false"
+                class="btn-watch-video d-flex align-items-center"><i class="bi bi-play-circle"></i><span>VDO และภาพกิจกรรม</span></a>
             </div>
           </div>
 
@@ -842,6 +843,22 @@
       <button type="button" id="announcement-gallery-autoplay" aria-label="หยุดสไลด์">หยุดสไลด์</button>
     </div>
   </div>
+  <div id="announcement-dashboard-popup" class="announcement-dashboard-popup d-none" role="dialog"
+    aria-modal="true" aria-labelledby="announcement-dashboard-title" aria-describedby="announcement-dashboard-empty">
+    <section class="announcement-dashboard-card">
+      <header class="announcement-dashboard-header">
+        <h2 id="announcement-dashboard-title">ประกาศ-ประชาสัมพันธ์</h2>
+        <button type="button" id="announcement-dashboard-close" class="announcement-dashboard-close" aria-label="ปิดแดชบอร์ดประกาศ">ปิด</button>
+      </header>
+      <div class="announcement-dashboard-actions">
+        <button type="button" class="announcement-dashboard-add" disabled aria-disabled="true">เพิ่มประกาศ</button>
+      </div>
+      <div id="announcement-dashboard-empty" class="announcement-dashboard-empty" role="status" aria-live="polite">
+        <i class="bi bi-megaphone" aria-hidden="true"></i>
+        <p>ยังไม่มีประกาศ</p>
+      </div>
+    </section>
+  </div>
   <div id="quiz-loading-overlay" class="quiz-loading-overlay d-none" role="status" aria-live="polite" aria-label="กำลังดำเนินการ">
     <div class="quiz-loading-card">
       <span class="quiz-loading-spinner" aria-hidden="true"></span>
@@ -945,7 +962,7 @@
   <script src="assets/js/tactical-score.js?v=20260930-centered-copy-prompt"></script>
   <script src="assets/js/special-assessment.js?v=20261001-special-assessment"></script>
   <script src="assets/js/teaching-management.js?v=20260930-attendance-login"></script>
-  <script src="assets/js/announcement-gallery.js?v=20261002-drive-gallery"></script>
+  <script src="assets/js/announcement-gallery.js?v=20261002-announcement-dashboard"></script>
 
   <!-- Main JS File -->
   <script src="assets/js/main.js"></script>
