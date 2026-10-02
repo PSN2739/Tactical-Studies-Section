@@ -163,7 +163,7 @@
             <h1>Army Non Commissioned Officer School <span>Tactical Studies Section</span></h1>
             <p>แผนกวิชายุทธวิธี กองการศึกษา โรงเรียนนายสิบทหารบก</p>
             <div class="d-flex">
-              <a href="https://www.facebook.com/ncopsnchanel" class="btn-get-started">ประกาศ-ประชาสัมพันธ์</a>
+              <a href="#announcement-gallery-popup" id="open-announcement-gallery" class="btn-get-started">ประกาศ-ประชาสัมพันธ์</a>
               <a href="https://youtu.be/mUxKtktJNiQ?si=KZQUhbBXxr_e1AfX"
                 class="glightbox btn-watch-video d-flex align-items-center"><i class="bi bi-play-circle"></i><span>Video
                   Tactical Studies Section</span></a>
@@ -816,6 +816,27 @@
       </form>
     </div>
   </div>
+  <div id="announcement-gallery-popup" class="announcement-gallery-popup d-none" role="dialog"
+    aria-modal="true" aria-labelledby="announcement-gallery-title" aria-describedby="announcement-gallery-status">
+    <h2 id="announcement-gallery-title" class="visually-hidden">ประกาศ-ประชาสัมพันธ์</h2>
+    <button type="button" id="announcement-gallery-close" class="announcement-gallery-close" aria-label="ปิด">&times;</button>
+    <div class="announcement-gallery-watermark" aria-hidden="true">
+      <span><strong>ANCOS-30</strong><small>Tactical Studies Section</small></span>
+      <span><strong>ANCOS-30</strong><small>Tactical Studies Section</small></span>
+      <span><strong>ANCOS-30</strong><small>Tactical Studies Section</small></span>
+      <span><strong>ANCOS-30</strong><small>Tactical Studies Section</small></span>
+    </div>
+    <div class="announcement-gallery-stage">
+      <p id="announcement-gallery-status" class="announcement-gallery-status" role="status" aria-live="polite">กำลังโหลดภาพ...</p>
+      <img id="announcement-gallery-image" class="announcement-gallery-image d-none" alt="">
+    </div>
+    <div class="announcement-gallery-controls">
+      <button type="button" id="announcement-gallery-previous" aria-label="ภาพก่อนหน้า">&#10094;</button>
+      <span id="announcement-gallery-counter" aria-live="polite"></span>
+      <button type="button" id="announcement-gallery-next" aria-label="ภาพถัดไป">&#10095;</button>
+      <button type="button" id="announcement-gallery-autoplay" aria-label="หยุดสไลด์">หยุดสไลด์</button>
+    </div>
+  </div>
   <div id="quiz-loading-overlay" class="quiz-loading-overlay d-none" role="status" aria-live="polite" aria-label="กำลังดำเนินการ">
     <div class="quiz-loading-card">
       <span class="quiz-loading-spinner" aria-hidden="true"></span>
@@ -919,6 +940,7 @@
   <script src="assets/js/tactical-score.js?v=20260930-centered-copy-prompt"></script>
   <script src="assets/js/special-assessment.js?v=20261001-special-assessment"></script>
   <script src="assets/js/teaching-management.js?v=20260930-attendance-login"></script>
+  <script src="assets/js/announcement-gallery.js?v=20261002-drive-gallery"></script>
 
   <!-- Main JS File -->
   <script src="assets/js/main.js"></script>

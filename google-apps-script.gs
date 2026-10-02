@@ -15,6 +15,7 @@ const CONFIG = {
   quizIndexSheetName: 'Quizzes',
   quizSheetPrefix: 'Quiz_',
   specialAssessmentIndexSheetName: 'SpecialAssessments',
+  announcementGalleryFolderId: '1mYtAuD15F6zD9TD-dzFAUsm4GZ7KBunQ',
   approvalEmail: 'nu2739@gmail.com',
   webAppUrl: 'https://script.google.com/macros/s/AKfycbylfNRFHqfE5QztOXuICj-NCqVD5U2zPfXUu16Z3-aqUm0D2u4mNEFojzk-6vKQxFQ/exec',
   lookupIdColumn: 3,
@@ -41,6 +42,9 @@ function doGet(e) {
     }
     if (String(params.action || '').toLowerCase() === 'special-assessment-list') {
       return listSpecialAssessments_();
+    }
+    if (String(params.action || '').toLowerCase() === 'announcement-gallery') {
+      return listAnnouncementGalleryImages_();
     }
     if (String(params.action || '').toLowerCase() === 'get-quiz') {
       return getQuiz_(params.quizId || '', params.studentId || '', params.phase || 'pre-test', params.title || '');
@@ -1200,6 +1204,27 @@ function listSpecialAssessments_() {
       requiresCode: row[7] === 'TRUE'
     }));
   return jsonResponse_({ ok: true, assessments: rows });
+}
+
+function listAnnouncementGalleryImages_() {
+  const files = DriveApp.getFolderById(CONFIG.announcementGalleryFolderId).getFiles();
+  const images = [];
+
+  while (files.hasNext()) {
+    const file = files.next();
+    if (!file.getMimeType().startsWith('image/')) continue;
+    images.push({
+      id: file.getId(),
+      name: file.getName()
+    });
+  }
+
+  images.sort((left, right) => left.name.localeCompare(right.name, 'th', {
+    numeric: true,
+    sensitivity: 'base'
+  }));
+
+  return jsonResponse_({ ok: true, images });
 }
 
 function getTeacherDashboard_(token) {
