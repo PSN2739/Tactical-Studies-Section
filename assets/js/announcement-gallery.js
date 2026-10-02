@@ -37,6 +37,9 @@
   const previousButton = document.getElementById('announcement-gallery-previous');
   const nextButton = document.getElementById('announcement-gallery-next');
   const autoplayButton = document.getElementById('announcement-gallery-autoplay');
+  const downloadButton = document.getElementById('announcement-gallery-download');
+  const downloadPopup = document.getElementById('announcement-gallery-download-popup');
+  const downloadCloseButton = document.getElementById('announcement-gallery-download-close');
   const imageElement = document.getElementById('announcement-gallery-image');
   const counter = document.getElementById('announcement-gallery-counter');
   const status = document.getElementById('announcement-gallery-status');
@@ -53,6 +56,22 @@
     status.classList.toggle('is-error', Boolean(isError));
     status.classList.toggle('d-none', !message);
   }
+
+  function closeDownloadNotice() {
+    downloadPopup.classList.add('d-none');
+    downloadButton.setAttribute('aria-expanded', 'false');
+    downloadButton.focus();
+  }
+
+  downloadButton.addEventListener('click', () => {
+    downloadPopup.classList.remove('d-none');
+    downloadButton.setAttribute('aria-expanded', 'true');
+    downloadCloseButton.focus();
+  });
+  downloadCloseButton.addEventListener('click', closeDownloadNotice);
+  downloadPopup.addEventListener('click', (event) => {
+    if (event.target === downloadPopup) closeDownloadNotice();
+  });
 
   function stopAutoplay() {
     window.clearInterval(autoplayTimer);
@@ -165,6 +184,10 @@
   });
   document.addEventListener('keydown', (event) => {
     if (popup.classList.contains('d-none')) return;
+    if (event.key === 'Escape' && !downloadPopup.classList.contains('d-none')) {
+      closeDownloadNotice();
+      return;
+    }
     if (event.key === 'Escape') closeGallery();
     if (event.key === 'ArrowLeft') showImage(currentIndex - 1);
     if (event.key === 'ArrowRight') showImage(currentIndex + 1);
