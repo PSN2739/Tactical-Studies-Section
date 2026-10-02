@@ -650,6 +650,7 @@ body.teaching-management-open { overflow: hidden; }
   inset: 0;
   z-index: 10000;
   display: grid;
+  pointer-events: none;
   place-items: center;
   padding: 20px;
   background: rgba(15, 23, 42, 0.42);
@@ -657,6 +658,7 @@ body.teaching-management-open { overflow: hidden; }
 }
 .quiz-loading-card {
   display: inline-flex;
+  pointer-events: auto;
   align-items: center;
   gap: 14px;
   padding: 18px 24px;

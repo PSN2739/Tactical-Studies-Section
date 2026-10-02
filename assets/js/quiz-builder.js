@@ -30,6 +30,8 @@
   const downloadTemplateButton = document.getElementById('download-quiz-template');
   const currentTeacherEmail = document.getElementById('current-teacher-email');
   const tokenKey = 'tacticalTeacherToken';
+  const pendingRequests = new Set();
+  const requestTimeoutMs = 30000;
 
   function setCurrentTeacherEmail(email) {
     if (currentTeacherEmail) currentTeacherEmail.textContent = email
@@ -63,6 +65,8 @@
   }
 
   function hideModal() {
+    pendingRequests.forEach((controller) => controller.abort());
+    setLoading(false);
     modal.classList.add('d-none');
     document.body.classList.remove('registration-modal-open');
   }
@@ -137,6 +141,7 @@
       renderTeacherDashboard(data);
       teacherDashboardStatus.classList.add('d-none');
     } catch (error) {
+      if (error.name === 'AbortError') return;
       teacherDashboardStatus.textContent = error.message || 'โหลดแดชบอร์ดไม่สำเร็จ';
       teacherDashboardStatus.classList.add('error-message');
     } finally {
@@ -198,10 +203,25 @@
       url += options.method.slice(3);
       options.method = 'GET';
     }
-    const response = await fetch(url, options);
-    const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error(data.message || 'ไม่สามารถเชื่อมต่อระบบได้');
-    return data;
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeoutId = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, requestTimeoutMs);
+    pendingRequests.add(controller);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.message || 'ไม่สามารถเชื่อมต่อระบบได้');
+      return data;
+    } catch (error) {
+      if (timedOut) throw new Error('การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่');
+      throw error;
+    } finally {
+      window.clearTimeout(timeoutId);
+      pendingRequests.delete(controller);
+    }
   }
 
 
@@ -445,7 +465,7 @@
       showAuthChoice();
       hideModal();
     } catch (error) {
-      setStatus(applicationForm, 'error-message', error.message);
+      if (error.name !== 'AbortError') setStatus(applicationForm, 'error-message', error.message);
     } finally {
       setLoading(false);
     }
@@ -466,7 +486,7 @@
       closeButton.classList.add('d-none');
       showTeacherMenu();
     } catch (error) {
-      setStatus(loginForm, 'error-message', error.message);
+      if (error.name !== 'AbortError') setStatus(loginForm, 'error-message', error.message);
     } finally {
       setLoading(false);
     }
@@ -518,7 +538,7 @@
       const displayText = passType === 'count' ? `จำนวน ${passValue} ข้อ` : `${passValue}%`;
       showQuizSuccessPopup(`สร้างแบบทดสอบสำเร็จ (เกณฑ์ผ่าน ${displayText})`);
     } catch (error) {
-      setStatus(uploadForm, 'error-message', error.message);
+      if (error.name !== 'AbortError') setStatus(uploadForm, 'error-message', error.message);
     } finally {
       setLoading(false);
     }
