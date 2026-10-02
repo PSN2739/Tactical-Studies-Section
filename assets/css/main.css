@@ -451,7 +451,7 @@ body.announcement-gallery-open { overflow: hidden; }
   inset: 0;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: repeat(3, minmax(0, 1fr));
   align-items: center;
   justify-items: center;
@@ -466,7 +466,7 @@ body.announcement-gallery-open { overflow: hidden; }
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
   transform: rotate(-22deg);
 }
-.announcement-gallery-watermark strong { font-size: clamp(20px, 3vw, 42px); letter-spacing: 0.08em; }
+.announcement-gallery-watermark strong { font-size: clamp(14px, 2vw, 26px); letter-spacing: 0.08em; }
 .announcement-gallery-watermark small { font-size: clamp(12px, 1.6vw, 22px); }
 .announcement-gallery-controls {
   position: relative;
