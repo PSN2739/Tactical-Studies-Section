@@ -112,6 +112,18 @@
     ].forEach(([id, count]) => {
       document.getElementById(`teacher-dashboard-${id}`).textContent = Number(count || 0).toLocaleString('th-TH');
     });
+    const episodeRows = document.getElementById('teacher-dashboard-topic-episode-rows');
+    episodeRows.replaceChildren();
+    (Array.isArray(courseSummary.topicAttendanceByEpisode) ? courseSummary.topicAttendanceByEpisode : [])
+      .forEach((item) => {
+        const row = document.createElement('tr');
+        const episodeCell = document.createElement('td');
+        const countCell = document.createElement('td');
+        episodeCell.textContent = item.episode || '-';
+        countCell.textContent = Number(item.count || 0).toLocaleString('th-TH');
+        row.append(episodeCell, countCell);
+        episodeRows.appendChild(row);
+      });
     teacherDashboardQuizRows.replaceChildren();
     const quizzes = Array.isArray(data.quizzes) ? data.quizzes : [];
     if (!quizzes.length) {

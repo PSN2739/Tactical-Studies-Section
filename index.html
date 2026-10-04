@@ -773,6 +773,13 @@
           <div><dt>ลงทะเบียนแผนกยุทธวิธี (คน)</dt><dd id="teacher-dashboard-department-registration-count">-</dd></div>
           <div><dt>ลงทะเบียนเรื่องนี้ (คน)</dt><dd id="teacher-dashboard-topic-attendance-count">-</dd></div>
         </dl>
+        <h4 id="teacher-dashboard-topic-episodes-title">แยกตามตอนที่ (คน)</h4>
+        <div class="teacher-dashboard-table-wrap">
+          <table>
+            <thead><tr><th scope="col">ตอนที่</th><th scope="col">จำนวนผู้ลงทะเบียน</th></tr></thead>
+            <tbody id="teacher-dashboard-topic-episode-rows"></tbody>
+          </table>
+        </div>
       </section>
       <section class="teacher-dashboard-assessments" aria-labelledby="teacher-dashboard-quizzes-title">
         <h4 id="teacher-dashboard-quizzes-title">ข้อสอบที่ฉันสร้าง</h4>
@@ -1002,7 +1009,7 @@
   <!-- Google Sheets form handler -->
   <script defer src="assets/js/google-sheet-form.js?v=20260918-separate-forms"></script>
   <script defer src="assets/js/attendance-registration.js?v=20261004-attendance-subject"></script>
-  <script defer src="assets/js/quiz-builder.js?v=20261004-teacher-course-summary"></script>
+  <script defer src="assets/js/quiz-builder.js?v=20261004-topic-registration-episodes"></script>
   <script defer src="assets/js/exam.js?v=20260929-posttest-80-retake"></script>
   <script defer src="assets/js/tactical-score.js?v=20260930-centered-copy-prompt"></script>
   <script defer src="assets/js/special-assessment.js?v=20261001-special-assessment"></script>

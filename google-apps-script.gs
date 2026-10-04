@@ -1358,6 +1358,10 @@ function getTeacherDashboard_(token) {
     'subject',
     'รบด้วยวิธีรุก-ตีกลางวัน'
   );
+  const attendanceByEpisode = countUniqueLearnersByEpisode_(
+    spreadsheet.getSheetByName(CONFIG.attendanceSheetName),
+    'รบด้วยวิธีรุก-ตีกลางวัน'
+  );
 
   return jsonResponse_({
     ok: true,
@@ -1371,7 +1375,8 @@ function getTeacherDashboard_(token) {
         passedPostTestCount: courseLearners.passedPostTest.size,
         scoreCount: courseLearners.score.size,
         departmentRegistrationCount: registrationCount,
-        topicAttendanceCount: attendanceCount
+        topicAttendanceCount: attendanceCount,
+        topicAttendanceByEpisode: attendanceByEpisode
       }
     },
     quizzes: quizzes,
@@ -1402,6 +1407,35 @@ function countUniqueLearnersInSheet_(sheet, filterHeader, filterValue) {
     learners.add(learnerId);
   });
   return learners.size;
+}
+
+function countUniqueLearnersByEpisode_(sheet, subject) {
+  const episodeLearners = Array.from({ length: 18 }, (_, index) => ({
+    episode: 'ตอนที่ ' + (index + 1),
+    learners: new Set()
+  }));
+  if (!sheet || sheet.getLastRow() < 2) {
+    return episodeLearners.map((item) => ({ episode: item.episode, count: 0 }));
+  }
+
+  const values = sheet.getDataRange().getDisplayValues();
+  const headers = values[0].map((header) => normalizeValue_(header).toLowerCase());
+  const learnerIndex = headers.indexOf('lookup_id');
+  const subjectIndex = headers.indexOf('subject');
+  const episodeIndex = headers.indexOf('episode');
+  if (learnerIndex < 0 || subjectIndex < 0 || episodeIndex < 0) {
+    return episodeLearners.map((item) => ({ episode: item.episode, count: 0 }));
+  }
+
+  const learnersByEpisode = new Map(episodeLearners.map((item) => [item.episode, item.learners]));
+  values.slice(1).forEach((row) => {
+    if (normalizeValue_(row[subjectIndex]) !== subject) return;
+    const learners = learnersByEpisode.get(normalizeValue_(row[episodeIndex]));
+    const learnerId = normalizeLookupId_(row[learnerIndex]);
+    if (learners && learnerId) learners.add(learnerId);
+  });
+
+  return episodeLearners.map((item) => ({ episode: item.episode, count: item.learners.size }));
 }
 
 function findSpecialAssessment_(assessmentId) {
