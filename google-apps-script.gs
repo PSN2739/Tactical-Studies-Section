@@ -1281,6 +1281,7 @@ function getTeacherDashboard_(token) {
   const studentIndex = historyHeaders.indexOf('student_id');
   const lookupIndex = historyHeaders.indexOf('lookup_id');
   const quizIndexColumn = historyHeaders.indexOf('quiz_id');
+  const phaseIndex = historyHeaders.indexOf('phase');
   const passedIndex = historyHeaders.indexOf('passed');
   const quizParticipants = new Map();
   const quizById = new Map();
@@ -1304,14 +1305,17 @@ function getTeacherDashboard_(token) {
 
     const quiz = quizById.get(quizId);
     if (!isDaytimeAttackQuizTitle_(quiz.title)) return;
-    if (quiz.phase === 'pre-test') courseLearners.preTest.add(studentId);
-    if (quiz.phase === 'post-test') {
+    const attemptPhase = phaseIndex >= 0
+      ? normalizePhase_(row[phaseIndex])
+      : quiz.phase;
+    if (attemptPhase === 'pre-test') courseLearners.preTest.add(studentId);
+    if (attemptPhase === 'post-test') {
       courseLearners.postTest.add(studentId);
       if (passedIndex >= 0 && normalizeValue_(row[passedIndex]).toUpperCase() === 'TRUE') {
         courseLearners.passedPostTest.add(studentId);
       }
     }
-    if (quiz.phase === 'score') courseLearners.score.add(studentId);
+    if (attemptPhase === 'score') courseLearners.score.add(studentId);
   });
   quizzes.forEach((quiz) => {
     quiz.participantCount = quizParticipants.get(quiz.quizId).size;
