@@ -2,7 +2,6 @@
   'use strict';
 
   const endpoint = document.querySelector('#registration-form')?.getAttribute('action');
-  const teacherTokenKey = 'tacticalTeacherToken';
   const dashboardOpenButton = document.getElementById('open-announcement-dashboard');
   const dashboardPopup = document.getElementById('announcement-dashboard-popup');
   const dashboardCloseButton = document.getElementById('announcement-dashboard-close');
@@ -16,6 +15,7 @@
   const announcementForm = document.getElementById('announcement-form');
   const announcementLoginStatus = document.getElementById('announcement-login-status');
   const announcementFormStatus = document.getElementById('announcement-form-status');
+  let announcementTeacherToken = '';
 
   async function postAnnouncementApi(parameters, method) {
     if (!endpoint) throw new Error('ไม่พบที่อยู่ระบบประกาศ');
@@ -111,24 +111,19 @@
 
   function openAnnouncementEditor() {
     if (!editorPopup) return;
+    announcementTeacherToken = '';
+    announcementLoginForm.reset();
+    announcementForm.reset();
     editorPopup.classList.remove('d-none');
     document.body.classList.add('announcement-dashboard-open');
     setAnnouncementStatus(announcementLoginStatus, '', false);
     setAnnouncementStatus(announcementFormStatus, '', false);
-    const hasTeacherToken = Boolean(localStorage.getItem(teacherTokenKey));
-    announcementLoginForm.classList.toggle('d-none', hasTeacherToken);
-    announcementForm.classList.toggle('d-none', !hasTeacherToken);
-    if (hasTeacherToken) {
-      document.getElementById('announcement-editor-account').textContent = 'เข้าสู่ระบบด้วยบัญชีครูที่อนุมัติแล้ว';
-      announcementForm.elements.startAt.min = getLocalDateTimeValue(new Date());
-      announcementForm.elements.endAt.min = announcementForm.elements.startAt.min;
-      announcementForm.elements.startAt.value = announcementForm.elements.startAt.min;
-      const defaultEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      announcementForm.elements.endAt.value = getLocalDateTimeValue(defaultEnd);
-      announcementForm.elements.title.focus();
-    } else {
-      announcementLoginForm.querySelector('input').focus();
-    }
+    announcementLoginForm.classList.remove('d-none');
+    announcementForm.classList.add('d-none');
+    document.getElementById('announcement-editor-account').textContent = '';
+    announcementLoginForm.elements.email.value = '';
+    announcementLoginForm.elements.password.value = '';
+    announcementLoginForm.querySelector('input').focus();
   }
 
   function getLocalDateTimeValue(date) {
@@ -138,6 +133,11 @@
   }
 
   function closeAnnouncementEditor() {
+    announcementTeacherToken = '';
+    announcementLoginForm.reset();
+    announcementForm.reset();
+    setAnnouncementStatus(announcementLoginStatus, '', false);
+    setAnnouncementStatus(announcementFormStatus, '', false);
     editorPopup.classList.add('d-none');
     if (dashboardPopup?.classList.contains('d-none')) {
       document.body.classList.remove('announcement-dashboard-open');
@@ -191,7 +191,8 @@
         email: formData.get('email'),
         password: formData.get('password')
       }, 'POST');
-      localStorage.setItem(teacherTokenKey, data.token);
+      announcementTeacherToken = data.token;
+      announcementLoginForm.reset();
       announcementLoginForm.classList.add('d-none');
       announcementForm.classList.remove('d-none');
       document.getElementById('announcement-editor-account').textContent =
@@ -235,7 +236,7 @@
     try {
       const data = await postAnnouncementApi({
         formName: 'create-announcement',
-        token: localStorage.getItem(teacherTokenKey) || '',
+        token: announcementTeacherToken,
         title: formData.get('title').trim(),
         startAt: formData.get('startAt'),
         endAt: formData.get('endAt'),
@@ -249,7 +250,8 @@
       setAnnouncementStatus(dashboardStatus, data.message || 'บันทึกประกาศแล้ว', false);
     } catch (error) {
       if (/เข้าสู่ระบบครูใหม่|บัญชีครู/i.test(error.message)) {
-        localStorage.removeItem(teacherTokenKey);
+        announcementTeacherToken = '';
+        announcementLoginForm.reset();
         announcementForm.classList.add('d-none');
         announcementLoginForm.classList.remove('d-none');
         setAnnouncementStatus(announcementLoginStatus, error.message, true);

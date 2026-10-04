@@ -933,10 +933,10 @@
         <h2 id="announcement-editor-title">เพิ่มประกาศ</h2>
         <button type="button" id="announcement-editor-close" class="announcement-dashboard-close" aria-label="ปิดแบบฟอร์มประกาศ">ปิด</button>
       </header>
-      <form id="announcement-login-form" class="announcement-form d-none">
+      <form id="announcement-login-form" class="announcement-form d-none" autocomplete="off">
         <p>เข้าสู่ระบบด้วยบัญชีครูที่ได้รับอนุมัติแล้ว</p>
-        <label><span>อีเมลครู</span><input type="email" name="email" autocomplete="username" required></label>
-        <label><span>รหัสผ่าน</span><input type="password" name="password" autocomplete="current-password" required></label>
+        <label><span>อีเมลครู</span><input type="email" name="email" autocomplete="off" required></label>
+        <label><span>รหัสผ่าน</span><input type="password" name="password" autocomplete="new-password" required></label>
         <button type="submit" class="announcement-form-submit">เข้าสู่ระบบ</button>
         <p id="announcement-login-status" class="announcement-form-status d-none" role="alert"></p>
       </form>
