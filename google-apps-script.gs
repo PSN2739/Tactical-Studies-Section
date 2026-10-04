@@ -15,6 +15,10 @@ const CONFIG = {
   quizIndexSheetName: 'Quizzes',
   quizSheetPrefix: 'Quiz_',
   specialAssessmentIndexSheetName: 'SpecialAssessments',
+  announcementsSheetName: 'Announcements',
+  announcementHeaders: [
+    'announcement_id', 'title', 'start_at', 'end_at', 'content', 'icon', 'created_at', 'created_by'
+  ],
   legacyAssessmentOwners: {
     'รบด้วยวิธีรุก-ตีกลางวัน': 'onnicha2739@gmail.com'
   },
@@ -48,6 +52,9 @@ function doGet(e) {
     }
     if (String(params.action || '').toLowerCase() === 'announcement-gallery') {
       return listAnnouncementGalleryImages_();
+    }
+    if (String(params.action || '').toLowerCase() === 'announcements') {
+      return listAnnouncements_();
     }
     if (String(params.action || '').toLowerCase() === 'get-quiz') {
       return getQuiz_(params.quizId || '', params.studentId || '', params.phase || 'pre-test', params.title || '');
@@ -105,6 +112,9 @@ function doPost(e) {
     }
     if (formName === 'teacher-dashboard') {
       return getTeacherDashboard_(data.token);
+    }
+    if (formName === 'create-announcement') {
+      return createAnnouncement_(data);
     }
     if (formName === 'create-quiz') {
       return createQuiz_(data);
@@ -1252,6 +1262,139 @@ function listAnnouncementGalleryImages_() {
   }));
 
   return jsonResponse_({ ok: true, images });
+}
+
+function getOrCreateAnnouncementsSheet_() {
+  return getOrCreateSheet_(
+    getRegistrationSpreadsheet_(),
+    CONFIG.announcementsSheetName,
+    CONFIG.announcementHeaders
+  );
+}
+
+function listAnnouncements_() {
+  const lock = LockService.getScriptLock();
+  let locked = false;
+  try {
+    lock.waitLock(30000);
+    locked = true;
+    const sheet = getOrCreateAnnouncementsSheet_();
+    deleteExpiredAnnouncementsFromSheet_(sheet, new Date());
+    if (sheet.getLastRow() < 2) return jsonResponse_({ ok: true, announcements: [] });
+
+    const now = new Date();
+    const announcements = sheet.getRange(2, 1, sheet.getLastRow() - 1, CONFIG.announcementHeaders.length)
+      .getValues()
+      .map((row) => ({
+        id: normalizeValue_(row[0]),
+        title: normalizeValue_(row[1]),
+        startAt: row[2] instanceof Date ? row[2] : new Date(row[2]),
+        endAt: row[3] instanceof Date ? row[3] : new Date(row[3]),
+        content: normalizeValue_(row[4]),
+        icon: normalizeValue_(row[5]) || '📢',
+        createdAt: row[6] instanceof Date ? row[6] : new Date(row[6])
+      }))
+      .filter((item) => item.id && item.title && item.content
+        && !isNaN(item.startAt.getTime()) && !isNaN(item.endAt.getTime())
+        && item.startAt <= now && item.endAt > now)
+      .sort((left, right) => right.startAt - left.startAt || right.createdAt - left.createdAt)
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        startAt: item.startAt.toISOString(),
+        endAt: item.endAt.toISOString(),
+        content: item.content,
+        icon: item.icon,
+        isNew: now.getTime() - item.startAt.getTime() < 7 * 24 * 60 * 60 * 1000
+      }));
+
+    return jsonResponse_({ ok: true, announcements: announcements });
+  } finally {
+    if (locked) lock.releaseLock();
+  }
+}
+
+function createAnnouncement_(data) {
+  const teacherEmail = CacheService.getScriptCache().get('teacher:' + normalizeValue_(data.token));
+  if (!teacherEmail) return jsonResponse_({ ok: false, message: 'กรุณาเข้าสู่ระบบครูใหม่' });
+
+  const title = normalizeValue_(data.title);
+  const content = normalizeValue_(data.content);
+  const icon = normalizeValue_(data.icon) || '📢';
+  const startAt = parseAnnouncementDate_(data.startAt);
+  const endAt = parseAnnouncementDate_(data.endAt);
+  if (!title || title.length > 150 || !content || content.length > 5000
+    || icon.length > 12 || !startAt || !endAt || endAt <= startAt) {
+    return jsonResponse_({ ok: false, message: 'กรุณาตรวจสอบชื่อเรื่อง วันเริ่ม/สิ้นสุด และเนื้อหาประกาศ' });
+  }
+
+  const teachersSheet = getRegistrationSpreadsheet_().getSheetByName(CONFIG.teachersSheetName);
+  const activeTeacher = teachersSheet && teachersSheet.getLastRow() > 1
+    && teachersSheet.getDataRange().getDisplayValues().slice(1).some((row) =>
+      normalizeValue_(row[3]).toLowerCase() === teacherEmail.toLowerCase()
+      && normalizeValue_(row[5]).toUpperCase() === 'ACTIVE');
+  if (!activeTeacher) return jsonResponse_({ ok: false, message: 'บัญชีครูนี้ไม่ได้รับอนุมัติหรือปิดใช้งานแล้ว' });
+
+  ensureAnnouncementCleanupTrigger_();
+  const sheet = getOrCreateAnnouncementsSheet_();
+  deleteExpiredAnnouncementsFromSheet_(sheet, new Date());
+  const nextRow = sheet.getLastRow() + 1;
+  [2, 5, 6, 8].forEach((column) => sheet.getRange(nextRow, column).setNumberFormat('@'));
+  sheet.getRange(nextRow, 1, 1, CONFIG.announcementHeaders.length).setValues([[
+    'A' + Utilities.getUuid(),
+    title,
+    startAt,
+    endAt,
+    content,
+    icon,
+    new Date(),
+    teacherEmail
+  ]]);
+  return jsonResponse_({ ok: true, message: 'บันทึกประกาศเรียบร้อยแล้ว' });
+}
+
+function parseAnnouncementDate_(value) {
+  const dateText = normalizeValue_(value);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dateText)) return null;
+  const date = new Date(dateText + ':00+07:00');
+  if (isNaN(date.getTime())
+    || Utilities.formatDate(date, 'Asia/Bangkok', "yyyy-MM-dd'T'HH:mm") !== dateText) return null;
+  return date;
+}
+
+function deleteExpiredAnnouncementsFromSheet_(sheet, now) {
+  if (sheet.getLastRow() < 2) return 0;
+  const endDates = sheet.getRange(2, 4, sheet.getLastRow() - 1, 1).getValues();
+  let deleted = 0;
+  for (let index = endDates.length - 1; index >= 0; index -= 1) {
+    const endAt = endDates[index][0] instanceof Date ? endDates[index][0] : new Date(endDates[index][0]);
+    if (isNaN(endAt.getTime())) throw new Error('พบวันสิ้นสุดประกาศที่ไม่ถูกต้องในชีต');
+    if (endAt <= now) {
+      sheet.deleteRow(index + 2);
+      deleted += 1;
+    }
+  }
+  return deleted;
+}
+
+function cleanupExpiredAnnouncements_() {
+  const lock = LockService.getScriptLock();
+  let locked = false;
+  try {
+    lock.waitLock(30000);
+    locked = true;
+    return deleteExpiredAnnouncementsFromSheet_(getOrCreateAnnouncementsSheet_(), new Date());
+  } finally {
+    if (locked) lock.releaseLock();
+  }
+}
+
+function ensureAnnouncementCleanupTrigger_() {
+  const exists = ScriptApp.getProjectTriggers().some((trigger) =>
+    trigger.getHandlerFunction() === 'cleanupExpiredAnnouncements_');
+  if (!exists) {
+    ScriptApp.newTrigger('cleanupExpiredAnnouncements_').timeBased().everyHours(1).create();
+  }
 }
 
 function getTeacherDashboard_(token) {

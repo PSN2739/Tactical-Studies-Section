@@ -916,12 +916,59 @@
         <button type="button" id="announcement-dashboard-close" class="announcement-dashboard-close" aria-label="ปิดแดชบอร์ดประกาศ">ปิด</button>
       </header>
       <div class="announcement-dashboard-actions">
-        <button type="button" class="announcement-dashboard-add" disabled aria-disabled="true">เพิ่มประกาศ</button>
+        <button type="button" id="announcement-dashboard-add" class="announcement-dashboard-add">เพิ่มประกาศ</button>
       </div>
       <div id="announcement-dashboard-empty" class="announcement-dashboard-empty" role="status" aria-live="polite">
         <i class="bi bi-megaphone" aria-hidden="true"></i>
         <p>ยังไม่มีประกาศ</p>
       </div>
+      <p id="announcement-dashboard-status" class="announcement-dashboard-status d-none" role="status" aria-live="polite"></p>
+      <div id="announcement-list" class="announcement-list" aria-label="รายการประกาศ"></div>
+    </section>
+  </div>
+  <div id="announcement-editor-popup" class="announcement-editor-popup d-none" role="dialog"
+    aria-modal="true" aria-labelledby="announcement-editor-title">
+    <section class="announcement-editor-card">
+      <header class="announcement-dashboard-header">
+        <h2 id="announcement-editor-title">เพิ่มประกาศ</h2>
+        <button type="button" id="announcement-editor-close" class="announcement-dashboard-close" aria-label="ปิดแบบฟอร์มประกาศ">ปิด</button>
+      </header>
+      <form id="announcement-login-form" class="announcement-form d-none">
+        <p>เข้าสู่ระบบด้วยบัญชีครูที่ได้รับอนุมัติแล้ว</p>
+        <label><span>อีเมลครู</span><input type="email" name="email" autocomplete="username" required></label>
+        <label><span>รหัสผ่าน</span><input type="password" name="password" autocomplete="current-password" required></label>
+        <button type="submit" class="announcement-form-submit">เข้าสู่ระบบ</button>
+        <p id="announcement-login-status" class="announcement-form-status d-none" role="alert"></p>
+      </form>
+      <form id="announcement-form" class="announcement-form d-none">
+        <p id="announcement-editor-account" class="announcement-editor-account"></p>
+        <label><span>ชื่อเรื่อง</span><input type="text" name="title" maxlength="150" required></label>
+        <div class="announcement-date-fields">
+          <label><span>เริ่มประกาศ</span><input type="datetime-local" name="startAt" required></label>
+          <label><span>สิ้นสุดประกาศ</span><input type="datetime-local" name="endAt" required></label>
+        </div>
+        <label><span>ไอคอนหัวเรื่อง</span>
+          <select name="icon">
+            <option value="📢">📢 ประกาศ</option>
+            <option value="📅">📅 กำหนดการ</option>
+            <option value="⚠️">⚠️ แจ้งเตือน</option>
+            <option value="🎉">🎉 กิจกรรม</option>
+            <option value="📌">📌 สำคัญ</option>
+          </select>
+        </label>
+        <label><span>เนื้อหาประกาศ</span>
+          <span class="announcement-emoji-tools" aria-label="แทรกอิโมจิ">
+            <button type="button" data-announcement-emoji="📢" aria-label="แทรกอิโมจิประกาศ">📢</button>
+            <button type="button" data-announcement-emoji="📅" aria-label="แทรกอิโมจิปฏิทิน">📅</button>
+            <button type="button" data-announcement-emoji="⚠️" aria-label="แทรกอิโมจิแจ้งเตือน">⚠️</button>
+            <button type="button" data-announcement-emoji="🎉" aria-label="แทรกอิโมจิเฉลิมฉลอง">🎉</button>
+            <button type="button" data-announcement-emoji="✅" aria-label="แทรกอิโมจิเครื่องหมายถูก">✅</button>
+          </span>
+          <textarea name="content" rows="7" maxlength="5000" required></textarea>
+        </label>
+        <button type="submit" class="announcement-form-submit">บันทึกประกาศ</button>
+        <p id="announcement-form-status" class="announcement-form-status d-none" role="status" aria-live="polite"></p>
+      </form>
     </section>
   </div>
   <div id="quiz-loading-overlay" class="quiz-loading-overlay d-none" role="status" aria-live="polite" aria-label="กำลังดำเนินการ">
@@ -1026,7 +1073,7 @@
   <script defer src="assets/js/tactical-score.js?v=20260930-centered-copy-prompt"></script>
   <script defer src="assets/js/special-assessment.js?v=20261001-special-assessment"></script>
   <script defer src="assets/js/teaching-management.js?v=20260930-attendance-login"></script>
-  <script defer src="assets/js/announcement-gallery.js?v=20261002-download-notice"></script>
+  <script defer src="assets/js/announcement-gallery.js?v=20261004-announcements"></script>
 
   <!-- Main JS File -->
   <script defer src="assets/js/main.js?v=20261002-faster-load"></script>
