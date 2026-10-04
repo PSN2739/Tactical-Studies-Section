@@ -20,7 +20,7 @@ const CONFIG = {
   },
   announcementGalleryFolderId: '1mYtAuD15F6zD9TD-dzFAUsm4GZ7KBunQ',
   approvalEmail: 'nu2739@gmail.com',
-  webAppUrl: 'https://script.google.com/macros/s/AKfycbylfNRFHqfE5QztOXuICj-NCqVD5U2zPfXUu16Z3-aqUm0D2u4mNEFojzk-6vKQxFQ/exec',
+  webAppUrl: 'https://script.google.com/macros/s/AKfycbwc8GrsggUQenFkeH5wYfHPzkPDFJ0XhtHAKts27axlNDhWaYbBIhocXobu5XkNV0YN/exec',
   lookupIdColumn: 3,
   studentIdLength: 13,
   registrationHeaders: [
