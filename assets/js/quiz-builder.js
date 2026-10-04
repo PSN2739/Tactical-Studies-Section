@@ -24,8 +24,6 @@
   const teacherMenuCloseButton = document.getElementById('teacher-menu-close');
   const teacherDashboardPopup = document.getElementById('teacher-dashboard-popup');
   const teacherDashboardStatus = document.getElementById('teacher-dashboard-status');
-  const teacherDashboardQuizRows = document.getElementById('teacher-dashboard-quiz-rows');
-  const teacherDashboardAssessmentRows = document.getElementById('teacher-dashboard-assessment-rows');
   const loadingOverlay = document.getElementById('quiz-loading-overlay');
   const previewBox = document.getElementById('quiz-preview-box');
   const downloadTemplateButton = document.getElementById('download-quiz-template');
@@ -99,8 +97,10 @@
   function renderTeacherDashboard(data) {
     document.getElementById('teacher-dashboard-name').textContent = data.teacher.name || 'ครู/อาจารย์';
     document.getElementById('teacher-dashboard-email').textContent = data.teacher.email || '';
-    document.getElementById('teacher-dashboard-quiz-count').textContent = Number(data.summary.quizCount || 0).toLocaleString('th-TH');
-    document.getElementById('teacher-dashboard-assessment-count').textContent = Number(data.summary.assessmentCount || 0).toLocaleString('th-TH');
+    document.getElementById('teacher-dashboard-tactical-score-participant-count').textContent =
+      Number(data.summary.tacticalScoreParticipantCount || 0).toLocaleString('th-TH');
+    document.getElementById('teacher-dashboard-tactical-score-code-count').textContent =
+      Number(data.summary.tacticalScoreCodeCount || 0).toLocaleString('th-TH');
     const courseSummary = data.summary.daytimeAttack || {};
     [
       ['pre-test-count', courseSummary.preTestCount],
@@ -127,56 +127,6 @@
         card.append(episode, count, unit);
         episodeRows.appendChild(card);
       });
-    teacherDashboardQuizRows.replaceChildren();
-    const quizzes = Array.isArray(data.quizzes) ? data.quizzes : [];
-    if (!quizzes.length) {
-      const row = document.createElement('tr');
-      const cell = document.createElement('td');
-      cell.colSpan = 3;
-      cell.textContent = 'ยังไม่มีข้อสอบที่สร้างไว้';
-      row.appendChild(cell);
-      teacherDashboardQuizRows.appendChild(row);
-    } else {
-      const phases = {
-        'pre-test': 'ก่อนเรียน',
-        'post-test': 'หลังเรียน',
-        score: 'สอบเก็บคะแนน',
-        midterm: 'สอบกลางภาค',
-        final: 'สอบปลายภาค'
-      };
-      quizzes.forEach((quiz) => {
-        const row = document.createElement('tr');
-        const titleCell = document.createElement('td');
-        const phaseCell = document.createElement('td');
-        const countCell = document.createElement('td');
-        titleCell.textContent = quiz.title || '-';
-        phaseCell.textContent = phases[quiz.phase] || quiz.phase || '-';
-        countCell.textContent = Number(quiz.participantCount || 0).toLocaleString('th-TH');
-        row.append(titleCell, phaseCell, countCell);
-        teacherDashboardQuizRows.appendChild(row);
-      });
-    }
-
-    teacherDashboardAssessmentRows.replaceChildren();
-
-    if (!data.assessments || data.assessments.length === 0) {
-      const row = document.createElement('tr');
-      const cell = document.createElement('td');
-      cell.colSpan = 2;
-      cell.textContent = 'ยังไม่มีข้อมูลการประเมิน';
-      row.appendChild(cell);
-      teacherDashboardAssessmentRows.appendChild(row);
-    } else {
-      data.assessments.forEach((assessment) => {
-        const row = document.createElement('tr');
-        const titleCell = document.createElement('td');
-        titleCell.textContent = assessment.title;
-        const countCell = document.createElement('td');
-        countCell.textContent = Number(assessment.participantCount || 0).toLocaleString('th-TH');
-        row.append(titleCell, countCell);
-        teacherDashboardAssessmentRows.appendChild(row);
-      });
-    }
 
     const updatedAt = document.getElementById('teacher-dashboard-updated-at');
     updatedAt.textContent = data.updatedAt

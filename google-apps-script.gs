@@ -1326,12 +1326,14 @@ function getTeacherDashboard_(token) {
   const assessmentRows = assessmentIndex.getDataRange().getDisplayValues().slice(1)
     .filter((row) => row[10] !== 'FALSE' && row[0] && row[3]
       && normalizeValue_(row[9]).toLowerCase() === email.toLowerCase());
+  const assessmentParticipants = new Set();
   const assessments = assessmentRows.map((row) => {
     const assessmentSheet = spreadsheet.getSheetByName(row[3]);
     const studentIds = assessmentSheet && assessmentSheet.getLastRow() > 1
       ? assessmentSheet.getRange(2, 2, assessmentSheet.getLastRow() - 1, 1).getDisplayValues().flat()
-        .map(normalizeValue_).filter(Boolean)
+        .map(normalizeLookupId_).filter(Boolean)
       : [];
+    studentIds.forEach((studentId) => assessmentParticipants.add(studentId));
     return {
       assessmentId: row[0],
       title: row[2],
@@ -1350,8 +1352,20 @@ function getTeacherDashboard_(token) {
       .filter((row) => normalizeValue_(row[0]) && row.slice(3, 29).some((value) => normalizeValue_(value)))
       .map((row) => normalizeLookupId_(row[0]))
       .filter(Boolean));
+    participants.forEach((studentId) => assessmentParticipants.add(studentId));
     assessments.push({ assessmentId: 'legacy-tactical-score', title: title, participantCount: participants.size });
   });
+
+  const tacticalScoreSheet = spreadsheet.getSheetByName('ScooreT');
+  if (!tacticalScoreSheet) throw new Error('ไม่พบชีต ScooreT ใน Spreadsheet ที่ตั้งค่าไว้');
+  const tacticalScoreRows = tacticalScoreSheet.getLastRow() > 1
+    ? tacticalScoreSheet.getRange(2, 1, tacticalScoreSheet.getLastRow() - 1, 29).getDisplayValues()
+    : [];
+  const tacticalScoreParticipants = new Set(tacticalScoreRows
+    .filter((row) => normalizeValue_(row[0]) && row.slice(3, 29).some((value) => normalizeValue_(value)))
+    .map((row) => normalizeLookupId_(row[0]))
+    .filter(Boolean));
+  const tacticalScoreCode = normalizeValue_(tacticalScoreSheet.getRange('AD2').getDisplayValue());
 
   const registrationCount = countUniqueLearnersInSheet_(spreadsheet.getSheetByName(CONFIG.registrationSheetName));
   const attendanceCount = countUniqueLearnersInSheet_(
@@ -1371,6 +1385,9 @@ function getTeacherDashboard_(token) {
     summary: {
       quizCount: quizzes.length,
       assessmentCount: assessments.length,
+      assessmentParticipantCount: assessmentParticipants.size,
+      tacticalScoreParticipantCount: tacticalScoreParticipants.size,
+      tacticalScoreCodeCount: /^\d{6}$/.test(tacticalScoreCode) ? 1 : 0,
       daytimeAttack: {
         preTestCount: courseLearners.preTest.size,
         postTestCount: courseLearners.postTest.size,
