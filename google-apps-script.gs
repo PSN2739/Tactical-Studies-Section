@@ -1361,7 +1361,8 @@ function getTeacherDashboard_(token) {
   );
   const attendanceByEpisode = countUniqueLearnersByEpisode_(
     spreadsheet.getSheetByName(CONFIG.attendanceSheetName),
-    'รบด้วยวิธีรุก-ตีกลางวัน'
+    'รบด้วยวิธีรุก-ตีกลางวัน',
+    spreadsheet.getSheetByName(CONFIG.registrationSheetName)
   );
 
   return jsonResponse_({
@@ -1410,7 +1411,7 @@ function countUniqueLearnersInSheet_(sheet, filterHeader, filterValue) {
   return learners.size;
 }
 
-function countUniqueLearnersByEpisode_(sheet, subject) {
+function countUniqueLearnersByEpisode_(sheet, subject, registrationSheet) {
   const episodeLearners = Array.from({ length: 18 }, (_, index) => ({
     episode: 'ตอนที่ ' + (index + 1),
     learners: new Set()
@@ -1419,20 +1420,39 @@ function countUniqueLearnersByEpisode_(sheet, subject) {
     return episodeLearners.map((item) => ({ episode: item.episode, count: 0 }));
   }
 
+  const registrationEpisodes = new Map();
+  if (registrationSheet && registrationSheet.getLastRow() > 1) {
+    const registrationRows = registrationSheet.getDataRange().getDisplayValues();
+    const registrationHeaders = registrationRows[0].map((header) => normalizeValue_(header).toLowerCase());
+    const registrationLearnerIndex = registrationHeaders.indexOf('lookup_id');
+    const registrationEpisodeIndex = registrationHeaders.indexOf('episode');
+    if (registrationLearnerIndex >= 0 && registrationEpisodeIndex >= 0) {
+      registrationRows.slice(1).forEach((row) => {
+        const learnerId = normalizeLookupId_(row[registrationLearnerIndex]);
+        const episode = normalizeValue_(row[registrationEpisodeIndex]);
+        if (learnerId && episode && !registrationEpisodes.has(learnerId)) {
+          registrationEpisodes.set(learnerId, episode);
+        }
+      });
+    }
+  }
+
   const values = sheet.getDataRange().getDisplayValues();
   const headers = values[0].map((header) => normalizeValue_(header).toLowerCase());
   const learnerIndex = headers.indexOf('lookup_id');
   const subjectIndex = headers.indexOf('subject');
   const episodeIndex = headers.indexOf('episode');
-  if (learnerIndex < 0 || subjectIndex < 0 || episodeIndex < 0) {
+  if (learnerIndex < 0 || subjectIndex < 0) {
     return episodeLearners.map((item) => ({ episode: item.episode, count: 0 }));
   }
 
   const learnersByEpisode = new Map(episodeLearners.map((item) => [item.episode, item.learners]));
   values.slice(1).forEach((row) => {
     if (normalizeValue_(row[subjectIndex]) !== subject) return;
-    const learners = learnersByEpisode.get(normalizeValue_(row[episodeIndex]));
     const learnerId = normalizeLookupId_(row[learnerIndex]);
+    const attendanceEpisode = episodeIndex >= 0 ? normalizeValue_(row[episodeIndex]) : '';
+    const episode = attendanceEpisode || registrationEpisodes.get(learnerId) || '';
+    const learners = learnersByEpisode.get(episode);
     if (learners && learnerId) learners.add(learnerId);
   });
 
