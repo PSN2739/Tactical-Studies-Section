@@ -15,6 +15,9 @@ const CONFIG = {
   quizIndexSheetName: 'Quizzes',
   quizSheetPrefix: 'Quiz_',
   specialAssessmentIndexSheetName: 'SpecialAssessments',
+  legacyAssessmentOwners: {
+    'รบด้วยวิธีรุก-ตีกลางวัน': 'onnicha2739@gmail.com'
+  },
   announcementGalleryFolderId: '1mYtAuD15F6zD9TD-dzFAUsm4GZ7KBunQ',
   approvalEmail: 'nu2739@gmail.com',
   webAppUrl: 'https://script.google.com/macros/s/AKfycbylfNRFHqfE5QztOXuICj-NCqVD5U2zPfXUu16Z3-aqUm0D2u4mNEFojzk-6vKQxFQ/exec',
@@ -1282,6 +1285,20 @@ function getTeacherDashboard_(token) {
       title: row[2],
       participantCount: new Set(studentIds).size
     };
+  });
+  Object.keys(CONFIG.legacyAssessmentOwners).forEach((title) => {
+    const ownerEmail = normalizeValue_(CONFIG.legacyAssessmentOwners[title]).toLowerCase();
+    if (ownerEmail !== email.toLowerCase()
+      || assessments.some((assessment) => assessment.title.toLowerCase() === title.toLowerCase())) return;
+    const legacySheet = spreadsheet.getSheetByName('ScooreT');
+    const legacyRows = legacySheet && legacySheet.getLastRow() > 1
+      ? legacySheet.getRange(2, 1, legacySheet.getLastRow() - 1, 29).getDisplayValues()
+      : [];
+    const participants = new Set(legacyRows
+      .filter((row) => normalizeValue_(row[0]) && row.slice(3, 29).some((value) => normalizeValue_(value)))
+      .map((row) => normalizeLookupId_(row[0]))
+      .filter(Boolean));
+    assessments.push({ assessmentId: 'legacy-tactical-score', title: title, participantCount: participants.size });
   });
 
   return jsonResponse_({
