@@ -32,6 +32,7 @@ const CONFIG = {
     'data_column_c',
     'data_column_d',
     'email',
+    'subject',
     'episode',
     'form_name'
   ]
@@ -190,6 +191,7 @@ function doPost(e) {
       student.columns[2].value,
       student.columns[3].value,
       email,
+      'รบด้วยวิธีรุก-ตีกลางวัน',
       episode,
       normalizeValue_(data.formName) || 'class-registration'
     ]);
@@ -904,6 +906,21 @@ function hashPassword_(password) {
 function saveAttendance_(data) {
   const registrationId = normalizeValue_(data.registrationId);
   const attendanceFormName = normalizeValue_(data.attendanceFormName);
+  const attendanceSubject = normalizeValue_(data.attendanceSubject);
+  const validSubjects = [
+    'รูปขบวน หมู่ ปล.',
+    'แบบฝึกทำการรบ',
+    'MOUT',
+    'ตั้งรับ',
+    'ระเบียบนำหน่วย คำสั่งฯ',
+    'รบด้วยวิธีรุก-ตีกลางวัน',
+    'ป้อมสนาม',
+    'ถอนตัว',
+    'เครื่องกีดขวาง',
+    'รบด้วยวิธีรุก-ตีกลางคืน',
+    'Unit School',
+    'Drone Tactical'
+  ];
 
   if (!/^\d{13}$/.test(registrationId)) {
     return jsonResponse_({
@@ -918,6 +935,12 @@ function saveAttendance_(data) {
       message: 'กรุณาเลือกครั้งที่ 1-4'
     });
   }
+  if (validSubjects.indexOf(attendanceSubject) === -1) {
+    return jsonResponse_({
+      ok: false,
+      message: 'กรุณาเลือกเรื่องจากรายการ'
+    });
+  }
 
   const source = findRegistrationRecord_(registrationId);
   if (!source) {
@@ -928,7 +951,7 @@ function saveAttendance_(data) {
   }
 
   const sheet = getOrCreateAttendanceSheet_();
-  if (attendanceDuplicateExists_(sheet, source.values[4], attendanceFormName)) {
+  if (attendanceDuplicateExists_(sheet, source.values[4], attendanceFormName, attendanceSubject)) {
     return jsonResponse_({
       ok: false,
       code: 'DUPLICATE_ATTENDANCE',
@@ -936,7 +959,9 @@ function saveAttendance_(data) {
     });
   }
 
-  sheet.appendRow(source.values.concat([attendanceFormName]));
+  const attendanceValues = source.values.slice();
+  attendanceValues[CONFIG.registrationHeaders.indexOf('subject')] = attendanceSubject;
+  sheet.appendRow(attendanceValues.concat([attendanceFormName, attendanceSubject]));
   sortAttendanceSheet_(sheet);
   return jsonResponse_({
     ok: true,
@@ -1518,6 +1543,8 @@ function attendanceStudentLogin_(data) {
   }
 
   const rows = sheet.getDataRange().getDisplayValues();
+  const headers = rows[0] || [];
+  const episodeIndex = headers.indexOf('episode');
   const row = rows.slice(1).find((record) => normalizeValue_(record[0]).replace(/^'/, '') === password
     && normalizeValue_(record[7]).toLowerCase() === email);
   if (!row) return jsonResponse_({ ok: false, message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
@@ -1531,7 +1558,7 @@ function attendanceStudentLogin_(data) {
         battalionNumber: normalizeValue_(row[2]),
         fullName: normalizeValue_(row[4]),
         email: normalizeValue_(row[7]),
-        episode: normalizeValue_(row[8])
+        episode: normalizeValue_(episodeIndex >= 0 ? row[episodeIndex] : '')
       },
       scores: getTeachingScores_(spreadsheet, row[0], row[2])
     }
@@ -1577,6 +1604,7 @@ function findRegistrationRecord_(registrationId) {
   const sheet = getRegistrationSheet_();
   const values = sheet.getDataRange().getDisplayValues();
   const headers = values.length > 0 ? values[0] : [];
+  const episodeIndex = headers.indexOf('episode');
 
   for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
     const row = values[rowIndex];
@@ -1585,16 +1613,16 @@ function findRegistrationRecord_(registrationId) {
     }
 
     return {
-      values: row.slice(0, 9),
+      values: row.slice(0, CONFIG.registrationHeaders.length),
       examInfo: {
         registrationId: normalizeValue_(row[0]),
         lookupId: normalizeLookupId_(row[2]),
         rankName: normalizeValue_(row[4]),
         affiliation: normalizeValue_(row[5]),
         email: normalizeValue_(row[7]),
-        formName: normalizeValue_(row[8])
+        formName: normalizeValue_(episodeIndex >= 0 ? row[episodeIndex] : '')
       },
-      columns: row.slice(0, 9).map((value, index) => ({
+      columns: row.slice(0, CONFIG.registrationHeaders.length).map((value, index) => ({
         label: normalizeValue_(headers[index]) || `คอลัมน์ ${String.fromCharCode(65 + index)}`,
         value: normalizeValue_(value)
       }))
@@ -1652,14 +1680,60 @@ function getOrCreateRegistrationSheet_() {
     sheet = spreadsheet.insertSheet(CONFIG.registrationSheetName);
   }
 
-  const headerRange = sheet.getRange(1, 1, 1, CONFIG.registrationHeaders.length);
-  if (headerRange.getValues()[0].every((value) => normalizeValue_(value) === '')) {
-    headerRange.setValues([CONFIG.registrationHeaders]);
-    headerRange.setFontWeight('bold');
-  }
+  ensureRegistrationSubjectColumn_(sheet);
+  const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
+  if (attendanceSheet) ensureAttendanceSubjectSchema_(attendanceSheet);
   sheet.getRange(1, CONFIG.lookupIdColumn, sheet.getMaxRows(), 2).setNumberFormat('@');
   normalizeRegistrationLookupColumns_(sheet);
   return sheet;
+}
+
+function ensureRegistrationSubjectColumn_(sheet) {
+  if (sheet.getLastColumn() === 0) ensureSheetColumns_(sheet, CONFIG.registrationHeaders.length);
+  let columnCount = Math.max(sheet.getLastColumn(), CONFIG.registrationHeaders.length - 1);
+  let headers = sheet.getRange(1, 1, 1, columnCount).getDisplayValues()[0].map(normalizeValue_);
+  if (headers.every((header) => !header)) {
+    sheet.getRange(1, 1, 1, CONFIG.registrationHeaders.length)
+      .setValues([CONFIG.registrationHeaders]).setFontWeight('bold');
+    return;
+  }
+
+  const formNameIndex = headers.indexOf('form_name');
+  if (headers.indexOf('episode') < 0 && formNameIndex >= 0 && sheet.getLastRow() > 1) {
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, columnCount).getDisplayValues();
+    const valuesLookLikeEpisodes = rows.length > 0 && rows.every((row) =>
+      !normalizeValue_(row[formNameIndex]) || /^ตอนที่\s*\d+$/.test(normalizeValue_(row[formNameIndex])));
+    const nextColumnHasFormName = rows.some((row) =>
+      /^(class-registration|attendance-registration)$/i.test(normalizeValue_(row[formNameIndex + 1])));
+    if (valuesLookLikeEpisodes && nextColumnHasFormName) {
+      sheet.getRange(1, formNameIndex + 1).setValue('episode');
+      sheet.getRange(1, formNameIndex + 2).setValue('form_name');
+      headers[formNameIndex] = 'episode';
+      headers[formNameIndex + 1] = 'form_name';
+    }
+  }
+
+  let subjectIndex = headers.indexOf('subject');
+  if (subjectIndex < 0) {
+    const emailIndex = headers.indexOf('email');
+    if (emailIndex < 0) throw new Error('ไม่พบคอลัมน์ email ในชีต ' + sheet.getName());
+    sheet.insertColumnAfter(emailIndex + 1);
+    subjectIndex = emailIndex + 1;
+    sheet.getRange(1, subjectIndex + 1).setValue('subject');
+    columnCount += 1;
+  }
+
+  const dataRowCount = sheet.getLastRow() - 1;
+  if (dataRowCount > 0) {
+    const subjectRange = sheet.getRange(2, subjectIndex + 1, dataRowCount, 1);
+    const currentSubjects = subjectRange.getDisplayValues();
+    if (currentSubjects.some((row) => !normalizeValue_(row[0]))) {
+      subjectRange.setValues(currentSubjects.map((row) => [
+        normalizeValue_(row[0]) || 'รบด้วยวิธีรุก-ตีกลางวัน'
+      ]));
+    }
+  }
+  sheet.getRange(1, 1, 1, Math.max(columnCount, sheet.getLastColumn())).setFontWeight('bold');
 }
 
 function getRegistrationSpreadsheet_() {
@@ -1724,6 +1798,9 @@ function getRegistrationSheet_() {
   if (!sheet) {
     throw new Error('ไม่พบชีต Registration');
   }
+  ensureRegistrationSubjectColumn_(sheet);
+  const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
+  if (attendanceSheet) ensureAttendanceSubjectSchema_(attendanceSheet);
   return sheet;
 }
 
@@ -1734,14 +1811,45 @@ function getOrCreateAttendanceSheet_() {
     sheet = spreadsheet.insertSheet(CONFIG.attendanceSheetName);
   }
 
-  const headers = CONFIG.registrationHeaders;
-  const headerRange = sheet.getRange(1, 1, 1, headers.length);
-  if (headerRange.getValues()[0].every((value) => normalizeValue_(value) === '')) {
-    headerRange.setValues([headers]);
-    headerRange.setFontWeight('bold');
-  }
-  normalizeAttendanceLookupColumns_(sheet);
+  ensureAttendanceSubjectSchema_(sheet);
   return sheet;
+}
+
+function ensureAttendanceSubjectSchema_(sheet) {
+  ensureRegistrationSubjectColumn_(sheet);
+  const headers = CONFIG.registrationHeaders.concat(['attendance_form_name', 'attendance_subject']);
+  ensureSheetColumns_(sheet, headers.length);
+  const existingHeaders = sheet.getRange(1, 1, 1, headers.length).getDisplayValues()[0]
+    .map(normalizeValue_);
+  if (headers.every((header, index) => existingHeaders[index] === header)) return;
+  const rows = sheet.getLastRow() > 1
+    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues()
+    : [];
+  const attendanceRoundIndex = CONFIG.registrationHeaders.indexOf('form_name');
+  const needsMigration = headers.some((header, index) => existingHeaders[index] !== header)
+    || rows.some((row) => /^ครั้งที่ [1-4]$/.test(normalizeValue_(row[attendanceRoundIndex]))
+      || !normalizeValue_(row[CONFIG.registrationHeaders.indexOf('subject')])
+      || !normalizeValue_(row[headers.indexOf('attendance_subject')]));
+  if (!needsMigration) return;
+
+  rows.forEach((row) => {
+    const existingRound = normalizeValue_(row[attendanceRoundIndex]);
+    if (/^ครั้งที่ [1-4]$/.test(existingRound)) {
+      if (!normalizeValue_(row[headers.indexOf('attendance_form_name')])) {
+        row[headers.indexOf('attendance_form_name')] = existingRound;
+      }
+      row[attendanceRoundIndex] = '';
+    }
+    if (!normalizeValue_(row[headers.indexOf('subject')])) {
+      row[headers.indexOf('subject')] = 'รบด้วยวิธีรุก-ตีกลางวัน';
+    }
+    if (!normalizeValue_(row[headers.indexOf('attendance_subject')])) {
+      row[headers.indexOf('attendance_subject')] = row[headers.indexOf('subject')];
+    }
+  });
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+  if (rows.length) sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  normalizeAttendanceLookupColumns_(sheet);
 }
 
 function normalizeAttendanceLookupColumns_(sheet) {
@@ -1758,15 +1866,16 @@ function normalizeAttendanceLookupColumns_(sheet) {
   ]));
 }
 
-function attendanceDuplicateExists_(sheet, dataColumnB, formName) {
+function attendanceDuplicateExists_(sheet, dataColumnB, formName, subject) {
   if (sheet.getLastRow() < 2) {
     return false;
   }
 
-  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 10).getDisplayValues();
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, CONFIG.registrationHeaders.length + 2).getDisplayValues();
   return values.some((row) =>
     normalizeValue_(row[4]) === normalizeValue_(dataColumnB)
-    && normalizeValue_(row[9]) === normalizeValue_(formName)
+    && normalizeValue_(row[CONFIG.registrationHeaders.length]) === normalizeValue_(formName)
+    && normalizeValue_(row[CONFIG.registrationHeaders.length + 1]) === normalizeValue_(subject)
   );
 }
 
@@ -1775,7 +1884,8 @@ function sortAttendanceSheet_(sheet) {
   if (dataRowCount < 2) {
     return;
   }
-  sheet.getRange(2, 1, dataRowCount, 10).sort({ column: 1, ascending: true });
+  sheet.getRange(2, 1, dataRowCount, CONFIG.registrationHeaders.length + 2)
+    .sort({ column: 1, ascending: true });
 }
 
 function isValidEmail_(email) {
