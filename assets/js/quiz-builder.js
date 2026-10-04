@@ -116,13 +116,16 @@
     episodeRows.replaceChildren();
     (Array.isArray(courseSummary.topicAttendanceByEpisode) ? courseSummary.topicAttendanceByEpisode : [])
       .forEach((item) => {
-        const row = document.createElement('tr');
-        const episodeCell = document.createElement('td');
-        const countCell = document.createElement('td');
-        episodeCell.textContent = item.episode || '-';
-        countCell.textContent = Number(item.count || 0).toLocaleString('th-TH');
-        row.append(episodeCell, countCell);
-        episodeRows.appendChild(row);
+        const card = document.createElement('article');
+        card.className = 'teacher-dashboard-episode-card';
+        const episode = document.createElement('span');
+        const count = document.createElement('strong');
+        const unit = document.createElement('small');
+        episode.textContent = item.episode || '-';
+        count.textContent = Number(item.count || 0).toLocaleString('th-TH');
+        unit.textContent = 'คน';
+        card.append(episode, count, unit);
+        episodeRows.appendChild(card);
       });
     teacherDashboardQuizRows.replaceChildren();
     const quizzes = Array.isArray(data.quizzes) ? data.quizzes : [];
