@@ -132,7 +132,8 @@
   }
 
   function getLocalDateTimeValue(date) {
-    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    const roundedDate = new Date(Math.ceil(date.getTime() / 60000) * 60000);
+    const localDate = new Date(roundedDate.getTime() - roundedDate.getTimezoneOffset() * 60000);
     return localDate.toISOString().slice(0, 16);
   }
 
@@ -245,6 +246,7 @@
       announcementForm.reset();
       await loadAnnouncements();
       closeAnnouncementEditor();
+      setAnnouncementStatus(dashboardStatus, data.message || 'บันทึกประกาศแล้ว', false);
     } catch (error) {
       if (/เข้าสู่ระบบครูใหม่|บัญชีครู/i.test(error.message)) {
         localStorage.removeItem(teacherTokenKey);

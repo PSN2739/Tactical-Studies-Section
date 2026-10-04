@@ -1324,7 +1324,8 @@ function createAnnouncement_(data) {
   const startAt = parseAnnouncementDate_(data.startAt);
   const endAt = parseAnnouncementDate_(data.endAt);
   if (!title || title.length > 150 || !content || content.length > 5000
-    || icon.length > 12 || !startAt || !endAt || endAt <= startAt) {
+    || icon.length > 12 || !startAt || !endAt || endAt <= startAt
+    || startAt.getTime() < Date.now() - 60000) {
     return jsonResponse_({ ok: false, message: 'กรุณาตรวจสอบชื่อเรื่อง วันเริ่ม/สิ้นสุด และเนื้อหาประกาศ' });
   }
 
@@ -1395,6 +1396,11 @@ function ensureAnnouncementCleanupTrigger_() {
   if (!exists) {
     ScriptApp.newTrigger('cleanupExpiredAnnouncements_').timeBased().everyHours(1).create();
   }
+}
+
+function setupAnnouncementCleanup() {
+  ensureAnnouncementCleanupTrigger_();
+  return 'ตั้งค่างานลบประกาศที่หมดอายุเรียบร้อยแล้ว';
 }
 
 function getTeacherDashboard_(token) {
