@@ -27,7 +27,7 @@
   <link href="assets/swiper/swiper-bundle.min.css" rel="stylesheet">
 
   <!-- Main CSS File -->
-  <link href="assets/css/main.css?v=20261002-announcement-dashboard" rel="stylesheet">
+  <link href="assets/css/main.css?v=20261004-teacher-owned-content" rel="stylesheet">
   <link rel="preload" href="assets/img/hero-bg-2.jpg" as="image" fetchpriority="high">
 
   <!-- =======================================================
@@ -743,13 +743,20 @@
         <span id="teacher-dashboard-email"></span>
       </div>
       <dl class="teacher-dashboard-summary">
-        <div><dt>ผู้ลงทะเบียนแผนกยุทธวิธี</dt><dd id="teacher-dashboard-registration-count">-</dd></div>
-        <div><dt>ผู้ลงทะเบียนเข้าเรียน</dt><dd id="teacher-dashboard-attendance-count">-</dd></div>
-        <div><dt>ผู้ทำแบบทดสอบก่อนเรียน</dt><dd id="teacher-dashboard-pretest-count">-</dd></div>
-        <div><dt>ผู้ทำแบบทดสอบเก็บคะแนน</dt><dd id="teacher-dashboard-score-count">-</dd></div>
+        <div><dt>ข้อสอบของฉัน</dt><dd id="teacher-dashboard-quiz-count">-</dd></div>
+        <div><dt>แบบประเมินของฉัน</dt><dd id="teacher-dashboard-assessment-count">-</dd></div>
       </dl>
+      <section class="teacher-dashboard-assessments" aria-labelledby="teacher-dashboard-quizzes-title">
+        <h4 id="teacher-dashboard-quizzes-title">ข้อสอบที่ฉันสร้าง</h4>
+        <div class="teacher-dashboard-table-wrap">
+          <table>
+            <thead><tr><th scope="col">ชื่อเรื่อง</th><th scope="col">ช่วงสอบ</th><th scope="col">ผู้เข้าสอบ</th></tr></thead>
+            <tbody id="teacher-dashboard-quiz-rows"></tbody>
+          </table>
+        </div>
+      </section>
       <section class="teacher-dashboard-assessments" aria-labelledby="teacher-dashboard-assessments-title">
-        <h4 id="teacher-dashboard-assessments-title">ผู้เข้ารับการประเมินรายเรื่อง</h4>
+        <h4 id="teacher-dashboard-assessments-title">แบบประเมินที่ฉันสร้าง</h4>
         <div class="teacher-dashboard-table-wrap">
           <table>
             <thead><tr><th scope="col">ชื่อเรื่อง</th><th scope="col">จำนวนผู้รับการประเมิน</th></tr></thead>
@@ -967,7 +974,7 @@
   <!-- Google Sheets form handler -->
   <script defer src="assets/js/google-sheet-form.js?v=20260918-separate-forms"></script>
   <script defer src="assets/js/attendance-registration.js?v=20260918-close-fix"></script>
-  <script defer src="assets/js/quiz-builder.js?v=20261002-lazy-xlsx"></script>
+  <script defer src="assets/js/quiz-builder.js?v=20261004-teacher-owned-content"></script>
   <script defer src="assets/js/exam.js?v=20260929-posttest-80-retake"></script>
   <script defer src="assets/js/tactical-score.js?v=20260930-centered-copy-prompt"></script>
   <script defer src="assets/js/special-assessment.js?v=20261001-special-assessment"></script>

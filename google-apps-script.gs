@@ -1240,66 +1240,58 @@ function getTeacherDashboard_(token) {
     && normalizeValue_(row[5]).toUpperCase() === 'ACTIVE');
   if (!teacher) return jsonResponse_({ ok: false, message: 'ไม่พบบัญชีครูที่ใช้งานอยู่ กรุณาเข้าสู่ระบบใหม่' });
 
-  const registrationSheet = spreadsheet.getSheetByName(CONFIG.registrationSheetName);
-  const registrationIds = registrationSheet && registrationSheet.getLastRow() > 1
-    ? registrationSheet.getRange(2, 1, registrationSheet.getLastRow() - 1, 1).getDisplayValues().flat()
-      .map(normalizeValue_).filter(Boolean)
-    : [];
-  const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
-  const attendanceIds = attendanceSheet && attendanceSheet.getLastRow() > 1
-    ? attendanceSheet.getRange(2, 1, attendanceSheet.getLastRow() - 1, 1).getDisplayValues().flat()
-      .map(normalizeValue_).filter(Boolean)
-    : [];
-
+  const quizIndex = getOrCreateQuizIndexSheet_();
+  const quizzes = quizIndex.getDataRange().getDisplayValues().slice(1)
+    .filter((row) => normalizeValue_(row[4]).toLowerCase() === email.toLowerCase())
+    .map((row) => ({
+      quizId: normalizeValue_(row[0]),
+      title: normalizeValue_(row[1]),
+      phase: normalizePhase_(row[10]) || 'pre-test'
+    }))
+    .filter((quiz) => quiz.quizId && quiz.title);
   const historySheet = getOrCreateQuizAttemptHistorySheet_();
   const historyRows = historySheet.getDataRange().getDisplayValues();
   const historyHeaders = historyRows[0] || [];
   const studentIndex = historyHeaders.indexOf('student_id');
   const lookupIndex = historyHeaders.indexOf('lookup_id');
-  const phaseIndex = historyHeaders.indexOf('phase');
-  const uniqueStudentCount = (phase) => new Set(historyRows.slice(1)
-    .filter((row) => normalizePhase_(row[phaseIndex]) === phase)
-    .map((row) => normalizeValue_(row[studentIndex]) || normalizeLookupId_(row[lookupIndex]))
-    .filter(Boolean)).size;
+  const quizIndexColumn = historyHeaders.indexOf('quiz_id');
+  const quizParticipants = new Map();
+  quizzes.forEach((quiz) => quizParticipants.set(quiz.quizId, new Set()));
+  historyRows.slice(1).forEach((row) => {
+    const participants = quizParticipants.get(normalizeValue_(row[quizIndexColumn]));
+    if (!participants) return;
+    const studentId = normalizeValue_(row[studentIndex]) || normalizeLookupId_(row[lookupIndex]);
+    if (studentId) participants.add(studentId);
+  });
+  quizzes.forEach((quiz) => {
+    quiz.participantCount = quizParticipants.get(quiz.quizId).size;
+  });
 
   const assessmentIndex = getOrCreateSpecialAssessmentIndex_();
   const assessmentRows = assessmentIndex.getDataRange().getDisplayValues().slice(1)
-    .filter((row) => row[10] !== 'FALSE' && row[0] && row[3]);
-  const assessmentParticipants = new Map();
-  assessmentRows.forEach((row) => {
+    .filter((row) => row[10] !== 'FALSE' && row[0] && row[3]
+      && normalizeValue_(row[9]).toLowerCase() === email.toLowerCase());
+  const assessments = assessmentRows.map((row) => {
     const assessmentSheet = spreadsheet.getSheetByName(row[3]);
     const studentIds = assessmentSheet && assessmentSheet.getLastRow() > 1
       ? assessmentSheet.getRange(2, 2, assessmentSheet.getLastRow() - 1, 1).getDisplayValues().flat()
         .map(normalizeValue_).filter(Boolean)
       : [];
-    assessmentParticipants.set(row[2], new Set(studentIds));
+    return {
+      assessmentId: row[0],
+      title: row[2],
+      participantCount: new Set(studentIds).size
+    };
   });
-
-  const legacyAssessmentTitle = 'รบด้วยวิธีรุก-ตีกลางวัน';
-  const legacyScoreSheet = spreadsheet.getSheetByName('ScooreT');
-  const legacyRows = legacyScoreSheet && legacyScoreSheet.getLastRow() > 1
-    ? legacyScoreSheet.getRange(2, 1, legacyScoreSheet.getLastRow() - 1, 29).getDisplayValues()
-    : [];
-  const legacyParticipants = new Set(legacyRows
-    .filter((row) => normalizeValue_(row[0]) && row.slice(3, 29).some((value) => normalizeValue_(value)))
-    .map((row) => normalizeLookupId_(row[0])));
-  const combinedLegacyParticipants = assessmentParticipants.get(legacyAssessmentTitle) || new Set();
-  legacyParticipants.forEach((studentId) => combinedLegacyParticipants.add(studentId));
-  assessmentParticipants.set(legacyAssessmentTitle, combinedLegacyParticipants);
-  const assessments = Array.from(assessmentParticipants.entries()).map(([title, studentIds]) => ({
-    title: title,
-    participantCount: studentIds.size
-  }));
 
   return jsonResponse_({
     ok: true,
     teacher: { name: normalizeValue_(teacher[2]), email: email },
     summary: {
-      departmentRegistrations: new Set(registrationIds).size,
-      attendanceRegistrations: new Set(attendanceIds).size,
-      preTestParticipants: uniqueStudentCount('pre-test'),
-      scoreTestParticipants: uniqueStudentCount('score')
+      quizCount: quizzes.length,
+      assessmentCount: assessments.length
     },
+    quizzes: quizzes,
     assessments: assessments,
     updatedAt: new Date().toISOString()
   });
