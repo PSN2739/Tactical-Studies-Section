@@ -101,6 +101,17 @@
     document.getElementById('teacher-dashboard-email').textContent = data.teacher.email || '';
     document.getElementById('teacher-dashboard-quiz-count').textContent = Number(data.summary.quizCount || 0).toLocaleString('th-TH');
     document.getElementById('teacher-dashboard-assessment-count').textContent = Number(data.summary.assessmentCount || 0).toLocaleString('th-TH');
+    const courseSummary = data.summary.daytimeAttack || {};
+    [
+      ['pre-test-count', courseSummary.preTestCount],
+      ['post-test-count', courseSummary.postTestCount],
+      ['passed-post-test-count', courseSummary.passedPostTestCount],
+      ['score-count', courseSummary.scoreCount],
+      ['department-registration-count', courseSummary.departmentRegistrationCount],
+      ['topic-attendance-count', courseSummary.topicAttendanceCount]
+    ].forEach(([id, count]) => {
+      document.getElementById(`teacher-dashboard-${id}`).textContent = Number(count || 0).toLocaleString('th-TH');
+    });
     teacherDashboardQuizRows.replaceChildren();
     const quizzes = Array.isArray(data.quizzes) ? data.quizzes : [];
     if (!quizzes.length) {

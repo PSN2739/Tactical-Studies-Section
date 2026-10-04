@@ -1281,13 +1281,37 @@ function getTeacherDashboard_(token) {
   const studentIndex = historyHeaders.indexOf('student_id');
   const lookupIndex = historyHeaders.indexOf('lookup_id');
   const quizIndexColumn = historyHeaders.indexOf('quiz_id');
+  const passedIndex = historyHeaders.indexOf('passed');
   const quizParticipants = new Map();
-  quizzes.forEach((quiz) => quizParticipants.set(quiz.quizId, new Set()));
+  const quizById = new Map();
+  quizzes.forEach((quiz) => {
+    quizParticipants.set(quiz.quizId, new Set());
+    quizById.set(quiz.quizId, quiz);
+  });
+  const courseLearners = {
+    preTest: new Set(),
+    postTest: new Set(),
+    passedPostTest: new Set(),
+    score: new Set()
+  };
   historyRows.slice(1).forEach((row) => {
-    const participants = quizParticipants.get(normalizeValue_(row[quizIndexColumn]));
+    const quizId = normalizeValue_(row[quizIndexColumn]);
+    const participants = quizParticipants.get(quizId);
     if (!participants) return;
     const studentId = normalizeValue_(row[studentIndex]) || normalizeLookupId_(row[lookupIndex]);
-    if (studentId) participants.add(studentId);
+    if (!studentId) return;
+    participants.add(studentId);
+
+    const quiz = quizById.get(quizId);
+    if (!isDaytimeAttackQuizTitle_(quiz.title)) return;
+    if (quiz.phase === 'pre-test') courseLearners.preTest.add(studentId);
+    if (quiz.phase === 'post-test') {
+      courseLearners.postTest.add(studentId);
+      if (passedIndex >= 0 && normalizeValue_(row[passedIndex]).toUpperCase() === 'TRUE') {
+        courseLearners.passedPostTest.add(studentId);
+      }
+    }
+    if (quiz.phase === 'score') courseLearners.score.add(studentId);
   });
   quizzes.forEach((quiz) => {
     quiz.participantCount = quizParticipants.get(quiz.quizId).size;
@@ -1324,17 +1348,56 @@ function getTeacherDashboard_(token) {
     assessments.push({ assessmentId: 'legacy-tactical-score', title: title, participantCount: participants.size });
   });
 
+  const registrationCount = countUniqueLearnersInSheet_(spreadsheet.getSheetByName(CONFIG.registrationSheetName));
+  const attendanceCount = countUniqueLearnersInSheet_(
+    spreadsheet.getSheetByName(CONFIG.attendanceSheetName),
+    'subject',
+    'รบด้วยวิธีรุก-ตีกลางวัน'
+  );
+
   return jsonResponse_({
     ok: true,
     teacher: { name: normalizeValue_(teacher[2]), email: email },
     summary: {
       quizCount: quizzes.length,
-      assessmentCount: assessments.length
+      assessmentCount: assessments.length,
+      daytimeAttack: {
+        preTestCount: courseLearners.preTest.size,
+        postTestCount: courseLearners.postTest.size,
+        passedPostTestCount: courseLearners.passedPostTest.size,
+        scoreCount: courseLearners.score.size,
+        departmentRegistrationCount: registrationCount,
+        topicAttendanceCount: attendanceCount
+      }
     },
     quizzes: quizzes,
     assessments: assessments,
     updatedAt: new Date().toISOString()
   });
+}
+
+function isDaytimeAttackQuizTitle_(title) {
+  const normalizedTitle = normalizeValue_(title);
+  return (normalizedTitle.indexOf('กลางวัน') >= 0 || normalizedTitle.indexOf('กางวัน') >= 0)
+    && (normalizedTitle.indexOf('รบด้วยวิธีรุก') >= 0 || normalizedTitle.indexOf('เข้าตี') >= 0);
+}
+
+function countUniqueLearnersInSheet_(sheet, filterHeader, filterValue) {
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  const values = sheet.getDataRange().getDisplayValues();
+  const headers = values[0].map((header) => normalizeValue_(header).toLowerCase());
+  const learnerIndex = headers.indexOf('lookup_id');
+  const filterIndex = filterHeader ? headers.indexOf(filterHeader.toLowerCase()) : -1;
+  if (learnerIndex < 0 || (filterHeader && filterIndex < 0)) return 0;
+
+  const learners = new Set();
+  values.slice(1).forEach((row) => {
+    const learnerId = normalizeLookupId_(row[learnerIndex]);
+    if (!learnerId) return;
+    if (filterHeader && normalizeValue_(row[filterIndex]) !== filterValue) return;
+    learners.add(learnerId);
+  });
+  return learners.size;
 }
 
 function findSpecialAssessment_(assessmentId) {
