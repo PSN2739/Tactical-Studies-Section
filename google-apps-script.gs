@@ -973,6 +973,7 @@ function setupRegistrationSheet() {
   sheet.setFrozenRows(1);
   sheet.autoResizeColumns(1, CONFIG.registrationHeaders.length);
   normalizeAllLookupIds();
+  sortRegistrationSheet_(sheet);
   return 'Registration sheet is ready.';
 }
 
