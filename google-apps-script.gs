@@ -1850,9 +1850,20 @@ function sortRegistrationSheet_(sheet) {
     return;
   }
 
-  sheet
-    .getRange(2, 1, dataRowCount, CONFIG.registrationHeaders.length)
-    .sort({ column: CONFIG.lookupIdColumn, ascending: true });
+  const range = sheet.getRange(2, 1, dataRowCount, CONFIG.registrationHeaders.length);
+  const rows = range.getValues();
+  const lookupOffset = CONFIG.lookupIdColumn - 1;
+  rows.sort((left, right) => {
+    const leftId = normalizeLookupId_(left[lookupOffset]);
+    const rightId = normalizeLookupId_(right[lookupOffset]);
+    const leftIsNumeric = /^\d+$/.test(leftId);
+    const rightIsNumeric = /^\d+$/.test(rightId);
+    if (leftIsNumeric && rightIsNumeric) return Number(leftId) - Number(rightId);
+    if (leftIsNumeric) return -1;
+    if (rightIsNumeric) return 1;
+    return leftId.localeCompare(rightId, 'en', { numeric: true, sensitivity: 'base' });
+  });
+  range.setValues(rows);
 }
 
 function getRegistrationSheet_() {
