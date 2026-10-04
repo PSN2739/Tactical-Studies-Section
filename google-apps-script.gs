@@ -687,6 +687,7 @@ function getOrCreateQuizAttemptHistorySheet_() {
         row[indexOf('score')], row[indexOf('total')], row[indexOf('passed')]
       ]);
     if (legacyRows.length) sheet.getRange(2, 1, legacyRows.length, headers.length).setValues(legacyRows);
+    sortQuizAttemptHistorySheet_(sheet);
   }
   return sheet;
 }
@@ -699,6 +700,13 @@ function appendQuizAttemptHistory_(result) {
     result.result_id, result.submitted_at, result.student_id, lookupId, result.quiz_id,
     result.phase, result.score, result.total, result.passed ? 'TRUE' : 'FALSE'
   ]);
+  sortQuizAttemptHistorySheet_(sheet);
+}
+
+function sortQuizAttemptHistorySheet_(sheet) {
+  const dataRowCount = sheet.getLastRow() - 1;
+  if (dataRowCount < 2) return;
+  sheet.getRange(2, 1, dataRowCount, 9).sort({ column: 4, ascending: true });
 }
 
 function clearFailedPostTestScores() {
@@ -1531,7 +1539,7 @@ function sortRegistrationSheet_(sheet) {
   }
 
   sheet
-    .getRange(2, 1, dataRowCount, CONFIG.registrationHeaders.length)
+    .getRange(2, 1, dataRowCount, sheet.getLastColumn())
     .sort({ column: CONFIG.lookupIdColumn, ascending: true });
 }
 
