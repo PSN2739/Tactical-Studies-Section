@@ -99,8 +99,8 @@
     document.getElementById('teacher-dashboard-email').textContent = data.teacher.email || '';
     document.getElementById('teacher-dashboard-tactical-score-participant-count').textContent =
       Number(data.summary.tacticalScoreParticipantCount || 0).toLocaleString('th-TH');
-    document.getElementById('teacher-dashboard-tactical-score-code-count').textContent =
-      Number(data.summary.tacticalScoreCodeCount || 0).toLocaleString('th-TH');
+    document.getElementById('teacher-dashboard-tactical-score-code').textContent =
+      data.summary.tacticalScoreAccessCode || '-';
     const courseSummary = data.summary.daytimeAttack || {};
     [
       ['pre-test-count', courseSummary.preTestCount],

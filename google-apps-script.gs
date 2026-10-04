@@ -1365,7 +1365,7 @@ function getTeacherDashboard_(token) {
     .filter((row) => normalizeValue_(row[0]) && row.slice(3, 29).some((value) => normalizeValue_(value)))
     .map((row) => normalizeLookupId_(row[0]))
     .filter(Boolean));
-  const tacticalScoreCode = normalizeValue_(tacticalScoreSheet.getRange('AD2').getDisplayValue());
+  const tacticalScoreCode = getCurrentTacticalScoreAccessCode_();
 
   const registrationCount = countUniqueLearnersInSheet_(spreadsheet.getSheetByName(CONFIG.registrationSheetName));
   const attendanceCount = countUniqueLearnersInSheet_(
@@ -1387,7 +1387,7 @@ function getTeacherDashboard_(token) {
       assessmentCount: assessments.length,
       assessmentParticipantCount: assessmentParticipants.size,
       tacticalScoreParticipantCount: tacticalScoreParticipants.size,
-      tacticalScoreCodeCount: /^\d{6}$/.test(tacticalScoreCode) ? 1 : 0,
+      tacticalScoreAccessCode: tacticalScoreCode,
       daytimeAttack: {
         preTestCount: courseLearners.preTest.size,
         postTestCount: courseLearners.postTest.size,
