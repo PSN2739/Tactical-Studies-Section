@@ -32,6 +32,21 @@ const CONFIG = {
   ]
 };
 
+const ATTENDANCE_SUBJECTS = [
+  'รูปขบวน หมู่ ปล.',
+  'แบบฝึกทำการรบ',
+  'MOUT',
+  'ตั้งรับ',
+  'ระเบียบนำหน่วย คำสั่งฯ',
+  'รบด้วยวิธีรุก-ตีกลางวัน',
+  'ป้อมสนาม',
+  'ถอนตัว',
+  'เครื่องกีดขวาง',
+  'รบด้วยวิธีรุก-ตีกลางคืน',
+  'Unit School',
+  'Drone Tactical'
+];
+
 function doGet(e) {
   try {
     const params = (e && e.parameter) || {};
@@ -936,6 +951,7 @@ function hashPassword_(password) {
 function saveAttendance_(data) {
   const registrationId = normalizeValue_(data.registrationId);
   const attendanceFormName = normalizeValue_(data.attendanceFormName);
+  const attendanceSubject = normalizeValue_(data.attendanceSubject);
 
   if (!/^\d{13}$/.test(registrationId)) {
     return jsonResponse_({
@@ -951,6 +967,13 @@ function saveAttendance_(data) {
     });
   }
 
+  if (ATTENDANCE_SUBJECTS.indexOf(attendanceSubject) === -1) {
+    return jsonResponse_({
+      ok: false,
+      message: 'กรุณาเลือกเรื่องจากรายการ'
+    });
+  }
+
   const source = findRegistrationRecord_(registrationId);
   if (!source) {
     return jsonResponse_({
@@ -960,7 +983,7 @@ function saveAttendance_(data) {
   }
 
   const sheet = getOrCreateAttendanceSheet_();
-  if (attendanceDuplicateExists_(sheet, source.values[4], attendanceFormName)) {
+  if (attendanceDuplicateExists_(sheet, source.values[4], attendanceFormName, attendanceSubject)) {
     return jsonResponse_({
       ok: false,
       code: 'DUPLICATE_ATTENDANCE',
@@ -968,7 +991,11 @@ function saveAttendance_(data) {
     });
   }
 
-  sheet.appendRow(source.values.concat([attendanceFormName]));
+  const attendanceValues = source.values.slice();
+  const subjectIndex = CONFIG.registrationHeaders.indexOf('email') + 1;
+  attendanceValues.splice(subjectIndex, 0, attendanceSubject);
+  attendanceValues[CONFIG.registrationHeaders.indexOf('form_name') + 1] = attendanceSubject;
+  sheet.appendRow(attendanceValues.concat([attendanceFormName]));
   sortAttendanceSheet_(sheet);
   return jsonResponse_({
     ok: true,
@@ -1273,7 +1300,10 @@ function attendanceStudentLogin_(data) {
     return jsonResponse_({ ok: false, message: 'ไม่พบข้อมูลสำหรับเข้าสู่ระบบ' });
   }
 
+  ensureAttendanceSubjectSchema_(sheet);
   const rows = sheet.getDataRange().getDisplayValues();
+  const headers = rows[0] || [];
+  const indexOf = (name) => headers.indexOf(name);
   const row = rows.slice(1).find((record) => normalizeValue_(record[0]).replace(/^'/, '') === password
     && normalizeValue_(record[7]).toLowerCase() === email);
   if (!row) return jsonResponse_({ ok: false, message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
@@ -1284,11 +1314,11 @@ function attendanceStudentLogin_(data) {
       student: {
         personalId: normalizeValue_(row[0]).replace(/^'/, ''),
         registrationDate: normalizeValue_(row[1]),
-        attendanceSession: normalizeValue_(row[9]),
+        attendanceSession: normalizeValue_(row[indexOf('attendance_form_name')]),
         battalionNumber: normalizeValue_(row[2]),
         fullName: normalizeValue_(row[4]),
         email: normalizeValue_(row[7]),
-        episode: normalizeValue_(row[8])
+        episode: normalizeValue_(row[indexOf('episode')])
       },
       scores: getTeachingScores_(spreadsheet, row[0], row[2])
     }
@@ -1442,6 +1472,8 @@ function getOrCreateRegistrationSheet_() {
     headerRange.setValues([CONFIG.registrationHeaders]);
     headerRange.setFontWeight('bold');
   }
+  const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
+  if (attendanceSheet) ensureAttendanceSubjectSchema_(attendanceSheet);
   sheet.getRange(1, CONFIG.lookupIdColumn, sheet.getMaxRows(), 2).setNumberFormat('@');
   normalizeRegistrationLookupColumns_(sheet);
   return sheet;
@@ -1509,6 +1541,8 @@ function getRegistrationSheet_() {
   if (!sheet) {
     throw new Error('ไม่พบชีต Registration');
   }
+  const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
+  if (attendanceSheet) ensureAttendanceSubjectSchema_(attendanceSheet);
   return sheet;
 }
 
@@ -1519,14 +1553,78 @@ function getOrCreateAttendanceSheet_() {
     sheet = spreadsheet.insertSheet(CONFIG.attendanceSheetName);
   }
 
-  const headers = CONFIG.registrationHeaders;
-  const headerRange = sheet.getRange(1, 1, 1, headers.length);
-  if (headerRange.getValues()[0].every((value) => normalizeValue_(value) === '')) {
-    headerRange.setValues([headers]);
-    headerRange.setFontWeight('bold');
+  ensureAttendanceSubjectSchema_(sheet);
+  return sheet;
+}
+
+function ensureAttendanceSubjectSchema_(sheet) {
+  const headers = CONFIG.registrationHeaders.slice();
+  headers.splice(headers.indexOf('email') + 1, 0, 'subject');
+  headers.push('attendance_form_name');
+  ensureSheetColumns_(sheet, headers.length);
+
+  const readWidth = Math.max(sheet.getLastColumn(), headers.length);
+  const existingHeaders = sheet.getRange(1, 1, 1, readWidth).getDisplayValues()[0]
+    .map(normalizeValue_);
+  const rows = sheet.getLastRow() > 1
+    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, readWidth).getValues()
+    : [];
+  const sourceIndexes = new Map(existingHeaders.map((header, index) => [header, index]));
+  const legacyRoundIndex = sourceIndexes.get('form_name');
+  const legacySubjectIndex = sourceIndexes.get('subject');
+  const selectedSubjectIndex = sourceIndexes.get('attendance_subject');
+  const legacyExtraIndex = CONFIG.registrationHeaders.length;
+  const unheadedRoundIndex = existingHeaders[legacyExtraIndex] ? -1 : legacyExtraIndex;
+  const migratedRows = rows.map((row) => {
+    const selectedSubject = selectedSubjectIndex === undefined
+      ? ''
+      : normalizeValue_(row[selectedSubjectIndex]);
+    const existingSubject = legacySubjectIndex === undefined
+      ? ''
+      : normalizeValue_(row[legacySubjectIndex]);
+    const legacyFormName = legacyRoundIndex === undefined
+      ? ''
+      : normalizeValue_(row[legacyRoundIndex]);
+    const legacyFormNameIsRound = /^ครั้งที่ [1-4]$/.test(legacyFormName);
+    const legacyFormNameIsRegistrationType = legacyFormName === 'class-registration';
+    const legacyTopic = legacyFormName && !legacyFormNameIsRound && !legacyFormNameIsRegistrationType
+      ? legacyFormName
+      : '';
+    const savedRoundIndex = sourceIndexes.get('attendance_form_name');
+    const savedRound = savedRoundIndex === undefined ? '' : normalizeValue_(row[savedRoundIndex]);
+    const unheadedRound = unheadedRoundIndex < 0 ? '' : normalizeValue_(row[unheadedRoundIndex]);
+    const unheadedTopic = unheadedRound && !/^ครั้งที่ [1-4]$/.test(unheadedRound)
+      && unheadedRound !== 'class-registration'
+      ? unheadedRound
+      : '';
+    const topic = selectedSubject || existingSubject || unheadedTopic || legacyTopic
+      || 'รบด้วยวิธีรุก-ตีกลางวัน';
+    const formName = legacyTopic || unheadedTopic || topic;
+    const attendanceRound = savedRound
+      || (/^ครั้งที่ [1-4]$/.test(legacyFormName) ? legacyFormName : '')
+      || (/^ครั้งที่ [1-4]$/.test(unheadedRound) ? unheadedRound : '');
+
+    return headers.map((header) => {
+      if (header === 'subject') return topic;
+      if (header === 'form_name') return formName;
+      if (header === 'attendance_form_name') return attendanceRound;
+      const index = sourceIndexes.get(header);
+      return index === undefined ? '' : row[index];
+    });
+  });
+
+  const hasChangedData = migratedRows.some((row, rowIndex) =>
+    headers.some((header, columnIndex) =>
+      normalizeValue_(rows[rowIndex][columnIndex]) !== normalizeValue_(row[columnIndex])));
+  const hasChangedHeaders = headers.some((header, index) => existingHeaders[index] !== header);
+  if (!hasChangedHeaders && !hasChangedData) return;
+
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+  if (migratedRows.length) {
+    sheet.getRange(2, 1, migratedRows.length, headers.length).setValues(migratedRows);
   }
   normalizeAttendanceLookupColumns_(sheet);
-  return sheet;
+  sortAttendanceSheet_(sheet);
 }
 
 function normalizeAttendanceLookupColumns_(sheet) {
@@ -1543,15 +1641,20 @@ function normalizeAttendanceLookupColumns_(sheet) {
   ]));
 }
 
-function attendanceDuplicateExists_(sheet, dataColumnB, formName) {
+function attendanceDuplicateExists_(sheet, dataColumnB, formName, subject) {
   if (sheet.getLastRow() < 2) {
     return false;
   }
 
-  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 10).getDisplayValues();
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0]
+    .map(normalizeValue_);
+  const roundIndex = headers.indexOf('attendance_form_name');
+  const subjectIndex = headers.indexOf('subject');
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getDisplayValues();
   return values.some((row) =>
     normalizeValue_(row[4]) === normalizeValue_(dataColumnB)
-    && normalizeValue_(row[9]) === normalizeValue_(formName)
+    && normalizeValue_(row[roundIndex]) === normalizeValue_(formName)
+    && normalizeValue_(row[subjectIndex]) === normalizeValue_(subject)
   );
 }
 
@@ -1560,7 +1663,8 @@ function sortAttendanceSheet_(sheet) {
   if (dataRowCount < 2) {
     return;
   }
-  sheet.getRange(2, 1, dataRowCount, 10).sort({ column: 1, ascending: true });
+  sheet.getRange(2, 1, dataRowCount, sheet.getLastColumn())
+    .sort({ column: CONFIG.lookupIdColumn, ascending: true });
 }
 
 function isValidEmail_(email) {

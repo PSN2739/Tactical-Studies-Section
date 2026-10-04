@@ -15,6 +15,7 @@
   const details = document.getElementById('attendance-details');
   const resultBox = document.getElementById('attendance-result');
   const formNameField = document.getElementById('attendance-form-name');
+  const subjectField = document.getElementById('attendance-subject');
   const popup = document.getElementById('registration-popup');
   const popupMessage = document.getElementById('registration-popup-message');
   const loadingOverlay = document.getElementById('quiz-loading-overlay');
@@ -133,12 +134,15 @@
       const registrationId = validateStudentId();
       const attendanceFormName = formNameField.value;
       if (!attendanceFormName) throw new Error('กรุณาเลือกครั้งที่ 1-4');
+      const attendanceSubject = subjectField.value;
+      if (!attendanceSubject) throw new Error('กรุณาเลือกเรื่อง');
       if (loading) loading.classList.remove('d-none');
       if (submitButton) submitButton.disabled = true;
       setMessage('error-message', '');
       const payload = new URLSearchParams({
         registrationId,
         attendanceFormName,
+        attendanceSubject,
         formName: 'attendance-registration'
       });
       const response = await fetch(endpoint, {

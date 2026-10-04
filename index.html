@@ -286,6 +286,23 @@
               <button type="button" id="close-attendance" class="registration-button registration-button-close">ปิด</button>
             </div>
             <div id="attendance-details" class="registration-details d-none">
+              <label class="registration-episode"><span>เรื่อง</span>
+                <select id="attendance-subject" required>
+                  <option value="">เลือกเรื่อง</option>
+                  <option value="รูปขบวน หมู่ ปล.">เรื่อง รูปขบวน หมู่ ปล.</option>
+                  <option value="แบบฝึกทำการรบ">เรื่อง แบบฝึกทำการรบ</option>
+                  <option value="MOUT">เรื่อง MOUT</option>
+                  <option value="ตั้งรับ">เรื่อง ตั้งรับ</option>
+                  <option value="ระเบียบนำหน่วย คำสั่งฯ">เรื่อง ระเบียบนำหน่วย คำสั่งฯ</option>
+                  <option value="รบด้วยวิธีรุก-ตีกลางวัน">เรื่อง รบด้วยวิธีรุก-ตีกลางวัน</option>
+                  <option value="ป้อมสนาม">เรื่อง ป้อมสนาม</option>
+                  <option value="ถอนตัว">เรื่อง ถอนตัว</option>
+                  <option value="เครื่องกีดขวาง">เรื่อง เครื่องกีดขวาง</option>
+                  <option value="รบด้วยวิธีรุก-ตีกลางคืน">เรื่อง รบด้วยวิธีรุก-ตีกลางคืน</option>
+                  <option value="Unit School">เรื่อง Unit School</option>
+                  <option value="Drone Tactical">เรื่อง Drone Tactical</option>
+                </select>
+              </label>
               <label class="registration-episode"><span>ครั้งที่</span>
                 <select id="attendance-form-name" required>
                   <option value="">เลือกครั้งที่</option>
@@ -817,7 +834,7 @@
 
   <!-- Google Sheets form handler -->
   <script src="assets/js/google-sheet-form.js?v=20260918-separate-forms"></script>
-  <script src="assets/js/attendance-registration.js?v=20260918-close-fix"></script>
+  <script src="assets/js/attendance-registration.js?v=20261005-attendance-subject"></script>
   <script src="assets/js/quiz-builder.js?v=20260929-dynamic-exam-menu"></script>
   <script src="assets/js/exam.js?v=20260929-posttest-80-retake"></script>
   <script src="assets/js/tactical-score.js?v=20260930-centered-copy-prompt"></script>
