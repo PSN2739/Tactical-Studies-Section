@@ -91,6 +91,13 @@ function doPost(e) {
       return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
     }
   }
+  if (formName === 'teacher-course-summary') {
+    try {
+      return getTeacherCourseSummary_(data);
+    } catch (error) {
+      return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
+    }
+  }
 
   const lock = LockService.getScriptLock();
 
@@ -325,6 +332,101 @@ function teacherLogin_(data) {
     return jsonResponse_({ ok: true, token: token, teacherName: row[2] });
   }
   return jsonResponse_({ ok: false, message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง หรือยังไม่ได้รับอนุมัติ' });
+}
+
+function getTeacherCourseSummary_(data) {
+  const email = CacheService.getScriptCache().get('teacher:' + normalizeValue_(data.token));
+  if (!email) return jsonResponse_({ ok: false, message: 'กรุณาเข้าสู่ระบบครูใหม่' });
+
+  const spreadsheet = getRegistrationSpreadsheet_();
+  const quizSheet = spreadsheet.getSheetByName(CONFIG.quizIndexSheetName);
+  const ownedQuizPhases = new Map();
+  if (quizSheet && quizSheet.getLastRow() > 1) {
+    const values = quizSheet.getDataRange().getDisplayValues();
+    const headers = values[0].map(normalizeValue_);
+    const indexOf = (name) => headers.indexOf(name);
+    const quizIdIndex = indexOf('quiz_id');
+    const titleIndex = indexOf('title');
+    const ownerIndex = indexOf('created_by');
+    const phaseIndex = indexOf('phase');
+    values.slice(1).forEach((row) => {
+      if (ownerIndex < 0 || quizIdIndex < 0 || titleIndex < 0 || phaseIndex < 0
+        || normalizeValue_(row[ownerIndex]).toLowerCase() !== email
+        || !isDaytimeAttackTitle_(row[titleIndex])) return;
+      ownedQuizPhases.set(normalizeValue_(row[quizIdIndex]), normalizePhase_(row[phaseIndex]));
+    });
+  }
+
+  const learners = { preTest: new Set(), postTest: new Set(), passedPostTest: new Set(), score: new Set() };
+  const historySheet = spreadsheet.getSheetByName('QuizAttemptHistory');
+  if (historySheet && historySheet.getLastRow() > 1 && ownedQuizPhases.size) {
+    const values = historySheet.getDataRange().getDisplayValues();
+    const headers = values[0].map(normalizeValue_);
+    const indexOf = (name) => headers.indexOf(name);
+    const studentIndex = indexOf('student_id');
+    const lookupIndex = indexOf('lookup_id');
+    const quizIndex = indexOf('quiz_id');
+    const phaseIndex = indexOf('phase');
+    const passedIndex = indexOf('passed');
+    values.slice(1).forEach((row) => {
+      const quizId = normalizeValue_(row[quizIndex]);
+      const phase = normalizePhase_(row[phaseIndex]);
+      if (!ownedQuizPhases.has(quizId) || ownedQuizPhases.get(quizId) !== phase) return;
+      const studentId = normalizeValue_(row[studentIndex]) || normalizeLookupId_(row[lookupIndex]);
+      if (!studentId) return;
+      if (phase === 'pre-test') learners.preTest.add(studentId);
+      if (phase === 'post-test') {
+        learners.postTest.add(studentId);
+        if (normalizeValue_(row[passedIndex]).toUpperCase() === 'TRUE') {
+          learners.passedPostTest.add(studentId);
+        }
+      }
+      if (phase === 'score') learners.score.add(studentId);
+    });
+  }
+
+  return jsonResponse_({
+    ok: true,
+    data: {
+      preTest: learners.preTest.size,
+      postTest: learners.postTest.size,
+      passedPostTest: learners.passedPostTest.size,
+      score: learners.score.size,
+      registration: countUniqueSheetValues_(spreadsheet.getSheetByName(CONFIG.registrationSheetName), 2),
+      attendance: countUniqueAttendanceBySubject_(spreadsheet.getSheetByName(CONFIG.attendanceSheetName))
+    }
+  });
+}
+
+function isDaytimeAttackTitle_(value) {
+  const title = normalizeValue_(value).replace(/\s+/g, '');
+  return title.indexOf('กลางวัน') !== -1
+    && (title.indexOf('รบด้วยวิธีรุก') !== -1 || title.indexOf('เข้าตี') !== -1);
+}
+
+function countUniqueSheetValues_(sheet, columnIndex) {
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  return new Set(sheet.getRange(2, columnIndex + 1, sheet.getLastRow() - 1, 1)
+    .getDisplayValues().map((row) => normalizeLookupId_(row[0])).filter(Boolean)).size;
+}
+
+function countUniqueAttendanceBySubject_(sheet) {
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0]
+    .map(normalizeValue_);
+  const lookupIndex = headers.indexOf('lookup_id');
+  const subjectIndex = headers.indexOf('form_name') >= 0 ? headers.indexOf('form_name') : 10;
+  if (lookupIndex < 0 || subjectIndex >= sheet.getLastColumn()) return 0;
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getDisplayValues();
+  const learners = new Set();
+  rows.forEach((row) => {
+    const subject = normalizeValue_(row[subjectIndex]).replace(/^เรื่อง\s*/, '');
+    if (subject === 'รบด้วยวิธีรุก-ตีกลางวัน') {
+      const lookupId = normalizeLookupId_(row[lookupIndex]);
+      if (lookupId) learners.add(lookupId);
+    }
+  });
+  return learners.size;
 }
 
 function getQuizIndexHeaders_() {

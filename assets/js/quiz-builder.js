@@ -17,7 +17,12 @@
   const registrationPopupButton = registrationPopup?.querySelector('.registration-popup-button');
   const teacherMenuPopup = document.getElementById('teacher-menu-popup');
   const teacherExamMenuButton = document.getElementById('teacher-exam-menu');
+  const teacherCourseMenuButton = document.getElementById('teacher-course-menu');
   const teacherMenuCloseButton = document.getElementById('teacher-menu-close');
+  const teacherCoursePopup = document.getElementById('teacher-course-popup');
+  const teacherCourseStatus = document.getElementById('teacher-course-status');
+  const teacherCourseRefreshButton = document.getElementById('teacher-course-refresh');
+  const teacherCourseCloseButton = document.getElementById('teacher-course-close');
   const loadingOverlay = document.getElementById('quiz-loading-overlay');
   const previewBox = document.getElementById('quiz-preview-box');
   const downloadTemplateButton = document.getElementById('download-quiz-template');
@@ -70,6 +75,55 @@
     uploadForm.classList.remove('d-none');
   }
 
+  function showTeacherCoursePopup() {
+    teacherMenuPopup.classList.add('d-none');
+    teacherCoursePopup.classList.remove('d-none');
+    loadTeacherCourseSummary();
+  }
+
+  async function loadTeacherCourseSummary() {
+    teacherCourseStatus.textContent = 'กำลังโหลดข้อมูลครู...';
+    teacherCourseStatus.classList.remove('is-error');
+    teacherCourseRefreshButton.disabled = true;
+    [
+      ['pre-test', 'teacher-course-pre-test'],
+      ['post-test', 'teacher-course-post-test'],
+      ['passed-post-test', 'teacher-course-passed-post-test'],
+      ['score', 'teacher-course-score'],
+      ['registration', 'teacher-course-registration'],
+      ['attendance', 'teacher-course-attendance']
+    ].forEach(([, id]) => {
+      document.getElementById(id).textContent = '—';
+    });
+
+    try {
+      const data = await request({
+        method: 'POST',
+        body: new URLSearchParams({
+          formName: 'teacher-course-summary',
+          token: localStorage.getItem(tokenKey) || ''
+        })
+      });
+      const values = [
+        ['preTest', 'teacher-course-pre-test'],
+        ['postTest', 'teacher-course-post-test'],
+        ['passedPostTest', 'teacher-course-passed-post-test'],
+        ['score', 'teacher-course-score'],
+        ['registration', 'teacher-course-registration'],
+        ['attendance', 'teacher-course-attendance']
+      ];
+      values.forEach(([key, id]) => {
+        document.getElementById(id).textContent = String(data.data[key]);
+      });
+      teacherCourseStatus.textContent = 'อัปเดตข้อมูลเรียบร้อยแล้ว';
+    } catch (error) {
+      teacherCourseStatus.textContent = `โหลดข้อมูลไม่สำเร็จ: ${error.message}`;
+      teacherCourseStatus.classList.add('is-error');
+    } finally {
+      teacherCourseRefreshButton.disabled = false;
+    }
+  }
+
   function clearBuilderState() {
     localStorage.removeItem(tokenKey);
     setCurrentTeacherEmail('');
@@ -87,6 +141,7 @@
     setStatus(uploadForm, 'error-message', '');
     setStatus(uploadForm, 'sent-message', '');
     teacherMenuPopup.classList.add('d-none');
+    teacherCoursePopup.classList.add('d-none');
     applicationForm.classList.remove('d-none');
     loginForm.classList.remove('quiz-login-complete');
     uploadForm.classList.add('d-none');
@@ -331,6 +386,12 @@
     if (event.target === modal) hideModal();
   });
   teacherExamMenuButton.addEventListener('click', enterExamManagement);
+  teacherCourseMenuButton.addEventListener('click', showTeacherCoursePopup);
+  teacherCourseRefreshButton.addEventListener('click', loadTeacherCourseSummary);
+  teacherCourseCloseButton.addEventListener('click', () => {
+    teacherCoursePopup.classList.add('d-none');
+    showTeacherMenu();
+  });
   teacherMenuCloseButton.addEventListener('click', () => {
     clearBuilderState();
     hideModal();

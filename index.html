@@ -27,7 +27,7 @@
   <link href="assets/swiper/swiper-bundle.min.css" rel="stylesheet">
 
   <!-- Main CSS File -->
-  <link href="assets/css/main.css?v=20260917-close-buttons-only" rel="stylesheet">
+  <link href="assets/css/main.css?v=20261004-teacher-course-summary" rel="stylesheet">
 
   <!-- =======================================================
   * Template Name: Bootslander
@@ -733,9 +733,38 @@
       <h3 id="teacher-menu-title">เมนูครูอาจารย์</h3>
       <button type="button" id="teacher-exam-menu" class="teacher-menu-option">การจัดการข้อสอบ</button>
       <button type="button" class="teacher-menu-option" disabled>การประเมิน</button>
-      <button type="button" class="teacher-menu-option" disabled>ข้อมูลวิชา/เรื่อง</button>
+      <button type="button" id="teacher-course-menu" class="teacher-menu-option">ข้อมูลวิชา/เรื่อง</button>
       <button type="button" id="teacher-menu-close" class="registration-button registration-button-close">ปิด</button>
     </div>
+  </div>
+  <div id="teacher-course-popup" class="teacher-menu-popup teacher-course-popup d-none"
+    role="dialog" aria-modal="true" aria-labelledby="teacher-course-title">
+    <section class="teacher-course-card">
+      <header class="teacher-course-header">
+        <div>
+          <h3 id="teacher-course-title">ข้อมูลวิชา/เรื่อง</h3>
+          <p>การรบด้วยวิธีรุก การเข้าตีเวลากลางวัน</p>
+        </div>
+        <button type="button" id="teacher-course-close" class="teacher-course-close">ปิด</button>
+      </header>
+      <p id="teacher-course-status" class="teacher-course-status" role="status" aria-live="polite">กำลังโหลดข้อมูลครู...</p>
+      <div class="teacher-course-table-wrap">
+        <table class="teacher-course-table">
+          <thead><tr><th scope="col">รายการ</th><th scope="col">จำนวนผู้เรียน</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">ก่อนเรียน</th><td id="teacher-course-pre-test">—</td></tr>
+            <tr><th scope="row">หลังเรียน</th><td id="teacher-course-post-test">—</td></tr>
+            <tr><th scope="row">หลังเรียน ผ่านเกณฑ์</th><td id="teacher-course-passed-post-test">—</td></tr>
+            <tr><th scope="row">การเข้าตีเวลากลางวัน · สอบเก็บคะแนน</th><td id="teacher-course-score">—</td></tr>
+            <tr><th scope="row">ลงทะเบียนแผนกยุทธวิธี</th><td id="teacher-course-registration">—</td></tr>
+            <tr><th scope="row">ลงทะเบียนเรื่อง รบด้วยวิธีรุก-ตีกลางวัน</th><td id="teacher-course-attendance">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="teacher-course-actions">
+        <button type="button" id="teacher-course-refresh" class="teacher-menu-option">รีเฟรชข้อมูล</button>
+      </div>
+    </section>
   </div>
   <div id="quiz-loading-overlay" class="quiz-loading-overlay d-none" role="status" aria-live="polite" aria-label="กำลังดำเนินการ">
     <div class="quiz-loading-card">
@@ -835,7 +864,7 @@
   <!-- Google Sheets form handler -->
   <script src="assets/js/google-sheet-form.js?v=20260918-separate-forms"></script>
   <script src="assets/js/attendance-registration.js?v=20261005-attendance-subject"></script>
-  <script src="assets/js/quiz-builder.js?v=20260929-dynamic-exam-menu"></script>
+  <script src="assets/js/quiz-builder.js?v=20261004-teacher-course-summary"></script>
   <script src="assets/js/exam.js?v=20260929-posttest-80-retake"></script>
   <script src="assets/js/tactical-score.js?v=20260930-centered-copy-prompt"></script>
   <script src="assets/js/teaching-management.js?v=20260930-attendance-login"></script>
