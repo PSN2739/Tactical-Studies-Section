@@ -32,7 +32,6 @@ const CONFIG = {
     'data_column_c',
     'data_column_d',
     'email',
-    'subject',
     'episode',
     'form_name'
   ]
@@ -191,7 +190,6 @@ function doPost(e) {
       student.columns[2].value,
       student.columns[3].value,
       email,
-      'รบด้วยวิธีรุก-ตีกลางวัน',
       episode,
       normalizeValue_(data.formName) || 'class-registration'
     ]);
@@ -960,8 +958,8 @@ function saveAttendance_(data) {
   }
 
   const attendanceValues = source.values.slice();
-  attendanceValues[CONFIG.registrationHeaders.indexOf('subject')] = attendanceSubject;
-  sheet.appendRow(attendanceValues.concat([attendanceFormName, attendanceSubject]));
+  attendanceValues.splice(CONFIG.registrationHeaders.indexOf('email') + 1, 0, attendanceSubject);
+  sheet.appendRow(attendanceValues.concat([attendanceFormName]));
   sortAttendanceSheet_(sheet);
   return jsonResponse_({
     ok: true,
@@ -1680,7 +1678,11 @@ function getOrCreateRegistrationSheet_() {
     sheet = spreadsheet.insertSheet(CONFIG.registrationSheetName);
   }
 
-  ensureRegistrationSubjectColumn_(sheet);
+  removeRegistrationSubjectColumn_(sheet);
+  const headerRange = sheet.getRange(1, 1, 1, CONFIG.registrationHeaders.length);
+  if (headerRange.getValues()[0].every((value) => normalizeValue_(value) === '')) {
+    headerRange.setValues([CONFIG.registrationHeaders]).setFontWeight('bold');
+  }
   const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
   if (attendanceSheet) ensureAttendanceSubjectSchema_(attendanceSheet);
   sheet.getRange(1, CONFIG.lookupIdColumn, sheet.getMaxRows(), 2).setNumberFormat('@');
@@ -1688,52 +1690,12 @@ function getOrCreateRegistrationSheet_() {
   return sheet;
 }
 
-function ensureRegistrationSubjectColumn_(sheet) {
-  if (sheet.getLastColumn() === 0) ensureSheetColumns_(sheet, CONFIG.registrationHeaders.length);
-  let columnCount = Math.max(sheet.getLastColumn(), CONFIG.registrationHeaders.length - 1);
-  let headers = sheet.getRange(1, 1, 1, columnCount).getDisplayValues()[0].map(normalizeValue_);
-  if (headers.every((header) => !header)) {
-    sheet.getRange(1, 1, 1, CONFIG.registrationHeaders.length)
-      .setValues([CONFIG.registrationHeaders]).setFontWeight('bold');
-    return;
-  }
-
-  const formNameIndex = headers.indexOf('form_name');
-  if (headers.indexOf('episode') < 0 && formNameIndex >= 0 && sheet.getLastRow() > 1) {
-    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, columnCount).getDisplayValues();
-    const valuesLookLikeEpisodes = rows.length > 0 && rows.every((row) =>
-      !normalizeValue_(row[formNameIndex]) || /^ตอนที่\s*\d+$/.test(normalizeValue_(row[formNameIndex])));
-    const nextColumnHasFormName = rows.some((row) =>
-      /^(class-registration|attendance-registration)$/i.test(normalizeValue_(row[formNameIndex + 1])));
-    if (valuesLookLikeEpisodes && nextColumnHasFormName) {
-      sheet.getRange(1, formNameIndex + 1).setValue('episode');
-      sheet.getRange(1, formNameIndex + 2).setValue('form_name');
-      headers[formNameIndex] = 'episode';
-      headers[formNameIndex + 1] = 'form_name';
-    }
-  }
-
-  let subjectIndex = headers.indexOf('subject');
-  if (subjectIndex < 0) {
-    const emailIndex = headers.indexOf('email');
-    if (emailIndex < 0) throw new Error('ไม่พบคอลัมน์ email ในชีต ' + sheet.getName());
-    sheet.insertColumnAfter(emailIndex + 1);
-    subjectIndex = emailIndex + 1;
-    sheet.getRange(1, subjectIndex + 1).setValue('subject');
-    columnCount += 1;
-  }
-
-  const dataRowCount = sheet.getLastRow() - 1;
-  if (dataRowCount > 0) {
-    const subjectRange = sheet.getRange(2, subjectIndex + 1, dataRowCount, 1);
-    const currentSubjects = subjectRange.getDisplayValues();
-    if (currentSubjects.some((row) => !normalizeValue_(row[0]))) {
-      subjectRange.setValues(currentSubjects.map((row) => [
-        normalizeValue_(row[0]) || 'รบด้วยวิธีรุก-ตีกลางวัน'
-      ]));
-    }
-  }
-  sheet.getRange(1, 1, 1, Math.max(columnCount, sheet.getLastColumn())).setFontWeight('bold');
+function removeRegistrationSubjectColumn_(sheet) {
+  if (!sheet || sheet.getLastColumn() === 0) return;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0]
+    .map(normalizeValue_);
+  const subjectIndex = headers.indexOf('subject');
+  if (subjectIndex >= 0) sheet.deleteColumn(subjectIndex + 1);
 }
 
 function getRegistrationSpreadsheet_() {
@@ -1798,7 +1760,7 @@ function getRegistrationSheet_() {
   if (!sheet) {
     throw new Error('ไม่พบชีต Registration');
   }
-  ensureRegistrationSubjectColumn_(sheet);
+  removeRegistrationSubjectColumn_(sheet);
   const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
   if (attendanceSheet) ensureAttendanceSubjectSchema_(attendanceSheet);
   return sheet;
@@ -1816,39 +1778,47 @@ function getOrCreateAttendanceSheet_() {
 }
 
 function ensureAttendanceSubjectSchema_(sheet) {
-  ensureRegistrationSubjectColumn_(sheet);
-  const headers = CONFIG.registrationHeaders.concat(['attendance_form_name', 'attendance_subject']);
+  const headers = CONFIG.registrationHeaders.slice();
+  headers.splice(headers.indexOf('email') + 1, 0, 'subject');
+  headers.push('attendance_form_name');
   ensureSheetColumns_(sheet, headers.length);
-  const existingHeaders = sheet.getRange(1, 1, 1, headers.length).getDisplayValues()[0]
+  const readWidth = Math.max(sheet.getLastColumn(), headers.length);
+  const existingHeaders = sheet.getRange(1, 1, 1, readWidth).getDisplayValues()[0]
     .map(normalizeValue_);
-  if (headers.every((header, index) => existingHeaders[index] === header)) return;
   const rows = sheet.getLastRow() > 1
-    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues()
+    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, readWidth).getValues()
     : [];
-  const attendanceRoundIndex = CONFIG.registrationHeaders.indexOf('form_name');
-  const needsMigration = headers.some((header, index) => existingHeaders[index] !== header)
-    || rows.some((row) => /^ครั้งที่ [1-4]$/.test(normalizeValue_(row[attendanceRoundIndex]))
-      || !normalizeValue_(row[CONFIG.registrationHeaders.indexOf('subject')])
-      || !normalizeValue_(row[headers.indexOf('attendance_subject')]));
-  if (!needsMigration) return;
+  const sourceIndexes = new Map(existingHeaders.map((header, index) => [header, index]));
+  const subjectIndex = headers.indexOf('subject');
+  const legacyRoundIndex = sourceIndexes.get('form_name');
+  const legacySubjectIndex = sourceIndexes.get('subject');
+  const selectedSubjectIndex = sourceIndexes.get('attendance_subject');
+  const migratedRows = rows.map((row) => headers.map((header) => {
+    if (header === 'subject') {
+      const selectedSubject = selectedSubjectIndex === undefined ? '' : normalizeValue_(row[selectedSubjectIndex]);
+      const existingSubject = legacySubjectIndex === undefined ? '' : normalizeValue_(row[legacySubjectIndex]);
+      return selectedSubject || existingSubject || 'รบด้วยวิธีรุก-ตีกลางวัน';
+    }
+    if (header === 'attendance_form_name') {
+      const savedRoundIndex = sourceIndexes.get('attendance_form_name');
+      const savedRound = savedRoundIndex === undefined ? '' : normalizeValue_(row[savedRoundIndex]);
+      const legacyRound = legacyRoundIndex === undefined ? '' : normalizeValue_(row[legacyRoundIndex]);
+      return savedRound || (/^ครั้งที่ [1-4]$/.test(legacyRound) ? legacyRound : '');
+    }
+    if (header === 'form_name' && legacyRoundIndex !== undefined
+      && /^ครั้งที่ [1-4]$/.test(normalizeValue_(row[legacyRoundIndex]))) return '';
+    const index = sourceIndexes.get(header);
+    return index === undefined ? '' : row[index];
+  }));
+  const hasMissingData = migratedRows.some((row) => !normalizeValue_(row[subjectIndex]));
+  const hasChangedHeaders = headers.some((header, index) => existingHeaders[index] !== header)
+    || existingHeaders.length !== headers.length;
+  if (!hasChangedHeaders && !hasMissingData) return;
 
-  rows.forEach((row) => {
-    const existingRound = normalizeValue_(row[attendanceRoundIndex]);
-    if (/^ครั้งที่ [1-4]$/.test(existingRound)) {
-      if (!normalizeValue_(row[headers.indexOf('attendance_form_name')])) {
-        row[headers.indexOf('attendance_form_name')] = existingRound;
-      }
-      row[attendanceRoundIndex] = '';
-    }
-    if (!normalizeValue_(row[headers.indexOf('subject')])) {
-      row[headers.indexOf('subject')] = 'รบด้วยวิธีรุก-ตีกลางวัน';
-    }
-    if (!normalizeValue_(row[headers.indexOf('attendance_subject')])) {
-      row[headers.indexOf('attendance_subject')] = row[headers.indexOf('subject')];
-    }
-  });
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
-  if (rows.length) sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  if (migratedRows.length) sheet.getRange(2, 1, migratedRows.length, headers.length).setValues(migratedRows);
+  const extraColumns = sheet.getLastColumn() - headers.length;
+  if (extraColumns > 0) sheet.deleteColumns(headers.length + 1, extraColumns);
   normalizeAttendanceLookupColumns_(sheet);
 }
 
@@ -1871,11 +1841,15 @@ function attendanceDuplicateExists_(sheet, dataColumnB, formName, subject) {
     return false;
   }
 
-  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, CONFIG.registrationHeaders.length + 2).getDisplayValues();
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0]
+    .map(normalizeValue_);
+  const roundIndex = headers.indexOf('attendance_form_name');
+  const subjectIndex = headers.indexOf('subject');
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getDisplayValues();
   return values.some((row) =>
     normalizeValue_(row[4]) === normalizeValue_(dataColumnB)
-    && normalizeValue_(row[CONFIG.registrationHeaders.length]) === normalizeValue_(formName)
-    && normalizeValue_(row[CONFIG.registrationHeaders.length + 1]) === normalizeValue_(subject)
+    && normalizeValue_(row[roundIndex]) === normalizeValue_(formName)
+    && normalizeValue_(row[subjectIndex]) === normalizeValue_(subject)
   );
 }
 
