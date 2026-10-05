@@ -5,6 +5,7 @@
   if (!form) return;
 
   const endpoint = form.getAttribute('action');
+  let verifiedLookupId = '';
   const lookupStudentIdField = document.getElementById('lookup-student-id');
   const registrationIdField = document.getElementById('registration-student-id');
   const registrationDetails = document.getElementById('registration-details');
@@ -60,6 +61,7 @@
 
   function resetRegistrationForm() {
     form.reset();
+    verifiedLookupId = '';
     resultBox.innerHTML = '';
     lookupActions.classList.remove('d-none');
     registrationDetails.classList.add('d-none');
@@ -154,10 +156,15 @@
 
   async function lookupStudent() {
     const lookupId = validateLookupId();
+    verifiedLookupId = '';
+    registrationDetails.classList.add('d-none');
     resultBox.innerHTML = '<div class="registration-result loading-result">กำลังค้นหาข้อมูล...</div>';
-    const response = await fetch(`${endpoint}?action=lookup&lookupId=${encodeURIComponent(lookupId)}`);
+    const response = await fetch(`${endpoint}?action=lookup&lookupId=${encodeURIComponent(lookupId)}`, { cache: 'no-store' });
     const data = parseResponse(await response.text());
     if (!response.ok || !data.ok) throw new Error(data.message || 'ไม่พบข้อมูลในชีต Data');
+    if (lookupStudentIdField.value.trim() !== lookupId) {
+      throw new Error('เลขค้นหามีการเปลี่ยนแปลง กรุณาตรวจสอบข้อมูลอีกครั้ง');
+    }
 
     const columns = data.data.columns;
     resultBox.innerHTML = `
@@ -170,6 +177,7 @@
           <div><dt>${escapeHtml(columns[3].label)}</dt><dd>${escapeHtml(columns[3].value || '-')}</dd></div>
         </dl>
       </div>`;
+    verifiedLookupId = lookupId;
     registrationDetails.classList.remove('d-none');
     lookupActions.classList.add('d-none');
     form.elements.email.required = true;
@@ -183,10 +191,20 @@
       setGlobalLoading(true);
       await lookupStudent();
     } catch (error) {
-      resultBox.innerHTML = `<div class="registration-result registration-result-error">${error.message}</div>`;
+      resultBox.innerHTML = '<div class="registration-result registration-result-error"></div>';
+      resultBox.firstElementChild.textContent = error.message || 'ไม่พบข้อมูลในชีต Data';
     } finally {
       setGlobalLoading(false);
     }
+  });
+
+  lookupStudentIdField.addEventListener('input', () => {
+    if (lookupStudentIdField.value.trim() === verifiedLookupId) return;
+    verifiedLookupId = '';
+    registrationDetails.classList.add('d-none');
+    lookupActions.classList.remove('d-none');
+    resultBox.innerHTML = '';
+    setMessage('error-message', '');
   });
 
   form.addEventListener('submit', async (event) => {
@@ -196,7 +214,10 @@
     try {
       setGlobalLoading(true);
       const registrationId = validateRegistrationId();
-      validateLookupId();
+      const lookupId = validateLookupId();
+      if (!verifiedLookupId || lookupId !== verifiedLookupId) {
+        throw new Error('กรุณาตรวจสอบข้อมูลผู้เรียนก่อนบันทึก');
+      }
       const episode = validateEpisode();
       if (loading) loading.classList.remove('d-none');
       if (submitButton) submitButton.disabled = true;
@@ -204,7 +225,7 @@
       setMessage('sent-message', '');
 
       const payload = new URLSearchParams({
-        lookupId: lookupStudentIdField.value.trim(),
+        lookupId,
         registrationId,
         email: form.elements.email.value.trim(),
         episode,
@@ -223,8 +244,7 @@
       }
       if (!response.ok || !data.ok) throw new Error(data.message || 'บันทึกข้อมูลไม่สำเร็จ');
 
-      form.reset();
-      resultBox.innerHTML = '';
+      resetRegistrationForm();
       setMessage('sent-message', 'บันทึกข้อมูลเรียบร้อยแล้ว');
     } catch (error) {
       setMessage('error-message', error.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');

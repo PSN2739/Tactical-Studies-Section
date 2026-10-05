@@ -94,11 +94,20 @@ function doPost(e) {
       return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
     }
   }
+  if (formName === 'teacher-dashboard') {
+    try {
+      return getTeacherDashboard_(data.token);
+    } catch (error) {
+      return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
+    }
+  }
 
   const lock = LockService.getScriptLock();
+  let locked = false;
 
   try {
     lock.waitLock(30000);
+    locked = true;
     const lookupId = normalizeValue_(data.lookupId);
     const registrationId = normalizeValue_(data.registrationId);
     const email = normalizeValue_(data.email);
@@ -109,9 +118,6 @@ function doPost(e) {
     }
     if (formName === 'teacher-login') {
       return teacherLogin_(data);
-    }
-    if (formName === 'teacher-dashboard') {
-      return getTeacherDashboard_(data.token);
     }
     if (formName === 'create-announcement') {
       return createAnnouncement_(data);
@@ -183,7 +189,7 @@ function doPost(e) {
     }
 
     const sheet = getOrCreateRegistrationSheet_();
-    if (registrationDataColumnBExists_(sheet, student.columns[1].value)) {
+    if (registrationExists_(sheet, lookupId, registrationId)) {
       return jsonResponse_({
         ok: false,
         code: 'DUPLICATE_REGISTRATION',
@@ -191,7 +197,9 @@ function doPost(e) {
       });
     }
 
-    sheet.appendRow([
+    const nextRow = sheet.getLastRow() + 1;
+    sheet.getRange(nextRow, CONFIG.lookupIdColumn, 1, 2).setNumberFormat('@');
+    sheet.getRange(nextRow, 1, 1, CONFIG.registrationHeaders.length).setValues([[
       registrationId,
       new Date(),
       lookupId,
@@ -202,7 +210,7 @@ function doPost(e) {
       email,
       episode,
       normalizeValue_(data.formName) || 'class-registration'
-    ]);
+    ]]);
     sortRegistrationSheet_(sheet);
 
     return jsonResponse_({
@@ -213,7 +221,7 @@ function doPost(e) {
   } catch (error) {
     return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
   } finally {
-    lock.releaseLock();
+    if (locked) lock.releaseLock();
   }
 
 }
@@ -448,6 +456,9 @@ function createQuiz_(data) {
 }
 
 function listQuizzes_() {
+  if (getRegistrationSpreadsheet_().getSheetByName('QuizAttemptHistory')) {
+    getOrCreateQuizAttemptHistorySheet_();
+  }
   const sheet = getOrCreateQuizIndexSheet_();
   const rows = sheet.getDataRange().getDisplayValues().slice(1)
     .filter((row) => row[14] !== 'FALSE')
@@ -661,11 +672,14 @@ function countQuizAttempts_(studentId, quizId, phase) {
 }
 
 function hasPassedPostTest_(studentId, quizId) {
-  return getQuizAttemptHistoryRows_(studentId, quizId, 'post-test').some((row) => {
-    const score = Number(row.score);
-    const total = Number(row.total);
-    return total > 0 && score / total >= 0.8;
-  });
+  return getQuizAttemptHistoryRows_(studentId, quizId, 'post-test')
+    .some((row) => isPostTestPassed_(row.score, row.total));
+}
+
+function isPostTestPassed_(scoreValue, totalValue) {
+  const score = Number(scoreValue);
+  const total = Number(totalValue);
+  return Number.isFinite(score) && Number.isFinite(total) && total > 0 && score / total >= 0.8;
 }
 
 function getQuizAttemptHistoryRows_(studentId, quizId, phase) {
@@ -703,6 +717,12 @@ function getOrCreateQuizAttemptHistorySheet_() {
       ]);
     if (legacyRows.length) sheet.getRange(2, 1, legacyRows.length, headers.length).setValues(legacyRows);
   }
+  ensureSheetColumns_(sheet, 25);
+  const hasPhaseViewHeaders = getQuizAttemptPhaseViews_().every((view) =>
+    sheet.getRange(1, view.column, 1, 4).getDisplayValues()[0]
+      .every((header, index) => header === ['lookup_id', 'score', 'total', 'passed'][index])
+  );
+  if (!hasPhaseViewHeaders) updateQuizAttemptPhaseViews_(sheet);
   return sheet;
 }
 
@@ -714,6 +734,79 @@ function appendQuizAttemptHistory_(result) {
     result.result_id, result.submitted_at, result.student_id, lookupId, result.quiz_id,
     result.phase, result.score, result.total, result.passed ? 'TRUE' : 'FALSE'
   ]);
+  updateQuizAttemptPhaseViews_(sheet);
+}
+
+function updateQuizAttemptPhaseViews_(sheet) {
+  ensureSheetColumns_(sheet, 25);
+  const phaseHeaders = ['lookup_id', 'score', 'total', 'passed'];
+  getQuizAttemptPhaseViews_().forEach((view) => {
+    sheet.getRange(1, view.column, 1, phaseHeaders.length).setValues([phaseHeaders]);
+  });
+
+  const lastRow = sheet.getLastRow();
+  const existingRows = lastRow > 1
+    ? sheet.getRange(2, 1, lastRow - 1, 9).getValues()
+    : [];
+  let dataRowCount = existingRows.length;
+  while (dataRowCount > 0 && existingRows[dataRowCount - 1].every((value) => !normalizeValue_(value))) {
+    dataRowCount -= 1;
+  }
+
+  const rows = existingRows.slice(0, dataRowCount);
+  if (dataRowCount > 1) {
+    rows.sort((left, right) => compareLookupIds_(left[3], right[3]));
+    sheet.getRange(2, 1, dataRowCount, 9).setValues(rows);
+  }
+  const phaseRows = new Map([
+    ['pre-test', []],
+    ['post-test', []],
+    ['score', []]
+  ]);
+  rows.forEach((row) => {
+    const phase = normalizePhase_(row[5]);
+    const records = phaseRows.get(phase);
+    if (!records || !normalizeValue_(row[3])) return;
+    const passed = phase === 'post-test'
+      ? isPostTestPassed_(row[6], row[7])
+      : normalizeValue_(row[8]).toUpperCase() === 'TRUE';
+    records.push([
+      normalizeLookupId_(row[3]),
+      row[6],
+      row[7],
+      passed ? 'TRUE' : 'FALSE'
+    ]);
+  });
+
+  const clearRowCount = Math.max(0, lastRow - 1);
+  getQuizAttemptPhaseViews_().forEach((view) => {
+    if (clearRowCount > 0) {
+      sheet.getRange(2, view.column, clearRowCount, phaseHeaders.length).clearContent();
+    }
+    const records = phaseRows.get(view.phase);
+    if (records.length > 0) {
+      sheet.getRange(2, view.column, records.length, phaseHeaders.length).setValues(records);
+    }
+  });
+}
+
+function compareLookupIds_(leftValue, rightValue) {
+  const leftId = normalizeLookupId_(leftValue);
+  const rightId = normalizeLookupId_(rightValue);
+  const leftIsNumeric = /^\d+$/.test(leftId);
+  const rightIsNumeric = /^\d+$/.test(rightId);
+  if (leftIsNumeric && rightIsNumeric) return Number(leftId) - Number(rightId);
+  if (leftIsNumeric) return -1;
+  if (rightIsNumeric) return 1;
+  return leftId.localeCompare(rightId, 'en', { numeric: true, sensitivity: 'base' });
+}
+
+function getQuizAttemptPhaseViews_() {
+  return [
+    { phase: 'pre-test', column: 12 },
+    { phase: 'post-test', column: 17 },
+    { phase: 'score', column: 22 }
+  ];
 }
 
 function hasQuizAttempt_(studentId, quizId, phase, attemptsAllowed) {
@@ -959,7 +1052,7 @@ function saveAttendance_(data) {
   }
 
   const sheet = getOrCreateAttendanceSheet_();
-  if (attendanceDuplicateExists_(sheet, source.values[4], attendanceFormName, attendanceSubject)) {
+  if (attendanceDuplicateExists_(sheet, source.values[0], attendanceFormName, attendanceSubject)) {
     return jsonResponse_({
       ok: false,
       code: 'DUPLICATE_ATTENDANCE',
@@ -969,7 +1062,10 @@ function saveAttendance_(data) {
 
   const attendanceValues = source.values.slice();
   attendanceValues.splice(CONFIG.registrationHeaders.indexOf('email') + 1, 0, attendanceSubject);
-  sheet.appendRow(attendanceValues.concat([attendanceFormName]));
+  const nextRow = sheet.getLastRow() + 1;
+  sheet.getRange(nextRow, CONFIG.lookupIdColumn, 1, 2).setNumberFormat('@');
+  sheet.getRange(nextRow, 1, 1, attendanceValues.length + 1)
+    .setValues([attendanceValues.concat([attendanceFormName])]);
   sortAttendanceSheet_(sheet);
   return jsonResponse_({
     ok: true,
@@ -1432,7 +1528,8 @@ function getTeacherDashboard_(token) {
   const lookupIndex = historyHeaders.indexOf('lookup_id');
   const quizIndexColumn = historyHeaders.indexOf('quiz_id');
   const phaseIndex = historyHeaders.indexOf('phase');
-  const passedIndex = historyHeaders.indexOf('passed');
+  const scoreIndex = historyHeaders.indexOf('score');
+  const totalIndex = historyHeaders.indexOf('total');
   const quizParticipants = new Map();
   const quizById = new Map();
   quizzes.forEach((quiz) => {
@@ -1461,7 +1558,7 @@ function getTeacherDashboard_(token) {
     if (attemptPhase === 'pre-test') courseLearners.preTest.add(studentId);
     if (attemptPhase === 'post-test') {
       courseLearners.postTest.add(studentId);
-      if (passedIndex >= 0 && normalizeValue_(row[passedIndex]).toUpperCase() === 'TRUE') {
+      if (isPostTestPassed_(row[scoreIndex], row[totalIndex])) {
         courseLearners.passedPostTest.add(studentId);
       }
     }
@@ -1888,58 +1985,48 @@ function getTeachingScores_(spreadsheet, personalId, lookupId) {
 
 function findRegistrationRecord_(registrationId) {
   const sheet = getRegistrationSheet_();
-  const values = sheet.getDataRange().getDisplayValues();
-  const headers = values.length > 0 ? values[0] : [];
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+  const width = Math.max(sheet.getLastColumn(), CONFIG.registrationHeaders.length);
+  const headers = sheet.getRange(1, 1, 1, width).getDisplayValues()[0];
+  const registrationIds = sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues();
+  const rowOffset = registrationIds.findIndex((row) =>
+    normalizeValue_(row[0]).replace(/^'/, '') === normalizeValue_(registrationId).replace(/^'/, ''));
+  if (rowOffset < 0) return null;
+  const row = sheet.getRange(rowOffset + 2, 1, 1, width).getDisplayValues()[0];
   const episodeIndex = headers.indexOf('episode');
-
-  for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
-    const row = values[rowIndex];
-    if (normalizeValue_(row[0]) !== registrationId) {
-      continue;
-    }
-
-    return {
-      values: row.slice(0, CONFIG.registrationHeaders.length),
-      examInfo: {
-        registrationId: normalizeValue_(row[0]),
-        lookupId: normalizeLookupId_(row[2]),
-        rankName: normalizeValue_(row[4]),
-        affiliation: normalizeValue_(row[5]),
-        email: normalizeValue_(row[7]),
-        formName: normalizeValue_(episodeIndex >= 0 ? row[episodeIndex] : '')
-      },
-      columns: row.slice(0, CONFIG.registrationHeaders.length).map((value, index) => ({
-        label: normalizeValue_(headers[index]) || `คอลัมน์ ${String.fromCharCode(65 + index)}`,
-        value: normalizeValue_(value)
-      }))
-    };
-  }
-  return null;
+  return {
+    values: row.slice(0, CONFIG.registrationHeaders.length),
+    examInfo: {
+      registrationId: normalizeValue_(row[0]),
+      lookupId: normalizeLookupId_(row[2]),
+      rankName: normalizeValue_(row[4]),
+      affiliation: normalizeValue_(row[5]),
+      email: normalizeValue_(row[7]),
+      formName: normalizeValue_(episodeIndex >= 0 ? row[episodeIndex] : '')
+    },
+    columns: row.slice(0, CONFIG.registrationHeaders.length).map((value, index) => ({
+      label: normalizeValue_(headers[index]) || `คอลัมน์ ${String.fromCharCode(65 + index)}`,
+      value: normalizeValue_(value)
+    }))
+  };
 }
 
 function findStudentRecord_(studentId) {
   const sheet = getSourceSheet_();
-  const values = sheet.getDataRange().getDisplayValues();
-  const headers = values.length > 0 ? values[0] : [];
   const requestedId = normalizeLookupId_(studentId);
-
-  for (let rowIndex = 0; rowIndex < values.length; rowIndex += 1) {
-    const row = values[rowIndex];
-    if (normalizeLookupId_(row[0]) !== requestedId) {
-      continue;
-    }
-
-    const columns = [];
-    for (let columnIndex = 0; columnIndex < 4; columnIndex += 1) {
-      columns.push({
-        label: normalizeValue_(headers[columnIndex]) || `คอลัมน์ ${String.fromCharCode(65 + columnIndex)}`,
-        value: normalizeValue_(row[columnIndex])
-      });
-    }
-    return { columns: columns };
-  }
-
-  return null;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+  const lookupIds = sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues();
+  const rowOffset = lookupIds.findIndex((row) => normalizeLookupId_(row[0]) === requestedId);
+  if (rowOffset < 0) return null;
+  const row = sheet.getRange(rowOffset + 2, 1, 1, 4).getDisplayValues()[0];
+  const headers = sheet.getRange(1, 1, 1, 4).getDisplayValues()[0];
+  const columns = row.map((value, columnIndex) => ({
+    label: normalizeValue_(headers[columnIndex]) || `คอลัมน์ ${String.fromCharCode(65 + columnIndex)}`,
+    value: normalizeValue_(value)
+  }));
+  return { columns: columns };
 }
 
 function getSourceSheet_() {
@@ -1966,15 +2053,13 @@ function getOrCreateRegistrationSheet_() {
     sheet = spreadsheet.insertSheet(CONFIG.registrationSheetName);
   }
 
-  removeRegistrationSubjectColumn_(sheet);
   const headerRange = sheet.getRange(1, 1, 1, CONFIG.registrationHeaders.length);
   if (headerRange.getValues()[0].every((value) => normalizeValue_(value) === '')) {
     headerRange.setValues([CONFIG.registrationHeaders]).setFontWeight('bold');
   }
-  const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
-  if (attendanceSheet) ensureAttendanceSubjectSchema_(attendanceSheet);
-  sheet.getRange(1, CONFIG.lookupIdColumn, sheet.getMaxRows(), 2).setNumberFormat('@');
-  normalizeRegistrationLookupColumns_(sheet);
+  const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0]
+    .map(normalizeValue_);
+  if (existingHeaders.indexOf('subject') >= 0) removeRegistrationSubjectColumn_(sheet);
   return sheet;
 }
 
@@ -2005,16 +2090,15 @@ function createUniqueRegistrationId_(sheet) {
   return id;
 }
 
-function registrationDataColumnBExists_(sheet, dataColumnB) {
-  if (sheet.getLastRow() < 2) {
-    return false;
-  }
-
-  const existingValues = sheet
-    .getRange(2, 5, sheet.getLastRow() - 1, 1)
-    .getDisplayValues()
-    .flat();
-  return existingValues.indexOf(normalizeValue_(dataColumnB)) !== -1;
+function registrationExists_(sheet, lookupId, registrationId) {
+  const dataRowCount = sheet.getLastRow() - 1;
+  if (dataRowCount < 1) return false;
+  const existing = sheet.getRange(2, 1, dataRowCount, CONFIG.lookupIdColumn).getDisplayValues();
+  const requestedLookupId = normalizeLookupId_(lookupId);
+  const requestedRegistrationId = normalizeValue_(registrationId).replace(/^'/, '');
+  return existing.some((row) =>
+    normalizeLookupId_(row[CONFIG.lookupIdColumn - 1]) === requestedLookupId
+    || normalizeValue_(row[0]).replace(/^'/, '') === requestedRegistrationId);
 }
 
 function normalizeRegistrationLookupColumns_(sheet) {
@@ -2037,20 +2121,8 @@ function sortRegistrationSheet_(sheet) {
     return;
   }
 
-  const range = sheet.getRange(2, 1, dataRowCount, CONFIG.registrationHeaders.length);
-  const rows = range.getValues();
-  const lookupOffset = CONFIG.lookupIdColumn - 1;
-  rows.sort((left, right) => {
-    const leftId = normalizeLookupId_(left[lookupOffset]);
-    const rightId = normalizeLookupId_(right[lookupOffset]);
-    const leftIsNumeric = /^\d+$/.test(leftId);
-    const rightIsNumeric = /^\d+$/.test(rightId);
-    if (leftIsNumeric && rightIsNumeric) return Number(leftId) - Number(rightId);
-    if (leftIsNumeric) return -1;
-    if (rightIsNumeric) return 1;
-    return leftId.localeCompare(rightId, 'en', { numeric: true, sensitivity: 'base' });
-  });
-  range.setValues(rows);
+  sheet.getRange(2, 1, dataRowCount, CONFIG.registrationHeaders.length)
+    .sort({ column: CONFIG.lookupIdColumn, ascending: true });
 }
 
 function getRegistrationSheet_() {
@@ -2059,9 +2131,9 @@ function getRegistrationSheet_() {
   if (!sheet) {
     throw new Error('ไม่พบชีต Registration');
   }
-  removeRegistrationSubjectColumn_(sheet);
-  const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
-  if (attendanceSheet) ensureAttendanceSubjectSchema_(attendanceSheet);
+  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), CONFIG.registrationHeaders.length)).getDisplayValues()[0]
+    .map(normalizeValue_);
+  if (headers.indexOf('subject') >= 0) removeRegistrationSubjectColumn_(sheet);
   return sheet;
 }
 
@@ -2084,6 +2156,10 @@ function ensureAttendanceSubjectSchema_(sheet) {
   const readWidth = Math.max(sheet.getLastColumn(), headers.length);
   const existingHeaders = sheet.getRange(1, 1, 1, readWidth).getDisplayValues()[0]
     .map(normalizeValue_);
+  const hasChangedHeaders = headers.some((header, index) => existingHeaders[index] !== header)
+    || existingHeaders.length !== headers.length;
+  if (!hasChangedHeaders) return;
+
   const rows = sheet.getLastRow() > 1
     ? sheet.getRange(2, 1, sheet.getLastRow() - 1, readWidth).getValues()
     : [];
@@ -2109,11 +2185,6 @@ function ensureAttendanceSubjectSchema_(sheet) {
     const index = sourceIndexes.get(header);
     return index === undefined ? '' : row[index];
   }));
-  const hasMissingData = migratedRows.some((row) => !normalizeValue_(row[subjectIndex]));
-  const hasChangedHeaders = headers.some((header, index) => existingHeaders[index] !== header)
-    || existingHeaders.length !== headers.length;
-  if (!hasChangedHeaders && !hasMissingData) return;
-
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
   if (migratedRows.length) sheet.getRange(2, 1, migratedRows.length, headers.length).setValues(migratedRows);
   const extraColumns = sheet.getLastColumn() - headers.length;
@@ -2135,20 +2206,22 @@ function normalizeAttendanceLookupColumns_(sheet) {
   ]));
 }
 
-function attendanceDuplicateExists_(sheet, dataColumnB, formName, subject) {
-  if (sheet.getLastRow() < 2) {
-    return false;
-  }
-
+function attendanceDuplicateExists_(sheet, registrationId, formName, subject) {
+  const rowCount = sheet.getLastRow() - 1;
+  if (rowCount < 1) return false;
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0]
     .map(normalizeValue_);
   const roundIndex = headers.indexOf('attendance_form_name');
   const subjectIndex = headers.indexOf('subject');
-  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getDisplayValues();
-  return values.some((row) =>
-    normalizeValue_(row[4]) === normalizeValue_(dataColumnB)
-    && normalizeValue_(row[roundIndex]) === normalizeValue_(formName)
-    && normalizeValue_(row[subjectIndex]) === normalizeValue_(subject)
+  if (roundIndex < 0 || subjectIndex < 0) throw new Error('โครงสร้างชีต Attendance ไม่ถูกต้อง');
+  const firstColumn = Math.min(subjectIndex + 1, roundIndex + 1);
+  const lastColumn = Math.max(subjectIndex + 1, roundIndex + 1);
+  const personalIds = sheet.getRange(2, 1, rowCount, 1).getDisplayValues();
+  const subjectAndRound = sheet.getRange(2, firstColumn, rowCount, lastColumn - firstColumn + 1).getDisplayValues();
+  return personalIds.some((row, index) =>
+    normalizeValue_(row[0]).replace(/^'/, '') === normalizeValue_(registrationId).replace(/^'/, '')
+    && normalizeValue_(subjectAndRound[index][subjectIndex + 1 - firstColumn]) === normalizeValue_(subject)
+    && normalizeValue_(subjectAndRound[index][roundIndex + 1 - firstColumn]) === normalizeValue_(formName)
   );
 }
 
@@ -2158,7 +2231,7 @@ function sortAttendanceSheet_(sheet) {
     return;
   }
   sheet.getRange(2, 1, dataRowCount, CONFIG.registrationHeaders.length + 2)
-    .sort({ column: 1, ascending: true });
+    .sort({ column: CONFIG.lookupIdColumn, ascending: true });
 }
 
 function isValidEmail_(email) {
