@@ -2159,7 +2159,28 @@ function ensureAttendanceSubjectSchema_(sheet) {
     .map(normalizeValue_);
   const hasChangedHeaders = headers.some((header, index) => existingHeaders[index] !== header)
     || existingHeaders.length !== headers.length;
-  if (!hasChangedHeaders) return;
+  let hasMissingData = false;
+  const existingRowCount = sheet.getLastRow() - 1;
+  if (!hasChangedHeaders && existingRowCount < 1) return;
+  if (!hasChangedHeaders) {
+    const existingSubjectIndex = headers.indexOf('subject');
+    const existingFormNameIndex = headers.indexOf('form_name');
+    const firstColumn = Math.min(existingSubjectIndex, existingFormNameIndex) + 1;
+    const lastColumn = Math.max(existingSubjectIndex, existingFormNameIndex) + 1;
+    const subjectAndFormNames = sheet.getRange(
+      2,
+      firstColumn,
+      existingRowCount,
+      lastColumn - firstColumn + 1
+    ).getDisplayValues();
+    const subjectsMatch = subjectAndFormNames.every((row) => {
+      const subject = normalizeValue_(row[existingSubjectIndex + 1 - firstColumn]);
+      const formName = normalizeValue_(row[existingFormNameIndex + 1 - firstColumn]);
+      return subject && subject === formName;
+    });
+    hasMissingData = !subjectsMatch;
+    if (subjectsMatch) return;
+  }
 
   const rows = sheet.getLastRow() > 1
     ? sheet.getRange(2, 1, sheet.getLastRow() - 1, readWidth).getValues()
@@ -2191,12 +2212,6 @@ function ensureAttendanceSubjectSchema_(sheet) {
     const index = sourceIndexes.get(header);
     return index === undefined ? '' : row[index];
   }));
-  const formNameIndex = headers.indexOf('form_name');
-  const hasMissingData = migratedRows.some((row) =>
-    !normalizeValue_(row[subjectIndex])
-    || normalizeValue_(row[formNameIndex]) !== normalizeValue_(row[subjectIndex]));
-  const hasChangedHeaders = headers.some((header, index) => existingHeaders[index] !== header)
-    || existingHeaders.length !== headers.length;
   if (!hasChangedHeaders && !hasMissingData) return;
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
