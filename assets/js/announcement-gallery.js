@@ -1,9 +1,150 @@
 (function () {
   'use strict';
 
+  const endpoint = document.querySelector('#registration-form')?.getAttribute('action');
   const dashboardOpenButton = document.getElementById('open-announcement-dashboard');
   const dashboardPopup = document.getElementById('announcement-dashboard-popup');
   const dashboardCloseButton = document.getElementById('announcement-dashboard-close');
+  const dashboardAddButton = document.getElementById('announcement-dashboard-add');
+  const announcementList = document.getElementById('announcement-list');
+  const dashboardEmpty = document.getElementById('announcement-dashboard-empty');
+  const dashboardStatus = document.getElementById('announcement-dashboard-status');
+  const editorPopup = document.getElementById('announcement-editor-popup');
+  const editorCloseButton = document.getElementById('announcement-editor-close');
+  const announcementLoginForm = document.getElementById('announcement-login-form');
+  const announcementForm = document.getElementById('announcement-form');
+  const announcementLoginStatus = document.getElementById('announcement-login-status');
+  const announcementFormStatus = document.getElementById('announcement-form-status');
+  let announcementTeacherToken = '';
+
+  async function postAnnouncementApi(parameters, method) {
+    if (!endpoint) throw new Error('ไม่พบที่อยู่ระบบประกาศ');
+    const url = new URL(endpoint);
+    const options = { method: 'GET', cache: 'no-store' };
+    if (method === 'POST') {
+      options.method = 'POST';
+      options.body = new URLSearchParams(parameters);
+    } else {
+      Object.entries(parameters).forEach(([key, value]) => url.searchParams.set(key, value));
+    }
+    const response = await fetch(url, options);
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.message || 'เชื่อมต่อระบบประกาศไม่สำเร็จ');
+    return data;
+  }
+
+  function setAnnouncementStatus(element, message, isError) {
+    element.textContent = message;
+    element.classList.toggle('d-none', !message);
+    element.classList.toggle('error-message', Boolean(isError));
+  }
+
+  function formatAnnouncementDate(value) {
+    return new Date(value).toLocaleString('th-TH', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Asia/Bangkok'
+    });
+  }
+
+  function renderAnnouncements(announcements) {
+    announcementList.replaceChildren();
+    dashboardEmpty.classList.toggle('d-none', announcements.length > 0);
+    announcements.forEach((announcement, index) => {
+      const item = document.createElement('article');
+      item.className = 'announcement-list-item';
+
+      const number = document.createElement('span');
+      number.className = 'announcement-list-number';
+      number.textContent = String(index + 1);
+
+      const details = document.createElement('div');
+      details.className = 'announcement-list-details';
+
+      const title = document.createElement('button');
+      title.type = 'button';
+      title.className = 'announcement-list-title';
+      title.setAttribute('aria-expanded', 'false');
+      title.textContent = `${announcement.icon || '📢'} ${announcement.title}`;
+      if (announcement.isNew) {
+        const badge = document.createElement('span');
+        badge.className = 'announcement-new-badge';
+        badge.textContent = 'NEW';
+        title.append(' ', badge);
+      }
+
+      const dates = document.createElement('p');
+      dates.className = 'announcement-list-dates';
+      dates.textContent = `${formatAnnouncementDate(announcement.startAt)} – ${formatAnnouncementDate(announcement.endAt)}`;
+
+      const content = document.createElement('p');
+      content.className = 'announcement-list-content d-none';
+      content.textContent = announcement.content;
+
+      title.addEventListener('click', () => {
+        const expanded = title.getAttribute('aria-expanded') === 'true';
+        title.setAttribute('aria-expanded', String(!expanded));
+        content.classList.toggle('d-none', expanded);
+      });
+
+      details.append(title, dates, content);
+      item.append(number, details);
+      announcementList.appendChild(item);
+    });
+  }
+
+  async function loadAnnouncements() {
+    if (!announcementList || !dashboardStatus) return;
+    setAnnouncementStatus(dashboardStatus, 'กำลังโหลดประกาศ...', false);
+    try {
+      const data = await postAnnouncementApi({ action: 'announcements' }, 'GET');
+      if (!Array.isArray(data.announcements)) throw new Error('รูปแบบข้อมูลประกาศไม่ถูกต้อง');
+      renderAnnouncements(data.announcements);
+      setAnnouncementStatus(dashboardStatus, '', false);
+      dashboardEmpty.querySelector('p').textContent = data.announcements.length
+        ? ''
+        : 'ขณะนี้ยังไม่มีประกาศที่กำลังเผยแพร่';
+    } catch (error) {
+      setAnnouncementStatus(dashboardStatus, error.message || 'โหลดประกาศไม่สำเร็จ กรุณาลองใหม่', true);
+    }
+  }
+
+  function openAnnouncementEditor() {
+    if (!editorPopup) return;
+    announcementTeacherToken = '';
+    announcementLoginForm.reset();
+    announcementForm.reset();
+    editorPopup.classList.remove('d-none');
+    document.body.classList.add('announcement-dashboard-open');
+    setAnnouncementStatus(announcementLoginStatus, '', false);
+    setAnnouncementStatus(announcementFormStatus, '', false);
+    announcementLoginForm.classList.remove('d-none');
+    announcementForm.classList.add('d-none');
+    document.getElementById('announcement-editor-account').textContent = '';
+    announcementLoginForm.elements.email.value = '';
+    announcementLoginForm.elements.password.value = '';
+    announcementLoginForm.querySelector('input').focus();
+  }
+
+  function getLocalDateTimeValue(date) {
+    const roundedDate = new Date(Math.ceil(date.getTime() / 60000) * 60000);
+    const localDate = new Date(roundedDate.getTime() - roundedDate.getTimezoneOffset() * 60000);
+    return localDate.toISOString().slice(0, 16);
+  }
+
+  function closeAnnouncementEditor() {
+    announcementTeacherToken = '';
+    announcementLoginForm.reset();
+    announcementForm.reset();
+    setAnnouncementStatus(announcementLoginStatus, '', false);
+    setAnnouncementStatus(announcementFormStatus, '', false);
+    editorPopup.classList.add('d-none');
+    if (dashboardPopup?.classList.contains('d-none')) {
+      document.body.classList.remove('announcement-dashboard-open');
+    }
+    dashboardAddButton?.focus();
+  }
+
   if (dashboardOpenButton && dashboardPopup && dashboardCloseButton) {
     function closeDashboard() {
       dashboardPopup.classList.add('d-none');
@@ -18,6 +159,7 @@
       document.body.classList.add('announcement-dashboard-open');
       dashboardOpenButton.setAttribute('aria-expanded', 'true');
       dashboardCloseButton.focus();
+      loadAnnouncements();
     });
     dashboardCloseButton.addEventListener('click', closeDashboard);
     dashboardPopup.addEventListener('click', (event) => {
@@ -28,11 +170,103 @@
     });
   }
 
+  dashboardAddButton?.addEventListener('click', openAnnouncementEditor);
+  editorCloseButton?.addEventListener('click', closeAnnouncementEditor);
+  editorPopup?.addEventListener('click', (event) => {
+    if (event.target === editorPopup) closeAnnouncementEditor();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (!editorPopup?.classList.contains('d-none') && event.key === 'Escape') closeAnnouncementEditor();
+  });
+
+  announcementLoginForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submitButton = announcementLoginForm.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    setAnnouncementStatus(announcementLoginStatus, 'กำลังตรวจสอบบัญชีครู...', false);
+    try {
+      const formData = new FormData(announcementLoginForm);
+      const data = await postAnnouncementApi({
+        formName: 'teacher-login',
+        email: formData.get('email'),
+        password: formData.get('password')
+      }, 'POST');
+      announcementTeacherToken = data.token;
+      announcementLoginForm.reset();
+      announcementLoginForm.classList.add('d-none');
+      announcementForm.classList.remove('d-none');
+      document.getElementById('announcement-editor-account').textContent =
+        `เข้าสู่ระบบแล้ว: ${data.teacherName || 'ครูที่ได้รับอนุมัติ'}`;
+      announcementForm.elements.startAt.min = getLocalDateTimeValue(new Date());
+      announcementForm.elements.endAt.min = announcementForm.elements.startAt.min;
+      announcementForm.elements.startAt.value = announcementForm.elements.startAt.min;
+      announcementForm.elements.endAt.value = getLocalDateTimeValue(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+      setAnnouncementStatus(announcementLoginStatus, '', false);
+      announcementForm.elements.title.focus();
+    } catch (error) {
+      setAnnouncementStatus(announcementLoginStatus, error.message || 'เข้าสู่ระบบไม่สำเร็จ', true);
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
+
+  announcementForm?.elements.startAt.addEventListener('change', () => {
+    announcementForm.elements.endAt.min = announcementForm.elements.startAt.value;
+  });
+
+  document.querySelectorAll('[data-announcement-emoji]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const content = announcementForm.elements.content;
+      const emoji = button.dataset.announcementEmoji;
+      content.setRangeText(emoji, content.selectionStart, content.selectionEnd, 'end');
+      content.focus();
+    });
+  });
+
+  announcementForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submitButton = announcementForm.querySelector('button[type="submit"]');
+    const formData = new FormData(announcementForm);
+    if (new Date(formData.get('endAt')) <= new Date(formData.get('startAt'))) {
+      setAnnouncementStatus(announcementFormStatus, 'วันและเวลาสิ้นสุดต้องอยู่หลังวันและเวลาเริ่มประกาศ', true);
+      return;
+    }
+    submitButton.disabled = true;
+    setAnnouncementStatus(announcementFormStatus, 'กำลังบันทึกประกาศ...', false);
+    try {
+      const data = await postAnnouncementApi({
+        formName: 'create-announcement',
+        token: announcementTeacherToken,
+        title: formData.get('title').trim(),
+        startAt: formData.get('startAt'),
+        endAt: formData.get('endAt'),
+        icon: formData.get('icon'),
+        content: formData.get('content').trim()
+      }, 'POST');
+      setAnnouncementStatus(announcementFormStatus, data.message || 'บันทึกประกาศแล้ว', false);
+      announcementForm.reset();
+      await loadAnnouncements();
+      closeAnnouncementEditor();
+      setAnnouncementStatus(dashboardStatus, data.message || 'บันทึกประกาศแล้ว', false);
+    } catch (error) {
+      if (/เข้าสู่ระบบครูใหม่|บัญชีครู/i.test(error.message)) {
+        announcementTeacherToken = '';
+        announcementLoginForm.reset();
+        announcementForm.classList.add('d-none');
+        announcementLoginForm.classList.remove('d-none');
+        setAnnouncementStatus(announcementLoginStatus, error.message, true);
+      } else {
+        setAnnouncementStatus(announcementFormStatus, error.message || 'บันทึกประกาศไม่สำเร็จ', true);
+      }
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
+
   const openButton = document.getElementById('open-announcement-gallery');
   const popup = document.getElementById('announcement-gallery-popup');
   if (!openButton || !popup) return;
 
-  const endpoint = document.querySelector('#registration-form')?.getAttribute('action');
   const closeButton = document.getElementById('announcement-gallery-close');
   const previousButton = document.getElementById('announcement-gallery-previous');
   const nextButton = document.getElementById('announcement-gallery-next');

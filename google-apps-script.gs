@@ -15,12 +15,16 @@ const CONFIG = {
   quizIndexSheetName: 'Quizzes',
   quizSheetPrefix: 'Quiz_',
   specialAssessmentIndexSheetName: 'SpecialAssessments',
+  announcementsSheetName: 'Announcements',
+  announcementHeaders: [
+    'announcement_id', 'title', 'start_at', 'end_at', 'content', 'icon', 'created_at', 'created_by'
+  ],
   legacyAssessmentOwners: {
     'รบด้วยวิธีรุก-ตีกลางวัน': 'onnicha2739@gmail.com'
   },
   announcementGalleryFolderId: '1mYtAuD15F6zD9TD-dzFAUsm4GZ7KBunQ',
   approvalEmail: 'nu2739@gmail.com',
-  webAppUrl: 'https://script.google.com/macros/s/AKfycbylfNRFHqfE5QztOXuICj-NCqVD5U2zPfXUu16Z3-aqUm0D2u4mNEFojzk-6vKQxFQ/exec',
+  webAppUrl: 'https://script.google.com/macros/s/AKfycbwc8GrsggUQenFkeH5wYfHPzkPDFJ0XhtHAKts27axlNDhWaYbBIhocXobu5XkNV0YN/exec',
   lookupIdColumn: 3,
   studentIdLength: 13,
   registrationHeaders: [
@@ -48,6 +52,9 @@ function doGet(e) {
     }
     if (String(params.action || '').toLowerCase() === 'announcement-gallery') {
       return listAnnouncementGalleryImages_();
+    }
+    if (String(params.action || '').toLowerCase() === 'announcements') {
+      return listAnnouncements_();
     }
     if (String(params.action || '').toLowerCase() === 'get-quiz') {
       return getQuiz_(params.quizId || '', params.studentId || '', params.phase || 'pre-test', params.title || '');
@@ -87,11 +94,20 @@ function doPost(e) {
       return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
     }
   }
+  if (formName === 'teacher-dashboard') {
+    try {
+      return getTeacherDashboard_(data.token);
+    } catch (error) {
+      return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
+    }
+  }
 
   const lock = LockService.getScriptLock();
+  let locked = false;
 
   try {
     lock.waitLock(30000);
+    locked = true;
     const lookupId = normalizeValue_(data.lookupId);
     const registrationId = normalizeValue_(data.registrationId);
     const email = normalizeValue_(data.email);
@@ -103,8 +119,8 @@ function doPost(e) {
     if (formName === 'teacher-login') {
       return teacherLogin_(data);
     }
-    if (formName === 'teacher-dashboard') {
-      return getTeacherDashboard_(data.token);
+    if (formName === 'create-announcement') {
+      return createAnnouncement_(data);
     }
     if (formName === 'create-quiz') {
       return createQuiz_(data);
@@ -173,7 +189,7 @@ function doPost(e) {
     }
 
     const sheet = getOrCreateRegistrationSheet_();
-    if (registrationDataColumnBExists_(sheet, student.columns[1].value)) {
+    if (registrationExists_(sheet, lookupId, registrationId)) {
       return jsonResponse_({
         ok: false,
         code: 'DUPLICATE_REGISTRATION',
@@ -181,7 +197,9 @@ function doPost(e) {
       });
     }
 
-    sheet.appendRow([
+    const nextRow = sheet.getLastRow() + 1;
+    sheet.getRange(nextRow, CONFIG.lookupIdColumn, 1, 2).setNumberFormat('@');
+    sheet.getRange(nextRow, 1, 1, CONFIG.registrationHeaders.length).setValues([[
       registrationId,
       new Date(),
       lookupId,
@@ -192,7 +210,7 @@ function doPost(e) {
       email,
       episode,
       normalizeValue_(data.formName) || 'class-registration'
-    ]);
+    ]]);
     sortRegistrationSheet_(sheet);
 
     return jsonResponse_({
@@ -203,7 +221,7 @@ function doPost(e) {
   } catch (error) {
     return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
   } finally {
-    lock.releaseLock();
+    if (locked) lock.releaseLock();
   }
 
 }
@@ -438,6 +456,9 @@ function createQuiz_(data) {
 }
 
 function listQuizzes_() {
+  if (getRegistrationSpreadsheet_().getSheetByName('QuizAttemptHistory')) {
+    getOrCreateQuizAttemptHistorySheet_();
+  }
   const sheet = getOrCreateQuizIndexSheet_();
   const rows = sheet.getDataRange().getDisplayValues().slice(1)
     .filter((row) => row[14] !== 'FALSE')
@@ -651,11 +672,14 @@ function countQuizAttempts_(studentId, quizId, phase) {
 }
 
 function hasPassedPostTest_(studentId, quizId) {
-  return getQuizAttemptHistoryRows_(studentId, quizId, 'post-test').some((row) => {
-    const score = Number(row.score);
-    const total = Number(row.total);
-    return total > 0 && score / total >= 0.8;
-  });
+  return getQuizAttemptHistoryRows_(studentId, quizId, 'post-test')
+    .some((row) => isPostTestPassed_(row.score, row.total));
+}
+
+function isPostTestPassed_(scoreValue, totalValue) {
+  const score = Number(scoreValue);
+  const total = Number(totalValue);
+  return Number.isFinite(score) && Number.isFinite(total) && total > 0 && score / total >= 0.8;
 }
 
 function getQuizAttemptHistoryRows_(studentId, quizId, phase) {
@@ -693,6 +717,12 @@ function getOrCreateQuizAttemptHistorySheet_() {
       ]);
     if (legacyRows.length) sheet.getRange(2, 1, legacyRows.length, headers.length).setValues(legacyRows);
   }
+  ensureSheetColumns_(sheet, 25);
+  const hasPhaseViewHeaders = getQuizAttemptPhaseViews_().every((view) =>
+    sheet.getRange(1, view.column, 1, 4).getDisplayValues()[0]
+      .every((header, index) => header === ['lookup_id', 'score', 'total', 'passed'][index])
+  );
+  if (!hasPhaseViewHeaders) updateQuizAttemptPhaseViews_(sheet);
   return sheet;
 }
 
@@ -704,6 +734,79 @@ function appendQuizAttemptHistory_(result) {
     result.result_id, result.submitted_at, result.student_id, lookupId, result.quiz_id,
     result.phase, result.score, result.total, result.passed ? 'TRUE' : 'FALSE'
   ]);
+  updateQuizAttemptPhaseViews_(sheet);
+}
+
+function updateQuizAttemptPhaseViews_(sheet) {
+  ensureSheetColumns_(sheet, 25);
+  const phaseHeaders = ['lookup_id', 'score', 'total', 'passed'];
+  getQuizAttemptPhaseViews_().forEach((view) => {
+    sheet.getRange(1, view.column, 1, phaseHeaders.length).setValues([phaseHeaders]);
+  });
+
+  const lastRow = sheet.getLastRow();
+  const existingRows = lastRow > 1
+    ? sheet.getRange(2, 1, lastRow - 1, 9).getValues()
+    : [];
+  let dataRowCount = existingRows.length;
+  while (dataRowCount > 0 && existingRows[dataRowCount - 1].every((value) => !normalizeValue_(value))) {
+    dataRowCount -= 1;
+  }
+
+  const rows = existingRows.slice(0, dataRowCount);
+  if (dataRowCount > 1) {
+    rows.sort((left, right) => compareLookupIds_(left[3], right[3]));
+    sheet.getRange(2, 1, dataRowCount, 9).setValues(rows);
+  }
+  const phaseRows = new Map([
+    ['pre-test', []],
+    ['post-test', []],
+    ['score', []]
+  ]);
+  rows.forEach((row) => {
+    const phase = normalizePhase_(row[5]);
+    const records = phaseRows.get(phase);
+    if (!records || !normalizeValue_(row[3])) return;
+    const passed = phase === 'post-test'
+      ? isPostTestPassed_(row[6], row[7])
+      : normalizeValue_(row[8]).toUpperCase() === 'TRUE';
+    records.push([
+      normalizeLookupId_(row[3]),
+      row[6],
+      row[7],
+      passed ? 'TRUE' : 'FALSE'
+    ]);
+  });
+
+  const clearRowCount = Math.max(0, lastRow - 1);
+  getQuizAttemptPhaseViews_().forEach((view) => {
+    if (clearRowCount > 0) {
+      sheet.getRange(2, view.column, clearRowCount, phaseHeaders.length).clearContent();
+    }
+    const records = phaseRows.get(view.phase);
+    if (records.length > 0) {
+      sheet.getRange(2, view.column, records.length, phaseHeaders.length).setValues(records);
+    }
+  });
+}
+
+function compareLookupIds_(leftValue, rightValue) {
+  const leftId = normalizeLookupId_(leftValue);
+  const rightId = normalizeLookupId_(rightValue);
+  const leftIsNumeric = /^\d+$/.test(leftId);
+  const rightIsNumeric = /^\d+$/.test(rightId);
+  if (leftIsNumeric && rightIsNumeric) return Number(leftId) - Number(rightId);
+  if (leftIsNumeric) return -1;
+  if (rightIsNumeric) return 1;
+  return leftId.localeCompare(rightId, 'en', { numeric: true, sensitivity: 'base' });
+}
+
+function getQuizAttemptPhaseViews_() {
+  return [
+    { phase: 'pre-test', column: 12 },
+    { phase: 'post-test', column: 17 },
+    { phase: 'score', column: 22 }
+  ];
 }
 
 function hasQuizAttempt_(studentId, quizId, phase, attemptsAllowed) {
@@ -949,7 +1052,7 @@ function saveAttendance_(data) {
   }
 
   const sheet = getOrCreateAttendanceSheet_();
-  if (attendanceDuplicateExists_(sheet, source.values[4], attendanceFormName, attendanceSubject)) {
+  if (attendanceDuplicateExists_(sheet, source.values[0], attendanceFormName, attendanceSubject)) {
     return jsonResponse_({
       ok: false,
       code: 'DUPLICATE_ATTENDANCE',
@@ -960,7 +1063,10 @@ function saveAttendance_(data) {
   const attendanceValues = source.values.slice();
   attendanceValues.splice(CONFIG.registrationHeaders.indexOf('email') + 1, 0, attendanceSubject);
   attendanceValues[CONFIG.registrationHeaders.indexOf('form_name') + 1] = attendanceSubject;
-  sheet.appendRow(attendanceValues.concat([attendanceFormName]));
+  const nextRow = sheet.getLastRow() + 1;
+  sheet.getRange(nextRow, CONFIG.lookupIdColumn, 1, 2).setNumberFormat('@');
+  sheet.getRange(nextRow, 1, 1, attendanceValues.length + 1)
+    .setValues([attendanceValues.concat([attendanceFormName])]);
   sortAttendanceSheet_(sheet);
   return jsonResponse_({
     ok: true,
@@ -974,6 +1080,7 @@ function setupRegistrationSheet() {
   sheet.setFrozenRows(1);
   sheet.autoResizeColumns(1, CONFIG.registrationHeaders.length);
   normalizeAllLookupIds();
+  sortRegistrationSheet_(sheet);
   return 'Registration sheet is ready.';
 }
 
@@ -1254,6 +1361,145 @@ function listAnnouncementGalleryImages_() {
   return jsonResponse_({ ok: true, images });
 }
 
+function getOrCreateAnnouncementsSheet_() {
+  return getOrCreateSheet_(
+    getRegistrationSpreadsheet_(),
+    CONFIG.announcementsSheetName,
+    CONFIG.announcementHeaders
+  );
+}
+
+function listAnnouncements_() {
+  const lock = LockService.getScriptLock();
+  let locked = false;
+  try {
+    lock.waitLock(30000);
+    locked = true;
+    const sheet = getOrCreateAnnouncementsSheet_();
+    deleteExpiredAnnouncementsFromSheet_(sheet, new Date());
+    if (sheet.getLastRow() < 2) return jsonResponse_({ ok: true, announcements: [] });
+
+    const now = new Date();
+    const announcements = sheet.getRange(2, 1, sheet.getLastRow() - 1, CONFIG.announcementHeaders.length)
+      .getValues()
+      .map((row) => ({
+        id: normalizeValue_(row[0]),
+        title: normalizeValue_(row[1]),
+        startAt: row[2] instanceof Date ? row[2] : new Date(row[2]),
+        endAt: row[3] instanceof Date ? row[3] : new Date(row[3]),
+        content: normalizeValue_(row[4]),
+        icon: normalizeValue_(row[5]) || '📢',
+        createdAt: row[6] instanceof Date ? row[6] : new Date(row[6])
+      }))
+      .filter((item) => item.id && item.title && item.content
+        && !isNaN(item.startAt.getTime()) && !isNaN(item.endAt.getTime())
+        && item.startAt <= now && item.endAt > now)
+      .sort((left, right) => right.startAt - left.startAt || right.createdAt - left.createdAt)
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        startAt: item.startAt.toISOString(),
+        endAt: item.endAt.toISOString(),
+        content: item.content,
+        icon: item.icon,
+        isNew: now.getTime() - item.startAt.getTime() < 7 * 24 * 60 * 60 * 1000
+      }));
+
+    return jsonResponse_({ ok: true, announcements: announcements });
+  } finally {
+    if (locked) lock.releaseLock();
+  }
+}
+
+function createAnnouncement_(data) {
+  const teacherEmail = CacheService.getScriptCache().get('teacher:' + normalizeValue_(data.token));
+  if (!teacherEmail) return jsonResponse_({ ok: false, message: 'กรุณาเข้าสู่ระบบครูใหม่' });
+
+  const title = normalizeValue_(data.title);
+  const content = normalizeValue_(data.content);
+  const icon = normalizeValue_(data.icon) || '📢';
+  const startAt = parseAnnouncementDate_(data.startAt);
+  const endAt = parseAnnouncementDate_(data.endAt);
+  if (!title || title.length > 150 || !content || content.length > 5000
+    || icon.length > 12 || !startAt || !endAt || endAt <= startAt
+    || startAt.getTime() < Date.now() - 60000) {
+    return jsonResponse_({ ok: false, message: 'กรุณาตรวจสอบชื่อเรื่อง วันเริ่ม/สิ้นสุด และเนื้อหาประกาศ' });
+  }
+
+  const teachersSheet = getRegistrationSpreadsheet_().getSheetByName(CONFIG.teachersSheetName);
+  const activeTeacher = teachersSheet && teachersSheet.getLastRow() > 1
+    && teachersSheet.getDataRange().getDisplayValues().slice(1).some((row) =>
+      normalizeValue_(row[3]).toLowerCase() === teacherEmail.toLowerCase()
+      && normalizeValue_(row[5]).toUpperCase() === 'ACTIVE');
+  if (!activeTeacher) return jsonResponse_({ ok: false, message: 'บัญชีครูนี้ไม่ได้รับอนุมัติหรือปิดใช้งานแล้ว' });
+
+  ensureAnnouncementCleanupTrigger_();
+  const sheet = getOrCreateAnnouncementsSheet_();
+  deleteExpiredAnnouncementsFromSheet_(sheet, new Date());
+  const nextRow = sheet.getLastRow() + 1;
+  [2, 5, 6, 8].forEach((column) => sheet.getRange(nextRow, column).setNumberFormat('@'));
+  sheet.getRange(nextRow, 1, 1, CONFIG.announcementHeaders.length).setValues([[
+    'A' + Utilities.getUuid(),
+    title,
+    startAt,
+    endAt,
+    content,
+    icon,
+    new Date(),
+    teacherEmail
+  ]]);
+  return jsonResponse_({ ok: true, message: 'บันทึกประกาศเรียบร้อยแล้ว' });
+}
+
+function parseAnnouncementDate_(value) {
+  const dateText = normalizeValue_(value);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dateText)) return null;
+  const date = new Date(dateText + ':00+07:00');
+  if (isNaN(date.getTime())
+    || Utilities.formatDate(date, 'Asia/Bangkok', "yyyy-MM-dd'T'HH:mm") !== dateText) return null;
+  return date;
+}
+
+function deleteExpiredAnnouncementsFromSheet_(sheet, now) {
+  if (sheet.getLastRow() < 2) return 0;
+  const endDates = sheet.getRange(2, 4, sheet.getLastRow() - 1, 1).getValues();
+  let deleted = 0;
+  for (let index = endDates.length - 1; index >= 0; index -= 1) {
+    const endAt = endDates[index][0] instanceof Date ? endDates[index][0] : new Date(endDates[index][0]);
+    if (isNaN(endAt.getTime())) throw new Error('พบวันสิ้นสุดประกาศที่ไม่ถูกต้องในชีต');
+    if (endAt <= now) {
+      sheet.deleteRow(index + 2);
+      deleted += 1;
+    }
+  }
+  return deleted;
+}
+
+function cleanupExpiredAnnouncements_() {
+  const lock = LockService.getScriptLock();
+  let locked = false;
+  try {
+    lock.waitLock(30000);
+    locked = true;
+    return deleteExpiredAnnouncementsFromSheet_(getOrCreateAnnouncementsSheet_(), new Date());
+  } finally {
+    if (locked) lock.releaseLock();
+  }
+}
+
+function ensureAnnouncementCleanupTrigger_() {
+  const exists = ScriptApp.getProjectTriggers().some((trigger) =>
+    trigger.getHandlerFunction() === 'cleanupExpiredAnnouncements_');
+  if (!exists) {
+    ScriptApp.newTrigger('cleanupExpiredAnnouncements_').timeBased().everyHours(1).create();
+  }
+}
+
+function setupAnnouncementCleanup() {
+  ensureAnnouncementCleanupTrigger_();
+  return 'ตั้งค่างานลบประกาศที่หมดอายุเรียบร้อยแล้ว';
+}
+
 function getTeacherDashboard_(token) {
   const email = CacheService.getScriptCache().get('teacher:' + normalizeValue_(token));
   if (!email) return jsonResponse_({ ok: false, message: 'กรุณาเข้าสู่ระบบครูใหม่' });
@@ -1282,13 +1528,42 @@ function getTeacherDashboard_(token) {
   const studentIndex = historyHeaders.indexOf('student_id');
   const lookupIndex = historyHeaders.indexOf('lookup_id');
   const quizIndexColumn = historyHeaders.indexOf('quiz_id');
+  const phaseIndex = historyHeaders.indexOf('phase');
+  const scoreIndex = historyHeaders.indexOf('score');
+  const totalIndex = historyHeaders.indexOf('total');
   const quizParticipants = new Map();
-  quizzes.forEach((quiz) => quizParticipants.set(quiz.quizId, new Set()));
+  const quizById = new Map();
+  quizzes.forEach((quiz) => {
+    quizParticipants.set(quiz.quizId, new Set());
+    quizById.set(quiz.quizId, quiz);
+  });
+  const courseLearners = {
+    preTest: new Set(),
+    postTest: new Set(),
+    passedPostTest: new Set(),
+    score: new Set()
+  };
   historyRows.slice(1).forEach((row) => {
-    const participants = quizParticipants.get(normalizeValue_(row[quizIndexColumn]));
+    const quizId = normalizeValue_(row[quizIndexColumn]);
+    const participants = quizParticipants.get(quizId);
     if (!participants) return;
     const studentId = normalizeValue_(row[studentIndex]) || normalizeLookupId_(row[lookupIndex]);
-    if (studentId) participants.add(studentId);
+    if (!studentId) return;
+    participants.add(studentId);
+
+    const quiz = quizById.get(quizId);
+    if (!isDaytimeAttackQuizTitle_(quiz.title)) return;
+    const attemptPhase = phaseIndex >= 0
+      ? normalizePhase_(row[phaseIndex])
+      : quiz.phase;
+    if (attemptPhase === 'pre-test') courseLearners.preTest.add(studentId);
+    if (attemptPhase === 'post-test') {
+      courseLearners.postTest.add(studentId);
+      if (isPostTestPassed_(row[scoreIndex], row[totalIndex])) {
+        courseLearners.passedPostTest.add(studentId);
+      }
+    }
+    if (attemptPhase === 'score') courseLearners.score.add(studentId);
   });
   quizzes.forEach((quiz) => {
     quiz.participantCount = quizParticipants.get(quiz.quizId).size;
@@ -1298,12 +1573,14 @@ function getTeacherDashboard_(token) {
   const assessmentRows = assessmentIndex.getDataRange().getDisplayValues().slice(1)
     .filter((row) => row[10] !== 'FALSE' && row[0] && row[3]
       && normalizeValue_(row[9]).toLowerCase() === email.toLowerCase());
+  const assessmentParticipants = new Set();
   const assessments = assessmentRows.map((row) => {
     const assessmentSheet = spreadsheet.getSheetByName(row[3]);
     const studentIds = assessmentSheet && assessmentSheet.getLastRow() > 1
       ? assessmentSheet.getRange(2, 2, assessmentSheet.getLastRow() - 1, 1).getDisplayValues().flat()
-        .map(normalizeValue_).filter(Boolean)
+        .map(normalizeLookupId_).filter(Boolean)
       : [];
+    studentIds.forEach((studentId) => assessmentParticipants.add(studentId));
     return {
       assessmentId: row[0],
       title: row[2],
@@ -1322,20 +1599,128 @@ function getTeacherDashboard_(token) {
       .filter((row) => normalizeValue_(row[0]) && row.slice(3, 29).some((value) => normalizeValue_(value)))
       .map((row) => normalizeLookupId_(row[0]))
       .filter(Boolean));
+    participants.forEach((studentId) => assessmentParticipants.add(studentId));
     assessments.push({ assessmentId: 'legacy-tactical-score', title: title, participantCount: participants.size });
   });
+
+  const tacticalScoreSheet = spreadsheet.getSheetByName('ScooreT');
+  if (!tacticalScoreSheet) throw new Error('ไม่พบชีต ScooreT ใน Spreadsheet ที่ตั้งค่าไว้');
+  const tacticalScoreRows = tacticalScoreSheet.getLastRow() > 1
+    ? tacticalScoreSheet.getRange(2, 1, tacticalScoreSheet.getLastRow() - 1, 29).getDisplayValues()
+    : [];
+  const tacticalScoreParticipants = new Set(tacticalScoreRows
+    .filter((row) => normalizeValue_(row[0]) && row.slice(3, 29).some((value) => normalizeValue_(value)))
+    .map((row) => normalizeLookupId_(row[0]))
+    .filter(Boolean));
+  const tacticalScoreCode = getCurrentTacticalScoreAccessCode_();
+
+  const registrationCount = countUniqueLearnersInSheet_(spreadsheet.getSheetByName(CONFIG.registrationSheetName));
+  const attendanceCount = countUniqueLearnersInSheet_(
+    spreadsheet.getSheetByName(CONFIG.attendanceSheetName),
+    'subject',
+    'รบด้วยวิธีรุก-ตีกลางวัน'
+  );
+  const attendanceByEpisode = countUniqueLearnersByEpisode_(
+    spreadsheet.getSheetByName(CONFIG.attendanceSheetName),
+    'รบด้วยวิธีรุก-ตีกลางวัน',
+    spreadsheet.getSheetByName(CONFIG.registrationSheetName)
+  );
 
   return jsonResponse_({
     ok: true,
     teacher: { name: normalizeValue_(teacher[2]), email: email },
     summary: {
       quizCount: quizzes.length,
-      assessmentCount: assessments.length
+      assessmentCount: assessments.length,
+      assessmentParticipantCount: assessmentParticipants.size,
+      tacticalScoreParticipantCount: tacticalScoreParticipants.size,
+      tacticalScoreAccessCode: tacticalScoreCode,
+      daytimeAttack: {
+        preTestCount: courseLearners.preTest.size,
+        postTestCount: courseLearners.postTest.size,
+        passedPostTestCount: courseLearners.passedPostTest.size,
+        scoreCount: courseLearners.score.size,
+        departmentRegistrationCount: registrationCount,
+        topicAttendanceCount: attendanceCount,
+        topicAttendanceByEpisode: attendanceByEpisode
+      }
     },
     quizzes: quizzes,
     assessments: assessments,
     updatedAt: new Date().toISOString()
   });
+}
+
+function isDaytimeAttackQuizTitle_(title) {
+  const normalizedTitle = normalizeValue_(title);
+  return (normalizedTitle.indexOf('กลางวัน') >= 0 || normalizedTitle.indexOf('กางวัน') >= 0)
+    && (normalizedTitle.indexOf('รบด้วยวิธีรุก') >= 0 || normalizedTitle.indexOf('เข้าตี') >= 0);
+}
+
+function countUniqueLearnersInSheet_(sheet, filterHeader, filterValue) {
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  const values = sheet.getDataRange().getDisplayValues();
+  const headers = values[0].map((header) => normalizeValue_(header).toLowerCase());
+  const learnerIndex = headers.indexOf('lookup_id');
+  const filterIndex = filterHeader ? headers.indexOf(filterHeader.toLowerCase()) : -1;
+  if (learnerIndex < 0 || (filterHeader && filterIndex < 0)) return 0;
+
+  const learners = new Set();
+  values.slice(1).forEach((row) => {
+    const learnerId = normalizeLookupId_(row[learnerIndex]);
+    if (!learnerId) return;
+    if (filterHeader && normalizeValue_(row[filterIndex]) !== filterValue) return;
+    learners.add(learnerId);
+  });
+  return learners.size;
+}
+
+function countUniqueLearnersByEpisode_(sheet, subject, registrationSheet) {
+  const episodeLearners = Array.from({ length: 18 }, (_, index) => ({
+    episode: 'ตอนที่ ' + (index + 1),
+    learners: new Set()
+  }));
+  if (!sheet || sheet.getLastRow() < 2) {
+    return episodeLearners.map((item) => ({ episode: item.episode, count: 0 }));
+  }
+
+  const registrationEpisodes = new Map();
+  if (registrationSheet && registrationSheet.getLastRow() > 1) {
+    const registrationRows = registrationSheet.getDataRange().getDisplayValues();
+    const registrationHeaders = registrationRows[0].map((header) => normalizeValue_(header).toLowerCase());
+    const registrationLearnerIndex = registrationHeaders.indexOf('lookup_id');
+    const registrationEpisodeIndex = registrationHeaders.indexOf('episode');
+    if (registrationLearnerIndex >= 0 && registrationEpisodeIndex >= 0) {
+      registrationRows.slice(1).forEach((row) => {
+        const learnerId = normalizeLookupId_(row[registrationLearnerIndex]);
+        const episode = normalizeValue_(row[registrationEpisodeIndex]);
+        if (learnerId && episode && !registrationEpisodes.has(learnerId)) {
+          registrationEpisodes.set(learnerId, episode);
+        }
+      });
+    }
+  }
+
+  const values = sheet.getDataRange().getDisplayValues();
+  const headers = values[0].map((header) => normalizeValue_(header).toLowerCase());
+  const learnerIndex = headers.indexOf('lookup_id');
+  const subjectIndex = headers.indexOf('subject');
+  const episodeIndex = headers.indexOf('episode');
+  if (learnerIndex < 0 || subjectIndex < 0) {
+    return episodeLearners.map((item) => ({ episode: item.episode, count: 0 }));
+  }
+
+  const learnersByEpisode = new Map(episodeLearners.map((item) => [item.episode, item.learners]));
+  values.slice(1).forEach((row) => {
+    if (normalizeValue_(row[subjectIndex]) !== subject) return;
+    const learnerId = normalizeLookupId_(row[learnerIndex]);
+    const attendanceEpisode = episodeIndex >= 0 ? normalizeValue_(row[episodeIndex]) : '';
+    const episode = attendanceEpisode || registrationEpisodes.get(learnerId) || '';
+    const learners = learnersByEpisode.get(episode);
+    if (learners && learnerId) learners.add(learnerId);
+  });
+
+  return episodeLearners.map((item) => ({ episode: item.episode, count: item.learners.size }));
 }
 
 function findSpecialAssessment_(assessmentId) {
@@ -1601,58 +1986,48 @@ function getTeachingScores_(spreadsheet, personalId, lookupId) {
 
 function findRegistrationRecord_(registrationId) {
   const sheet = getRegistrationSheet_();
-  const values = sheet.getDataRange().getDisplayValues();
-  const headers = values.length > 0 ? values[0] : [];
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+  const width = Math.max(sheet.getLastColumn(), CONFIG.registrationHeaders.length);
+  const headers = sheet.getRange(1, 1, 1, width).getDisplayValues()[0];
+  const registrationIds = sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues();
+  const rowOffset = registrationIds.findIndex((row) =>
+    normalizeValue_(row[0]).replace(/^'/, '') === normalizeValue_(registrationId).replace(/^'/, ''));
+  if (rowOffset < 0) return null;
+  const row = sheet.getRange(rowOffset + 2, 1, 1, width).getDisplayValues()[0];
   const episodeIndex = headers.indexOf('episode');
-
-  for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
-    const row = values[rowIndex];
-    if (normalizeValue_(row[0]) !== registrationId) {
-      continue;
-    }
-
-    return {
-      values: row.slice(0, CONFIG.registrationHeaders.length),
-      examInfo: {
-        registrationId: normalizeValue_(row[0]),
-        lookupId: normalizeLookupId_(row[2]),
-        rankName: normalizeValue_(row[4]),
-        affiliation: normalizeValue_(row[5]),
-        email: normalizeValue_(row[7]),
-        formName: normalizeValue_(episodeIndex >= 0 ? row[episodeIndex] : '')
-      },
-      columns: row.slice(0, CONFIG.registrationHeaders.length).map((value, index) => ({
-        label: normalizeValue_(headers[index]) || `คอลัมน์ ${String.fromCharCode(65 + index)}`,
-        value: normalizeValue_(value)
-      }))
-    };
-  }
-  return null;
+  return {
+    values: row.slice(0, CONFIG.registrationHeaders.length),
+    examInfo: {
+      registrationId: normalizeValue_(row[0]),
+      lookupId: normalizeLookupId_(row[2]),
+      rankName: normalizeValue_(row[4]),
+      affiliation: normalizeValue_(row[5]),
+      email: normalizeValue_(row[7]),
+      formName: normalizeValue_(episodeIndex >= 0 ? row[episodeIndex] : '')
+    },
+    columns: row.slice(0, CONFIG.registrationHeaders.length).map((value, index) => ({
+      label: normalizeValue_(headers[index]) || `คอลัมน์ ${String.fromCharCode(65 + index)}`,
+      value: normalizeValue_(value)
+    }))
+  };
 }
 
 function findStudentRecord_(studentId) {
   const sheet = getSourceSheet_();
-  const values = sheet.getDataRange().getDisplayValues();
-  const headers = values.length > 0 ? values[0] : [];
   const requestedId = normalizeLookupId_(studentId);
-
-  for (let rowIndex = 0; rowIndex < values.length; rowIndex += 1) {
-    const row = values[rowIndex];
-    if (normalizeLookupId_(row[0]) !== requestedId) {
-      continue;
-    }
-
-    const columns = [];
-    for (let columnIndex = 0; columnIndex < 4; columnIndex += 1) {
-      columns.push({
-        label: normalizeValue_(headers[columnIndex]) || `คอลัมน์ ${String.fromCharCode(65 + columnIndex)}`,
-        value: normalizeValue_(row[columnIndex])
-      });
-    }
-    return { columns: columns };
-  }
-
-  return null;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+  const lookupIds = sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues();
+  const rowOffset = lookupIds.findIndex((row) => normalizeLookupId_(row[0]) === requestedId);
+  if (rowOffset < 0) return null;
+  const row = sheet.getRange(rowOffset + 2, 1, 1, 4).getDisplayValues()[0];
+  const headers = sheet.getRange(1, 1, 1, 4).getDisplayValues()[0];
+  const columns = row.map((value, columnIndex) => ({
+    label: normalizeValue_(headers[columnIndex]) || `คอลัมน์ ${String.fromCharCode(65 + columnIndex)}`,
+    value: normalizeValue_(value)
+  }));
+  return { columns: columns };
 }
 
 function getSourceSheet_() {
@@ -1679,15 +2054,13 @@ function getOrCreateRegistrationSheet_() {
     sheet = spreadsheet.insertSheet(CONFIG.registrationSheetName);
   }
 
-  removeRegistrationSubjectColumn_(sheet);
   const headerRange = sheet.getRange(1, 1, 1, CONFIG.registrationHeaders.length);
   if (headerRange.getValues()[0].every((value) => normalizeValue_(value) === '')) {
     headerRange.setValues([CONFIG.registrationHeaders]).setFontWeight('bold');
   }
-  const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
-  if (attendanceSheet) ensureAttendanceSubjectSchema_(attendanceSheet);
-  sheet.getRange(1, CONFIG.lookupIdColumn, sheet.getMaxRows(), 2).setNumberFormat('@');
-  normalizeRegistrationLookupColumns_(sheet);
+  const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0]
+    .map(normalizeValue_);
+  if (existingHeaders.indexOf('subject') >= 0) removeRegistrationSubjectColumn_(sheet);
   return sheet;
 }
 
@@ -1718,16 +2091,15 @@ function createUniqueRegistrationId_(sheet) {
   return id;
 }
 
-function registrationDataColumnBExists_(sheet, dataColumnB) {
-  if (sheet.getLastRow() < 2) {
-    return false;
-  }
-
-  const existingValues = sheet
-    .getRange(2, 5, sheet.getLastRow() - 1, 1)
-    .getDisplayValues()
-    .flat();
-  return existingValues.indexOf(normalizeValue_(dataColumnB)) !== -1;
+function registrationExists_(sheet, lookupId, registrationId) {
+  const dataRowCount = sheet.getLastRow() - 1;
+  if (dataRowCount < 1) return false;
+  const existing = sheet.getRange(2, 1, dataRowCount, CONFIG.lookupIdColumn).getDisplayValues();
+  const requestedLookupId = normalizeLookupId_(lookupId);
+  const requestedRegistrationId = normalizeValue_(registrationId).replace(/^'/, '');
+  return existing.some((row) =>
+    normalizeLookupId_(row[CONFIG.lookupIdColumn - 1]) === requestedLookupId
+    || normalizeValue_(row[0]).replace(/^'/, '') === requestedRegistrationId);
 }
 
 function normalizeRegistrationLookupColumns_(sheet) {
@@ -1750,8 +2122,7 @@ function sortRegistrationSheet_(sheet) {
     return;
   }
 
-  sheet
-    .getRange(2, 1, dataRowCount, CONFIG.registrationHeaders.length)
+  sheet.getRange(2, 1, dataRowCount, CONFIG.registrationHeaders.length)
     .sort({ column: CONFIG.lookupIdColumn, ascending: true });
 }
 
@@ -1761,9 +2132,9 @@ function getRegistrationSheet_() {
   if (!sheet) {
     throw new Error('ไม่พบชีต Registration');
   }
-  removeRegistrationSubjectColumn_(sheet);
-  const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
-  if (attendanceSheet) ensureAttendanceSubjectSchema_(attendanceSheet);
+  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), CONFIG.registrationHeaders.length)).getDisplayValues()[0]
+    .map(normalizeValue_);
+  if (headers.indexOf('subject') >= 0) removeRegistrationSubjectColumn_(sheet);
   return sheet;
 }
 
@@ -1786,6 +2157,10 @@ function ensureAttendanceSubjectSchema_(sheet) {
   const readWidth = Math.max(sheet.getLastColumn(), headers.length);
   const existingHeaders = sheet.getRange(1, 1, 1, readWidth).getDisplayValues()[0]
     .map(normalizeValue_);
+  const hasChangedHeaders = headers.some((header, index) => existingHeaders[index] !== header)
+    || existingHeaders.length !== headers.length;
+  if (!hasChangedHeaders) return;
+
   const rows = sheet.getLastRow() > 1
     ? sheet.getRange(2, 1, sheet.getLastRow() - 1, readWidth).getValues()
     : [];
@@ -1846,20 +2221,22 @@ function normalizeAttendanceLookupColumns_(sheet) {
   ]));
 }
 
-function attendanceDuplicateExists_(sheet, dataColumnB, formName, subject) {
-  if (sheet.getLastRow() < 2) {
-    return false;
-  }
-
+function attendanceDuplicateExists_(sheet, registrationId, formName, subject) {
+  const rowCount = sheet.getLastRow() - 1;
+  if (rowCount < 1) return false;
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0]
     .map(normalizeValue_);
   const roundIndex = headers.indexOf('attendance_form_name');
   const subjectIndex = headers.indexOf('subject');
-  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getDisplayValues();
-  return values.some((row) =>
-    normalizeValue_(row[4]) === normalizeValue_(dataColumnB)
-    && normalizeValue_(row[roundIndex]) === normalizeValue_(formName)
-    && normalizeValue_(row[subjectIndex]) === normalizeValue_(subject)
+  if (roundIndex < 0 || subjectIndex < 0) throw new Error('โครงสร้างชีต Attendance ไม่ถูกต้อง');
+  const firstColumn = Math.min(subjectIndex + 1, roundIndex + 1);
+  const lastColumn = Math.max(subjectIndex + 1, roundIndex + 1);
+  const personalIds = sheet.getRange(2, 1, rowCount, 1).getDisplayValues();
+  const subjectAndRound = sheet.getRange(2, firstColumn, rowCount, lastColumn - firstColumn + 1).getDisplayValues();
+  return personalIds.some((row, index) =>
+    normalizeValue_(row[0]).replace(/^'/, '') === normalizeValue_(registrationId).replace(/^'/, '')
+    && normalizeValue_(subjectAndRound[index][subjectIndex + 1 - firstColumn]) === normalizeValue_(subject)
+    && normalizeValue_(subjectAndRound[index][roundIndex + 1 - firstColumn]) === normalizeValue_(formName)
   );
 }
 
