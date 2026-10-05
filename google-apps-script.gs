@@ -461,15 +461,46 @@ function saveAttitudeScore_(data) {
     return jsonResponse_({ ok: false, message: 'คะแนนตัดต้องไม่เกินคะแนนเต็ม ' + maximumScore });
   }
 
-  const remainingScore = maximumScore - deduction;
-  sheet.getRange(record.rowNumber, 6, 1, 3).setValues([[deduction, remainingScore, reason]]);
-  sheet.getRange(record.rowNumber, 6, 1, 2).setNumberFormat('0.##');
-  sheet.getRange(record.rowNumber, 8).setNumberFormat('@');
+  sheet.getRange(record.rowNumber, 6).setValue(deduction).setNumberFormat('0.##');
+  sheet.getRange(record.rowNumber, 8).setValue(reason).setNumberFormat('@');
+  const remainingScore = recalculateAttitudeScoreRows_(sheet, record.rowNumber, 1)[0];
+  sheet.getRange(record.rowNumber, 7).setNumberFormat('0.##');
   return jsonResponse_({
     ok: true,
     data: { lookupId: lookupId, deduction: deduction, score: remainingScore, reason: reason },
     message: 'บันทึกคะแนนเจตคติเรียบร้อยแล้ว'
   });
+}
+
+function onEdit(e) {
+  if (!e || !e.range) return;
+  const range = e.range;
+  if (range.getSheet().getName() !== 'เจตคติ'
+    || range.getColumn() !== 6 || range.getNumColumns() !== 1) return;
+  recalculateAttitudeScoreRows_(range.getSheet(), range.getRow(), range.getNumRows());
+}
+
+function recalculateAttitudeScoreRows_(sheet, firstRow, rowCount) {
+  const lastRow = firstRow + rowCount - 1;
+  const calculationStartRow = Math.max(2, firstRow);
+  const calculationRowCount = lastRow - calculationStartRow + 1;
+  if (calculationRowCount < 1) return [];
+  const scores = sheet.getRange(calculationStartRow, 5, calculationRowCount, 2).getValues().map((row, index) => {
+    if (normalizeValue_(row[0]) === '') {
+      throw new Error('ไม่พบคะแนนเต็มในคอลัมน์ E แถว ' + (calculationStartRow + index));
+    }
+    const maximumScore = Number(row[0]);
+    const deduction = row[1] === '' || row[1] === null ? 0 : Number(row[1]);
+    if (!Number.isFinite(maximumScore) || maximumScore < 0) {
+      throw new Error('คะแนนเต็มในคอลัมน์ E แถว ' + (calculationStartRow + index) + ' ไม่ถูกต้อง');
+    }
+    if (!Number.isFinite(deduction) || deduction < 0 || deduction > maximumScore) {
+      throw new Error('คะแนนตัดในคอลัมน์ F แถว ' + (calculationStartRow + index) + ' ไม่ถูกต้อง');
+    }
+    return maximumScore - deduction;
+  });
+  sheet.getRange(calculationStartRow, 7, calculationRowCount, 1).setValues(scores.map((score) => [score]));
+  return scores;
 }
 
 function getQuizIndexHeaders_() {
