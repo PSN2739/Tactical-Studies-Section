@@ -751,48 +751,36 @@ body.announcement-dashboard-open { overflow: hidden; }
 .teacher-menu-option:disabled { color: color-mix(in srgb, var(--default-color), transparent 25%); cursor: not-allowed; }
 .teacher-menu-option span { font-size: 13px; font-weight: 400; }
 .teacher-attitude-card {
-  width: min(560px, 100%);
+  width: min(1100px, 100%);
   max-height: 92vh;
   overflow-y: auto;
 }
 .teacher-attitude-card > form { display: grid; gap: 10px; }
-.teacher-attitude-lookup-field,
-.teacher-attitude-card label span { color: var(--heading-color); font-weight: 600; }
+.teacher-attitude-hint { margin: 0; color: var(--default-color); font-size: 14px; }
 .teacher-attitude-card input,
 .teacher-attitude-card select {
   width: 100%;
   min-width: 0;
-  min-height: 44px;
-  padding: 9px 11px;
+  min-height: 40px;
+  padding: 7px 9px;
   border: 1px solid color-mix(in srgb, var(--default-color), transparent 72%);
   border-radius: 8px;
   color: var(--default-color);
   background: var(--surface-color);
   font: inherit;
 }
-.teacher-attitude-record { display: grid; gap: 16px; }
-.teacher-attitude-columns {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0;
-}
-.teacher-attitude-columns > div {
-  min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--default-color), transparent 88%);
-  border-radius: 8px;
-}
-.teacher-attitude-columns dt { color: var(--default-color); font-size: 12px; }
-.teacher-attitude-columns dd {
-  margin: 4px 0 0;
-  color: var(--heading-color);
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-.teacher-attitude-columns > div:first-child { grid-column: 1 / -1; }
-.teacher-attitude-record form { display: grid; gap: 12px; }
-.teacher-attitude-record form label { display: grid; gap: 6px; }
+.teacher-attitude-table-wrap { width: 100%; overflow-x: auto; }
+.teacher-attitude-table { width: 100%; min-width: 800px; border-collapse: collapse; }
+.teacher-attitude-table th,
+.teacher-attitude-table td { padding: 6px; border: 1px solid color-mix(in srgb, var(--default-color), transparent 86%); }
+.teacher-attitude-table th { color: var(--heading-color); font-size: 13px; text-align: left; }
+.teacher-attitude-table td:nth-child(1) { width: 115px; }
+.teacher-attitude-table td:nth-child(2) { min-width: 190px; }
+.teacher-attitude-table td:nth-child(3) { width: 150px; }
+.teacher-attitude-table td:nth-child(4) { width: 100px; text-align: center; font-weight: 600; }
+.teacher-attitude-table td:nth-child(5) { width: 210px; }
+.teacher-attitude-name { overflow-wrap: anywhere; }
+.teacher-attitude-score { color: var(--heading-color); }
 .special-assessment-builder-card {
   width: min(560px, 100%);
   max-height: 92vh;
