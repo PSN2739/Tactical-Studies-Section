@@ -260,11 +260,13 @@
         state.record.lookupId
       )));
       const refreshedCount = refreshedRows.filter(Boolean).length;
-      setStatus(refreshedCount === result.data.length
-        ? 'บันทึกคะแนนเรียบร้อยแล้ว ' + result.data.length + ' หมายเลข'
+      const refreshSucceeded = refreshedCount === result.data.length;
+      if (refreshSucceeded) resetRows();
+      setStatus(refreshSucceeded
+        ? 'บันทึกคะแนนเรียบร้อยแล้ว ' + result.data.length + ' หมายเลข และรีเฟรชข้อมูลแล้ว'
         : 'บันทึกข้อมูลแล้ว แต่รีเฟรชข้อมูลได้ ' + refreshedCount + ' จาก '
           + result.data.length + ' หมายเลข กรุณาค้นหาใหม่',
-      refreshedCount === result.data.length ? 'success' : 'error');
+      refreshSucceeded ? 'success' : 'error');
     } catch (error) {
       setStatus(error.message || 'ไม่สามารถบันทึกข้อมูลได้', 'error');
     } finally {
