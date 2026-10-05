@@ -959,6 +959,7 @@ function saveAttendance_(data) {
 
   const attendanceValues = source.values.slice();
   attendanceValues.splice(CONFIG.registrationHeaders.indexOf('email') + 1, 0, attendanceSubject);
+  attendanceValues[CONFIG.registrationHeaders.indexOf('form_name') + 1] = attendanceSubject;
   sheet.appendRow(attendanceValues.concat([attendanceFormName]));
   sortAttendanceSheet_(sheet);
   return jsonResponse_({
@@ -1799,6 +1800,11 @@ function ensureAttendanceSubjectSchema_(sheet) {
       const existingSubject = legacySubjectIndex === undefined ? '' : normalizeValue_(row[legacySubjectIndex]);
       return selectedSubject || existingSubject || 'รบด้วยวิธีรุก-ตีกลางวัน';
     }
+    if (header === 'form_name') {
+      const selectedSubject = selectedSubjectIndex === undefined ? '' : normalizeValue_(row[selectedSubjectIndex]);
+      const existingSubject = legacySubjectIndex === undefined ? '' : normalizeValue_(row[legacySubjectIndex]);
+      return selectedSubject || existingSubject || 'รบด้วยวิธีรุก-ตีกลางวัน';
+    }
     if (header === 'attendance_form_name') {
       const savedRoundIndex = sourceIndexes.get('attendance_form_name');
       const savedRound = savedRoundIndex === undefined ? '' : normalizeValue_(row[savedRoundIndex]);
@@ -1810,7 +1816,10 @@ function ensureAttendanceSubjectSchema_(sheet) {
     const index = sourceIndexes.get(header);
     return index === undefined ? '' : row[index];
   }));
-  const hasMissingData = migratedRows.some((row) => !normalizeValue_(row[subjectIndex]));
+  const formNameIndex = headers.indexOf('form_name');
+  const hasMissingData = migratedRows.some((row) =>
+    !normalizeValue_(row[subjectIndex])
+    || normalizeValue_(row[formNameIndex]) !== normalizeValue_(row[subjectIndex]));
   const hasChangedHeaders = headers.some((header, index) => existingHeaders[index] !== header)
     || existingHeaders.length !== headers.length;
   if (!hasChangedHeaders && !hasMissingData) return;
@@ -1820,6 +1829,7 @@ function ensureAttendanceSubjectSchema_(sheet) {
   const extraColumns = sheet.getLastColumn() - headers.length;
   if (extraColumns > 0) sheet.deleteColumns(headers.length + 1, extraColumns);
   normalizeAttendanceLookupColumns_(sheet);
+  sortAttendanceSheet_(sheet);
 }
 
 function normalizeAttendanceLookupColumns_(sheet) {
@@ -1858,8 +1868,8 @@ function sortAttendanceSheet_(sheet) {
   if (dataRowCount < 2) {
     return;
   }
-  sheet.getRange(2, 1, dataRowCount, CONFIG.registrationHeaders.length + 2)
-    .sort({ column: 1, ascending: true });
+  sheet.getRange(2, 1, dataRowCount, sheet.getLastColumn())
+    .sort({ column: 3, ascending: true });
 }
 
 function isValidEmail_(email) {
