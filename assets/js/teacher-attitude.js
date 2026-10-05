@@ -20,6 +20,8 @@
   const tokenKey = 'tacticalTeacherToken';
   const endpoint = registrationForm?.getAttribute('action');
   let currentRecord = null;
+  let currentMaximumScore = 0;
+  let scoreValueElement = null;
 
   if (!endpoint || !menuPopup || !menuButton || !popup || !lookupForm || !recordSection
     || !columnsList || !saveForm || !status) return;
@@ -49,6 +51,8 @@
 
   function clearRecord() {
     currentRecord = null;
+    currentMaximumScore = 0;
+    scoreValueElement = null;
     recordSection.classList.add('d-none');
     columnsList.replaceChildren();
     saveForm.reset();
@@ -79,7 +83,7 @@
     const scoreLabel = document.createElement('dt');
     const scoreValue = document.createElement('dd');
     scoreLabel.textContent = 'คะแนนคงเหลือ (คอลัมน์ G)';
-    scoreValue.textContent = record.score || '—';
+    scoreValue.textContent = String(record.score);
     scoreItem.append(scoreLabel, scoreValue);
     columnsList.appendChild(scoreItem);
 
@@ -88,9 +92,12 @@
     if (!maximumScoreValue || !Number.isFinite(maximumScore) || maximumScore < 0) {
       throw new Error('คะแนนเต็มในคอลัมน์ E ไม่ถูกต้อง');
     }
+    currentMaximumScore = maximumScore;
+    scoreValueElement = scoreValue;
     deductionInput.max = String(maximumScore);
-    deductionInput.value = record.deduction;
+    deductionInput.value = String(record.deduction);
     reasonInput.value = record.reason;
+    reasonInput.required = Number(record.deduction) > 0;
     recordSection.classList.remove('d-none');
     currentRecord = record;
   }
@@ -142,6 +149,14 @@
     } finally {
       searchButton.disabled = false;
       lookupInput.disabled = false;
+    }
+  });
+
+  deductionInput.addEventListener('input', () => {
+    const deduction = Number(deductionInput.value);
+    reasonInput.required = deduction > 0;
+    if (scoreValueElement && deductionInput.value !== '' && Number.isFinite(deduction)) {
+      scoreValueElement.textContent = String(currentMaximumScore - deduction);
     }
   });
 

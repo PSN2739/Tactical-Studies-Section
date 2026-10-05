@@ -397,6 +397,16 @@ function lookupAttitudeScore_(value) {
   const record = findAttitudeRecord_(sheet, lookupId);
   if (!record) return jsonResponse_({ ok: false, message: 'ไม่มีข้อมูลสำหรับเลขที่กองพันนี้' });
   const headers = sheet.getRange(1, 1, 1, 5).getDisplayValues()[0];
+  const maximumScoreValue = normalizeValue_(record.values[4]);
+  const maximumScore = Number(maximumScoreValue);
+  const deductionValue = normalizeValue_(record.values[5]);
+  const deduction = deductionValue ? Number(deductionValue) : 0;
+  if (!maximumScoreValue || !Number.isFinite(maximumScore) || maximumScore < 0) {
+    return jsonResponse_({ ok: false, message: 'คะแนนเต็มในคอลัมน์ E ไม่ถูกต้อง' });
+  }
+  if (!Number.isFinite(deduction) || deduction < 0 || deduction > maximumScore) {
+    return jsonResponse_({ ok: false, message: 'คะแนนตัดในคอลัมน์ F ไม่ถูกต้อง' });
+  }
   return jsonResponse_({
     ok: true,
     data: {
@@ -405,8 +415,8 @@ function lookupAttitudeScore_(value) {
         label: normalizeValue_(headers[index]) || 'คอลัมน์ ' + String.fromCharCode(65 + index),
         value: normalizeValue_(value)
       })),
-      deduction: normalizeValue_(record.values[5]),
-      score: normalizeValue_(record.values[6]),
+      deduction: deduction,
+      score: maximumScore - deduction,
       reason: normalizeValue_(record.values[7])
     }
   });
@@ -433,7 +443,8 @@ function saveAttitudeScore_(data) {
   if (!deductionValue || !Number.isFinite(deduction) || deduction < 0) {
     return jsonResponse_({ ok: false, message: 'กรุณากรอกคะแนนตัดเป็นตัวเลขตั้งแต่ 0 ขึ้นไป' });
   }
-  if (validReasons.indexOf(reason) < 0) {
+  if ((deduction > 0 && validReasons.indexOf(reason) < 0)
+    || (deduction === 0 && reason && validReasons.indexOf(reason) < 0)) {
     return jsonResponse_({ ok: false, message: 'กรุณาเลือกสาเหตุการตัดคะแนน' });
   }
 
