@@ -27,7 +27,7 @@
   <link href="assets/swiper/swiper-bundle.min.css" rel="stylesheet">
 
   <!-- Main CSS File -->
-  <link href="assets/css/main.css?v=20261004-special-task-dashboard" rel="stylesheet">
+  <link href="assets/css/main.css?v=20261005-teacher-attitude" rel="stylesheet">
   <link rel="preload" href="assets/img/hero-bg-2.jpg" as="image" fetchpriority="high">
 
   <!-- =======================================================
@@ -744,9 +744,55 @@
       <h3 id="teacher-menu-title">เมนูครูอาจารย์</h3>
       <button type="button" id="teacher-exam-menu" class="teacher-menu-option">การจัดการข้อสอบ</button>
       <button type="button" id="teacher-assessment-menu" class="teacher-menu-option">การประเมิน</button>
+      <button type="button" id="teacher-attitude-menu" class="teacher-menu-option">คะแนนเจตคติ</button>
       <button type="button" id="teacher-info-menu" class="teacher-menu-option">ข้อมูลวิชา/เรื่อง</button>
       <button type="button" id="teacher-menu-close" class="registration-button registration-button-close">ปิด</button>
     </div>
+  </div>
+  <div id="teacher-attitude-popup" class="teacher-menu-popup d-none" role="dialog"
+    aria-modal="true" aria-labelledby="teacher-attitude-title">
+    <section class="teacher-menu-card teacher-attitude-card">
+      <h3 id="teacher-attitude-title">คะแนนเจตคติ</h3>
+      <form id="teacher-attitude-lookup-form">
+        <label class="teacher-attitude-lookup-field" for="teacher-attitude-lookup-id">เลขที่กองพัน 4 หลัก</label>
+        <input id="teacher-attitude-lookup-id" name="lookupId" type="text" inputmode="numeric"
+          pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" required>
+        <div class="registration-actions">
+          <button type="submit" id="teacher-attitude-search" class="registration-button">ค้นหา</button>
+          <button type="button" id="teacher-attitude-search-close"
+            class="registration-button registration-button-close">ปิด</button>
+        </div>
+      </form>
+      <div id="teacher-attitude-status" class="quiz-status d-none" role="status" aria-live="polite"></div>
+      <section id="teacher-attitude-record" class="teacher-attitude-record d-none"
+        aria-label="ข้อมูลคะแนนเจตคติ">
+        <dl id="teacher-attitude-columns" class="teacher-attitude-columns"></dl>
+        <form id="teacher-attitude-save-form">
+          <label><span>คะแนนตัด</span>
+            <input id="teacher-attitude-deduction" name="deduction" type="number" min="0"
+              step="0.01" required>
+          </label>
+          <label><span>สาเหตุ</span>
+            <select id="teacher-attitude-reason" name="reason" required>
+              <option value="">เลือกสาเหตุ</option>
+              <option>ป่วย</option>
+              <option>ลา</option>
+              <option>ขาด</option>
+              <option>ธุรการ</option>
+              <option>เครื่องแต่งกาย</option>
+              <option>หลับ</option>
+              <option>เล่นระหว่างเรียน</option>
+              <option>ทานขนมระหว่างเรียน</option>
+            </select>
+          </label>
+          <div class="registration-actions">
+            <button type="submit" id="teacher-attitude-save" class="registration-button">บันทึก</button>
+            <button type="button" id="teacher-attitude-record-close"
+              class="registration-button registration-button-close">ปิด</button>
+          </div>
+        </form>
+      </section>
+    </section>
   </div>
   <div id="teacher-dashboard-popup" class="teacher-menu-popup d-none" role="dialog"
     aria-modal="true" aria-labelledby="teacher-dashboard-title">
@@ -1069,6 +1115,7 @@
   <script defer src="assets/js/google-sheet-form.js?v=20260918-separate-forms"></script>
   <script defer src="assets/js/attendance-registration.js?v=20261004-attendance-subject"></script>
   <script defer src="assets/js/quiz-builder.js?v=20261004-show-tactical-score-code"></script>
+  <script defer src="assets/js/teacher-attitude.js?v=20261005-teacher-attitude"></script>
   <script defer src="assets/js/exam.js?v=20260929-posttest-80-retake"></script>
   <script defer src="assets/js/tactical-score.js?v=20260930-centered-copy-prompt"></script>
   <script defer src="assets/js/special-assessment.js?v=20261001-special-assessment"></script>

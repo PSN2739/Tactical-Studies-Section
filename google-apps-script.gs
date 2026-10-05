@@ -113,6 +113,14 @@ function doPost(e) {
     const email = normalizeValue_(data.email);
     const episode = normalizeValue_(data.episode);
 
+    if (formName === 'teacher-attitude-lookup' || formName === 'teacher-attitude-save') {
+      if (!getActiveTeacherEmail_(data.token)) {
+        return jsonResponse_({ ok: false, message: 'กรุณาเข้าสู่ระบบครูใหม่' });
+      }
+      return formName === 'teacher-attitude-lookup'
+        ? lookupAttitudeScore_(data.lookupId)
+        : saveAttitudeScore_(data);
+    }
     if (formName === 'teacher-application') {
       return submitTeacherApplication_(data);
     }
@@ -351,6 +359,106 @@ function teacherLogin_(data) {
     return jsonResponse_({ ok: true, token: token, teacherName: row[2] });
   }
   return jsonResponse_({ ok: false, message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง หรือยังไม่ได้รับอนุมัติ' });
+}
+
+function getActiveTeacherEmail_(token) {
+  const email = CacheService.getScriptCache().get('teacher:' + normalizeValue_(token));
+  if (!email) return '';
+  const teachersSheet = getRegistrationSpreadsheet_().getSheetByName(CONFIG.teachersSheetName);
+  if (!teachersSheet || teachersSheet.getLastRow() < 2) return '';
+  const isActive = teachersSheet.getRange(2, 4, teachersSheet.getLastRow() - 1, 3)
+    .getDisplayValues()
+    .some((row) => normalizeValue_(row[0]).toLowerCase() === email.toLowerCase()
+      && normalizeValue_(row[2]).toUpperCase() === 'ACTIVE');
+  return isActive ? email : '';
+}
+
+function findAttitudeRecord_(sheet, lookupId) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+  const rows = sheet.getRange(2, 1, lastRow - 1, 8).getDisplayValues();
+  const matches = [];
+  rows.forEach((row, index) => {
+    if (normalizeLookupId_(row[0]) === lookupId) {
+      matches.push({ rowNumber: index + 2, values: row });
+    }
+  });
+  if (matches.length > 1) throw new Error('ชีตเจตคติมีเลขที่กองพันซ้ำ กรุณาตรวจสอบข้อมูล');
+  return matches[0] || null;
+}
+
+function lookupAttitudeScore_(value) {
+  const lookupId = normalizeLookupId_(value);
+  if (!/^\d{4}$/.test(lookupId)) {
+    return jsonResponse_({ ok: false, message: 'กรุณากรอกเลขที่กองพันให้ครบ 4 หลัก' });
+  }
+  const sheet = getRegistrationSpreadsheet_().getSheetByName('เจตคติ');
+  if (!sheet) return jsonResponse_({ ok: false, message: 'ไม่พบชีตเจตคติ' });
+  const record = findAttitudeRecord_(sheet, lookupId);
+  if (!record) return jsonResponse_({ ok: false, message: 'ไม่มีข้อมูลสำหรับเลขที่กองพันนี้' });
+  const headers = sheet.getRange(1, 1, 1, 5).getDisplayValues()[0];
+  return jsonResponse_({
+    ok: true,
+    data: {
+      lookupId: lookupId,
+      columns: record.values.slice(0, 5).map((value, index) => ({
+        label: normalizeValue_(headers[index]) || 'คอลัมน์ ' + String.fromCharCode(65 + index),
+        value: normalizeValue_(value)
+      })),
+      deduction: normalizeValue_(record.values[5]),
+      score: normalizeValue_(record.values[6]),
+      reason: normalizeValue_(record.values[7])
+    }
+  });
+}
+
+function saveAttitudeScore_(data) {
+  const lookupId = normalizeLookupId_(data.lookupId);
+  const deductionValue = normalizeValue_(data.deduction);
+  const deduction = Number(deductionValue);
+  const reason = normalizeValue_(data.reason);
+  const validReasons = [
+    'ป่วย',
+    'ลา',
+    'ขาด',
+    'ธุรการ',
+    'เครื่องแต่งกาย',
+    'หลับ',
+    'เล่นระหว่างเรียน',
+    'ทานขนมระหว่างเรียน'
+  ];
+  if (!/^\d{4}$/.test(lookupId)) {
+    return jsonResponse_({ ok: false, message: 'กรุณากรอกเลขที่กองพันให้ครบ 4 หลัก' });
+  }
+  if (!deductionValue || !Number.isFinite(deduction) || deduction < 0) {
+    return jsonResponse_({ ok: false, message: 'กรุณากรอกคะแนนตัดเป็นตัวเลขตั้งแต่ 0 ขึ้นไป' });
+  }
+  if (validReasons.indexOf(reason) < 0) {
+    return jsonResponse_({ ok: false, message: 'กรุณาเลือกสาเหตุการตัดคะแนน' });
+  }
+
+  const sheet = getRegistrationSpreadsheet_().getSheetByName('เจตคติ');
+  if (!sheet) return jsonResponse_({ ok: false, message: 'ไม่พบชีตเจตคติ' });
+  const record = findAttitudeRecord_(sheet, lookupId);
+  if (!record) return jsonResponse_({ ok: false, message: 'ไม่มีข้อมูลสำหรับเลขที่กองพันนี้' });
+  const maximumScoreValue = normalizeValue_(record.values[4]);
+  const maximumScore = Number(maximumScoreValue);
+  if (!maximumScoreValue || !Number.isFinite(maximumScore) || maximumScore < 0) {
+    return jsonResponse_({ ok: false, message: 'คะแนนเต็มในคอลัมน์ E ไม่ถูกต้อง' });
+  }
+  if (deduction > maximumScore) {
+    return jsonResponse_({ ok: false, message: 'คะแนนตัดต้องไม่เกินคะแนนเต็ม ' + maximumScore });
+  }
+
+  const remainingScore = maximumScore - deduction;
+  sheet.getRange(record.rowNumber, 6, 1, 3).setValues([[deduction, remainingScore, reason]]);
+  sheet.getRange(record.rowNumber, 6, 1, 2).setNumberFormat('0.##');
+  sheet.getRange(record.rowNumber, 8).setNumberFormat('@');
+  return jsonResponse_({
+    ok: true,
+    data: { lookupId: lookupId, deduction: deduction, score: remainingScore, reason: reason },
+    message: 'บันทึกคะแนนเจตคติเรียบร้อยแล้ว'
+  });
 }
 
 function getQuizIndexHeaders_() {
@@ -1951,6 +2059,14 @@ function attendanceStudentLogin_(data) {
 
 function getTeachingScores_(spreadsheet, personalId, lookupId) {
   const scores = { attitude: '', preTest: '', postTest: '', knowledgeAssessment: '', specialTask: '' };
+  const attitudeSheet = spreadsheet.getSheetByName('เจตคติ');
+  if (attitudeSheet && attitudeSheet.getLastRow() > 1) {
+    const rows = attitudeSheet.getRange(2, 1, attitudeSheet.getLastRow() - 1, 7).getDisplayValues();
+    const wantedLookupId = normalizeLookupId_(lookupId);
+    const match = rows.find((row) => normalizeLookupId_(row[0]) === wantedLookupId);
+    if (match) scores.attitude = normalizeValue_(match[6]);
+  }
+
   const resultsSheet = spreadsheet.getSheetByName('QuizResults');
   if (resultsSheet && resultsSheet.getLastRow() > 1) {
     const rows = resultsSheet.getDataRange().getDisplayValues();
