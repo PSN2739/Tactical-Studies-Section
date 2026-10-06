@@ -101,6 +101,18 @@ function doPost(e) {
       return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
     }
   }
+  if (formName === 'teacher-attitude-lookup' || formName === 'teacher-attitude-lookup-many') {
+    try {
+      if (!getActiveTeacherEmail_(data.token)) {
+        return jsonResponse_({ ok: false, message: 'กรุณาเข้าสู่ระบบครูใหม่' });
+      }
+      return formName === 'teacher-attitude-lookup-many'
+        ? lookupAttitudeScores_(data.lookupIds)
+        : lookupAttitudeScore_(data.lookupId);
+    } catch (error) {
+      return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
+    }
+  }
 
   const lock = LockService.getScriptLock();
   let locked = false;
@@ -113,12 +125,10 @@ function doPost(e) {
     const email = normalizeValue_(data.email);
     const episode = normalizeValue_(data.episode);
 
-    if (formName === 'teacher-attitude-lookup' || formName === 'teacher-attitude-save'
-      || formName === 'teacher-attitude-save-many') {
+    if (formName === 'teacher-attitude-save' || formName === 'teacher-attitude-save-many') {
       if (!getActiveTeacherEmail_(data.token)) {
         return jsonResponse_({ ok: false, message: 'กรุณาเข้าสู่ระบบครูใหม่' });
       }
-      if (formName === 'teacher-attitude-lookup') return lookupAttitudeScore_(data.lookupId);
       return formName === 'teacher-attitude-save-many'
         ? saveAttitudeScores_(data)
         : saveAttitudeScore_(data);
@@ -399,17 +409,68 @@ function lookupAttitudeScore_(value) {
   const record = findAttitudeRecord_(sheet, lookupId);
   if (!record) return jsonResponse_({ ok: false, message: 'ไม่มีข้อมูลสำหรับเลขที่กองพันนี้' });
   const headers = sheet.getRange(1, 1, 1, 5).getDisplayValues()[0];
+  return jsonResponse_(getAttitudeScoreResult_(lookupId, record, headers));
+}
+
+function lookupAttitudeScores_(values) {
+  let lookupIds;
+  try {
+    lookupIds = JSON.parse(values || '');
+  } catch (error) {
+    return jsonResponse_({ ok: false, message: 'ข้อมูลเลขที่กองพันไม่ถูกต้อง' });
+  }
+  if (!Array.isArray(lookupIds) || lookupIds.length < 1 || lookupIds.length > 10) {
+    return jsonResponse_({ ok: false, message: 'กรุณาส่งเลขที่กองพันตั้งแต่ 1 ถึง 10 หมายเลข' });
+  }
+
+  const normalizedIds = lookupIds.map(normalizeLookupId_);
+  const sheet = getRegistrationSpreadsheet_().getSheetByName('เจตคติ');
+  if (!sheet) return jsonResponse_({ ok: false, message: 'ไม่พบชีตเจตคติ' });
+  const headers = sheet.getRange(1, 1, 1, 5).getDisplayValues()[0];
+  const recordsById = new Map();
+  const lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    sheet.getRange(2, 1, lastRow - 1, 8).getDisplayValues().forEach((values, index) => {
+      const lookupId = normalizeLookupId_(values[0]);
+      if (!/^\d{4}$/.test(lookupId)) return;
+      if (recordsById.has(lookupId)) {
+        recordsById.set(lookupId, { duplicate: true });
+        return;
+      }
+      recordsById.set(lookupId, { rowNumber: index + 2, values });
+    });
+  }
+
+  return jsonResponse_({
+    ok: true,
+    data: normalizedIds.map((lookupId) => {
+      if (!/^\d{4}$/.test(lookupId)) {
+        return { lookupId, ok: false, message: 'กรุณากรอกเลขที่กองพันให้ครบ 4 หลัก' };
+      }
+      const record = recordsById.get(lookupId);
+      if (!record) {
+        return { lookupId, ok: false, message: 'ไม่มีข้อมูลสำหรับเลขที่กองพันนี้' };
+      }
+      if (record.duplicate) {
+        return { lookupId, ok: false, message: 'ชีตเจตคติมีเลขที่กองพันซ้ำ กรุณาตรวจสอบข้อมูล' };
+      }
+      return Object.assign({ lookupId }, getAttitudeScoreResult_(lookupId, record, headers));
+    })
+  });
+}
+
+function getAttitudeScoreResult_(lookupId, record, headers) {
   const maximumScoreValue = normalizeValue_(record.values[4]);
   const maximumScore = Number(maximumScoreValue);
   const deductionValue = normalizeValue_(record.values[5]);
   const deduction = deductionValue ? Number(deductionValue) : 0;
   if (!maximumScoreValue || !Number.isFinite(maximumScore) || maximumScore < 0) {
-    return jsonResponse_({ ok: false, message: 'คะแนนเต็มในคอลัมน์ E ไม่ถูกต้อง' });
+    return { ok: false, message: 'คะแนนเต็มในคอลัมน์ E ไม่ถูกต้อง' };
   }
   if (!Number.isFinite(deduction) || deduction < 0 || deduction > maximumScore) {
-    return jsonResponse_({ ok: false, message: 'คะแนนตัดในคอลัมน์ F ไม่ถูกต้อง' });
+    return { ok: false, message: 'คะแนนตัดในคอลัมน์ F ไม่ถูกต้อง' };
   }
-  return jsonResponse_({
+  return {
     ok: true,
     data: {
       lookupId: lookupId,
@@ -422,7 +483,7 @@ function lookupAttitudeScore_(value) {
       score: maximumScore - deduction,
       reason: normalizeValue_(record.values[7])
     }
-  });
+  };
 }
 
 function getAttitudeName_(headers, values) {

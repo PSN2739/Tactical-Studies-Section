@@ -14,6 +14,7 @@
   const tokenKey = 'tacticalTeacherToken';
   const endpoint = registrationForm?.getAttribute('action');
   const rowStates = [];
+  let lookupTimer = 0;
   const reasons = [
     'ป่วย', 'ลา', 'ขาด', 'ธุรการ', 'เครื่องแต่งกาย', 'หลับ',
     'เล่นระหว่างเรียน', 'ทานขนมระหว่างเรียน'
@@ -84,30 +85,69 @@
       : '—';
   }
 
-  async function loadRow(state, lookupId) {
-    const requestId = ++state.requestId;
-    state.lookupInput.setCustomValidity('');
-    clearRow(state, 'กำลังค้นหา...');
-    state.lookupInput.dataset.lookupState = 'loading';
+  async function loadPendingRows() {
+    const pendingRows = rowStates
+      .map((state) => ({ state, lookupId: state.lookupInput.value.trim() }))
+      .filter(({ state, lookupId }) => /^\d{4}$/.test(lookupId)
+        && state.lookupInput.dataset.lookupState !== 'loading'
+        && (!state.record || state.record.lookupId !== lookupId));
+    if (!pendingRows.length) return;
+
+    const requests = pendingRows.map(({ state, lookupId }) => {
+      state.lookupInput.setCustomValidity('');
+      clearRow(state, 'กำลังค้นหา...');
+      state.lookupInput.dataset.lookupState = 'loading';
+      return { state, lookupId, requestId: ++state.requestId };
+    });
+
     try {
       const result = await post({
-        formName: 'teacher-attitude-lookup',
+        formName: 'teacher-attitude-lookup-many',
         token: localStorage.getItem(tokenKey) || '',
-        lookupId
+        lookupIds: JSON.stringify(requests.map(({ lookupId }) => lookupId))
       });
-      if (requestId !== state.requestId || state.lookupInput.value.trim() !== lookupId) return false;
-      setRowLoaded(state, result.data);
-      state.lookupInput.dataset.lookupState = 'loaded';
-      state.lookupInput.setCustomValidity('');
-      return true;
+      if (!Array.isArray(result.data)) throw new Error('ข้อมูลผลการค้นหาไม่ถูกต้อง');
+      requests.forEach(({ state, lookupId, requestId }, index) => {
+        if (requestId !== state.requestId || state.lookupInput.value.trim() !== lookupId) return;
+        const item = result.data[index];
+        if (!item || !item.ok) {
+          const message = item?.message || 'ไม่พบข้อมูล';
+          clearRow(state, 'ไม่มีข้อมูล');
+          state.lookupInput.dataset.lookupState = 'error';
+          state.lookupInput.setCustomValidity(message);
+          setStatus('เลขที่ ' + lookupId + ': ' + message, 'error');
+          return;
+        }
+        try {
+          setRowLoaded(state, item.data);
+          state.lookupInput.dataset.lookupState = 'loaded';
+          state.lookupInput.setCustomValidity('');
+        } catch (error) {
+          clearRow(state, 'ข้อมูลไม่ถูกต้อง');
+          state.lookupInput.dataset.lookupState = 'error';
+          state.lookupInput.setCustomValidity(error.message || 'ข้อมูลไม่ถูกต้อง');
+          setStatus('เลขที่ ' + lookupId + ': ' + (error.message || 'ข้อมูลไม่ถูกต้อง'), 'error');
+        }
+      });
     } catch (error) {
-      if (requestId !== state.requestId || state.lookupInput.value.trim() !== lookupId) return false;
-      clearRow(state, 'ไม่มีข้อมูล');
-      state.lookupInput.dataset.lookupState = 'error';
-      state.lookupInput.setCustomValidity(error.message || 'ไม่พบข้อมูล');
-      setStatus('เลขที่ ' + lookupId + ': ' + (error.message || 'ไม่พบข้อมูล'), 'error');
-      return false;
+      const message = error.message || 'ไม่สามารถค้นหาข้อมูลได้';
+      const requiresTeacherLogin = /เข้าสู่ระบบครูใหม่|กรุณาเข้าสู่ระบบครู/i.test(message);
+      if (requiresTeacherLogin) localStorage.removeItem(tokenKey);
+      requests.forEach(({ state, lookupId, requestId }) => {
+        if (requestId !== state.requestId || state.lookupInput.value.trim() !== lookupId) return;
+        clearRow(state, requiresTeacherLogin ? 'เข้าสู่ระบบใหม่' : 'ค้นหาไม่สำเร็จ');
+        state.lookupInput.dataset.lookupState = 'error';
+        state.lookupInput.setCustomValidity(requiresTeacherLogin ? '' : message);
+      });
+      setStatus(requiresTeacherLogin
+        ? 'เซสชันครูหมดอายุหรือไม่ถูกต้อง กรุณาเข้าสู่ระบบครูใหม่ แล้วค้นหาอีกครั้ง'
+        : 'ค้นหาข้อมูลไม่สำเร็จ: ' + message, 'error');
     }
+  }
+
+  function scheduleLookup() {
+    window.clearTimeout(lookupTimer);
+    lookupTimer = window.setTimeout(loadPendingRows, 250);
   }
 
   function createRow(index) {
@@ -127,15 +167,14 @@
       scoreCell,
       reasonInput,
       record: null,
-      requestId: 0,
-      lookupTimer: 0
+      requestId: 0
     });
     rowsContainer.appendChild(fragment);
   }
 
   function resetRows() {
+    window.clearTimeout(lookupTimer);
     rowStates.forEach((state) => {
-      window.clearTimeout(state.lookupTimer);
       state.requestId += 1;
       state.lookupInput.value = '';
       state.lookupInput.disabled = false;
@@ -178,10 +217,9 @@
       state.lookupInput.setCustomValidity('');
       state.lookupInput.dataset.lookupState = '';
       clearRow(state, '—');
-      window.clearTimeout(state.lookupTimer);
       const lookupId = state.lookupInput.value.trim();
       if (/^\d{4}$/.test(lookupId)) {
-        state.lookupTimer = window.setTimeout(() => loadRow(state, lookupId), 250);
+        scheduleLookup();
       }
     });
     state.deductionInput.addEventListener('input', () => updateScore(state));
@@ -255,18 +293,12 @@
         token: localStorage.getItem(tokenKey) || '',
         entries: JSON.stringify(entries)
       });
-      const refreshedRows = await Promise.all(populatedRows.map((state) => loadRow(
-        state,
-        state.record.lookupId
-      )));
-      const refreshedCount = refreshedRows.filter(Boolean).length;
-      const refreshSucceeded = refreshedCount === result.data.length;
-      if (refreshSucceeded) resetRows();
-      setStatus(refreshSucceeded
-        ? 'บันทึกคะแนนเรียบร้อยแล้ว ' + result.data.length + ' หมายเลข และรีเฟรชข้อมูลแล้ว'
-        : 'บันทึกข้อมูลแล้ว แต่รีเฟรชข้อมูลได้ ' + refreshedCount + ' จาก '
-          + result.data.length + ' หมายเลข กรุณาค้นหาใหม่',
-      refreshSucceeded ? 'success' : 'error');
+      if (!Array.isArray(result.data) || result.data.length !== entries.length) {
+        setStatus('ส่งคำขอบันทึกแล้ว แต่ตรวจสอบผลบันทึกไม่ได้ กรุณาค้นหาใหม่', 'error');
+        return;
+      }
+      resetRows();
+      setStatus('บันทึกคะแนนเรียบร้อยแล้ว ' + result.data.length + ' หมายเลข', 'success');
     } catch (error) {
       setStatus(error.message || 'ไม่สามารถบันทึกข้อมูลได้', 'error');
     } finally {
