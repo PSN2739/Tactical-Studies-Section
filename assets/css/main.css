@@ -279,6 +279,11 @@ body.teaching-management-open { overflow: hidden; }
 .teaching-score-item > div > span { color: #737c8f; font-size: 12px; }
 .teaching-score-item strong { overflow-wrap: anywhere; color: var(--heading-color); font-size: 16px; }
 .teaching-score-attitude strong { font-size: 12px; font-weight: 500; }
+.teaching-assessment-results { margin-top: 20px; padding: 16px; border: 1px solid #e1e5ed; border-radius: 8px; background: #fff; }
+.teaching-assessment-results h3 { margin: 0 0 10px; color: var(--heading-color); font-size: 14px; }
+.teaching-assessment-results ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.teaching-assessment-results li { display: flex; justify-content: space-between; gap: 16px; color: #737c8f; font-size: 13px; }
+.teaching-assessment-results li strong { color: var(--heading-color); white-space: nowrap; }
 
 .registration-form input:focus {
   outline: 0;

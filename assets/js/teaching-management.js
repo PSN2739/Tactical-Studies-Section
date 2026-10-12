@@ -12,6 +12,8 @@
   const loginButton = document.getElementById('teaching-login-submit');
   const userName = document.getElementById('teaching-user-name');
   const connectionState = document.getElementById('teaching-connection-state');
+  const assessmentResults = document.getElementById('teaching-assessment-results');
+  const assessmentList = document.getElementById('teaching-assessment-list');
   const endpoint = document.querySelector('#registration-form')?.getAttribute('action');
   const homeButton = document.getElementById('teaching-login-home');
   const returnButton = document.getElementById('teaching-app-home');
@@ -30,6 +32,21 @@
     loginStatus.classList.toggle('d-none', !message);
     loginStatus.classList.toggle('success', Boolean(message) && isSuccess);
     loginStatus.classList.toggle('error-message', Boolean(message) && !isSuccess);
+  }
+
+  function renderAssessments(assessments) {
+    if (!assessmentResults || !assessmentList) return;
+    assessmentList.replaceChildren();
+    (Array.isArray(assessments) ? assessments : []).forEach((assessment) => {
+      const item = document.createElement('li');
+      const title = document.createElement('span');
+      const score = document.createElement('strong');
+      title.textContent = assessment.title || 'แบบประเมิน';
+      score.textContent = `${assessment.score === '' ? '—' : assessment.score} / ${assessment.total || '—'}`;
+      item.append(title, score);
+      assessmentList.appendChild(item);
+    });
+    assessmentResults.classList.toggle('d-none', assessmentList.childElementCount === 0);
   }
 
   function showLogin() {
@@ -57,6 +74,7 @@
     setValue('teaching-score-post', scores.postTest);
     setValue('teaching-score-knowledge', scores.knowledgeAssessment);
     setValue('teaching-score-special', scores.specialTask);
+    renderAssessments(scores.assessments);
     if (connectionState) {
       connectionState.innerHTML = '<i aria-hidden="true"></i> เชื่อมต่อแล้ว';
       connectionState.classList.add('is-connected');
@@ -97,6 +115,7 @@
         'teaching-score-pre', 'teaching-score-post', 'teaching-score-knowledge', 'teaching-score-special']
         .forEach((id) => setValue(id, ''));
       setValue('teaching-score-attitude', '', 'ยังไม่ระบุแหล่งข้อมูล');
+      renderAssessments([]);
       setLoginStatus('', false);
       showLogin();
     });

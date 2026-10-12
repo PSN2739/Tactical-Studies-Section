@@ -128,6 +128,21 @@ function doPost(e) {
     }
   }
 
+  if ([
+    'teacher-attitude-save',
+    'teacher-attitude-save-many',
+    'submit-quiz',
+    'submit-tactical-scores',
+    'submit-special-assessment',
+    'attendance-registration'
+  ].indexOf(formName) >= 0) {
+    try {
+      ensureLearningSummaryInitialized_();
+    } catch (error) {
+      return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
+    }
+  }
+
   const lock = LockService.getScriptLock();
   let locked = false;
 
@@ -563,6 +578,9 @@ function saveAttitudeScore_(data) {
   sheet.getRange(record.rowNumber, 8).setValue(reason).setNumberFormat('@');
   const remainingScore = recalculateAttitudeScoreRows_(sheet, record.rowNumber, 1)[0];
   sheet.getRange(record.rowNumber, 7).setNumberFormat('0.##');
+  updateLearningSummaryAfterSourceWrite_(() => {
+    syncLearningSummaryScoresByLookupId_(lookupId, { attitude: remainingScore });
+  });
   return jsonResponse_({
     ok: true,
     data: { lookupId: lookupId, deduction: deduction, score: remainingScore, reason: reason },
@@ -646,6 +664,11 @@ function saveAttitudeScores_(data) {
     sheet.getRange(record.rowNumber, 6, 1, 2).setNumberFormat('0.##');
     sheet.getRange(record.rowNumber, 8).setNumberFormat('@');
   });
+  updateLearningSummaryAfterSourceWrite_(() => {
+    recordsToSave.forEach((record) => {
+      syncLearningSummaryScoresByLookupId_(record.lookupId, { attitude: record.score });
+    });
+  });
 
   return jsonResponse_({
     ok: true,
@@ -662,9 +685,30 @@ function saveAttitudeScores_(data) {
 function onEdit(e) {
   if (!e || !e.range) return;
   const range = e.range;
-  if (range.getSheet().getName() !== 'เจตคติ'
-    || range.getColumn() !== 6 || range.getNumColumns() !== 1) return;
-  recalculateAttitudeScoreRows_(range.getSheet(), range.getRow(), range.getNumRows());
+  const sheet = range.getSheet();
+  const sheetName = sheet.getName();
+  if (range.getRow() < 2 || sheetName === 'LearningSummary') return;
+
+  const isAttitudeEdit = sheetName === 'เจตคติ' && range.getColumn() <= 8;
+  const isLearningSourceEdit = isAttitudeEdit
+    || (sheetName === CONFIG.attendanceSheetName && range.getColumn() <= 10)
+    || (sheetName === 'QuizResults' && range.getColumn() <= 17)
+    || (sheetName === 'ScooreT' && range.getColumn() <= 29)
+    || sheetName === 'Registration'
+    || sheetName === CONFIG.specialAssessmentIndexSheetName
+    || sheetName.indexOf('Assessment_') === 0;
+  if (!isLearningSourceEdit) return;
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    if (isAttitudeEdit && range.getColumn() <= 6 && range.getLastColumn() >= 6) {
+      recalculateAttitudeScoreRows_(sheet, range.getRow(), range.getNumRows());
+    }
+    rebuildLearningSummary_();
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function recalculateAttitudeScoreRows_(sheet, firstRow, rowCount) {
@@ -963,6 +1007,7 @@ function submitQuiz_(data) {
   };
   appendQuizAttemptHistory_(resultPayload);
   appendQuizResult_(resultsSheet, resultPayload);
+  updateLearningSummaryAfterSourceWrite_(() => syncLearningSummaryQuizResult_(resultPayload));
   CacheService.getScriptCache().remove('quiz-attempt:' + attemptToken);
   const summary = getQuizPhaseSummary_(studentId, quizId);
   const attemptsRemaining = retryPostTestUntilPassed
@@ -1488,6 +1533,12 @@ function saveAttendance_(data) {
   sheet.getRange(nextRow, CONFIG.lookupIdColumn, 1, 2).setNumberFormat('@');
   sheet.getRange(nextRow, 1, 1, attendanceValues.length + 1)
     .setValues([attendanceValues.concat([attendanceFormName])]);
+  updateLearningSummaryAfterSourceWrite_(() => {
+    syncLearningSummaryAttendance_(
+      getAttendanceHeaders_(),
+      attendanceValues.concat([attendanceFormName])
+    );
+  });
   sortAttendanceSheet_(sheet);
   return jsonResponse_({
     ok: true,
@@ -1723,11 +1774,16 @@ function submitTacticalScores_(data) {
       return jsonResponse_({ ok: false, message: 'คะแนนรวมของเลขที่ ' + lookupId + ' ต้องไม่เกิน 200 คะแนน' });
     }
 
-    rows.push({ existingRow: existing.rowNumber, scores: scores.concat([total]) });
+    rows.push({ existingRow: existing.rowNumber, lookupId: lookupId, scores: scores.concat([total]) });
   }
 
   rows.forEach((entry) => {
     sheet.getRange(entry.existingRow, 4, 1, 26).setValues([entry.scores]);
+  });
+  updateLearningSummaryAfterSourceWrite_(() => {
+    rows.forEach((entry) => syncLearningSummaryScoresByLookupId_(entry.lookupId, {
+      specialTask: entry.scores[25]
+    }));
   });
   return jsonResponse_({ ok: true, saved: rows.length, message: 'บันทึกคะแนนเรียบร้อยแล้ว' });
 }
@@ -2282,6 +2338,15 @@ function submitSpecialAssessment_(data) {
   }
 
   sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+  updateLearningSummaryAfterSourceWrite_(() => {
+    rows.forEach((row) => syncLearningSummarySpecialAssessment_(row[1], {
+      assessmentId: assessment.assessmentId,
+      title: assessment.title,
+      score: row[row.length - 1],
+      total: assessment.maxTotal,
+      recordedAt: row[0]
+    }));
+  });
   return jsonResponse_({ ok: true, saved: rows.length, message: 'บันทึกผลแบบประเมินเรียบร้อยแล้ว' });
 }
 
@@ -2400,76 +2465,472 @@ function attendanceStudentLogin_(data) {
     return jsonResponse_({ ok: false, message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
   }
 
-  const spreadsheet = getRegistrationSpreadsheet_();
-  const sheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
-  if (!sheet || sheet.getLastRow() < 2) {
+  ensureLearningSummaryInitialized_();
+  const sheet = getOrCreateLearningSummarySheet_();
+  const summaryRow = findLearningSummaryRowByPersonalId_(sheet, password);
+  if (!summaryRow) {
     return jsonResponse_({ ok: false, message: 'ไม่พบข้อมูลสำหรับเข้าสู่ระบบ' });
   }
-
-  const rows = sheet.getDataRange().getDisplayValues();
-  const headers = rows[0] || [];
-  const episodeIndex = headers.indexOf('episode');
-  const row = rows.slice(1).find((record) => normalizeValue_(record[0]).replace(/^'/, '') === password
-    && normalizeValue_(record[7]).toLowerCase() === email);
-  if (!row) return jsonResponse_({ ok: false, message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
+  const row = sheet.getRange(summaryRow, 1, 1, getLearningSummaryHeaders_().length).getDisplayValues()[0];
+  const headers = getLearningSummaryHeaders_();
+  const value = (name) => normalizeValue_(row[headers.indexOf(name)]);
+  if (value('email').toLowerCase() !== email) {
+    return jsonResponse_({ ok: false, message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
+  }
+  let assessments;
+  try {
+    assessments = JSON.parse(value('assessments') || '[]');
+  } catch (error) {
+    throw new Error('ข้อมูลแบบประเมินในชีต LearningSummary ไม่ถูกต้อง กรุณาสร้างชีตสรุปใหม่');
+  }
 
   return jsonResponse_({
     ok: true,
     data: {
       student: {
-        personalId: normalizeValue_(row[0]).replace(/^'/, ''),
-        attendanceDate: normalizeValue_(row[1]),
-        battalionNumber: normalizeValue_(row[2]),
-        fullName: normalizeValue_(row[4]),
-        email: normalizeValue_(row[7]),
-        episode: normalizeValue_(episodeIndex >= 0 ? row[episodeIndex] : '')
+        personalId: value('personal_id'),
+        attendanceDate: value('attendance_date'),
+        battalionNumber: value('battalion_number'),
+        fullName: value('full_name'),
+        email: value('email'),
+        episode: value('episode')
       },
-      scores: getTeachingScores_(spreadsheet, row[0], row[2])
+      scores: {
+        attitude: value('attitude'),
+        preTest: value('pre_test'),
+        postTest: value('post_test'),
+        knowledgeAssessment: value('knowledge_assessment'),
+        specialTask: value('special_task'),
+        assessments: assessments
+      }
     }
   });
 }
 
-function getTeachingScores_(spreadsheet, personalId, lookupId) {
-  const scores = { attitude: '', preTest: '', postTest: '', knowledgeAssessment: '', specialTask: '' };
-  const attitudeSheet = spreadsheet.getSheetByName('เจตคติ');
-  if (attitudeSheet && attitudeSheet.getLastRow() > 1) {
-    const rows = attitudeSheet.getRange(2, 1, attitudeSheet.getLastRow() - 1, 7).getDisplayValues();
-    const wantedLookupId = normalizeLookupId_(lookupId);
-    const match = rows.find((row) => normalizeLookupId_(row[0]) === wantedLookupId);
-    if (match) scores.attitude = normalizeValue_(match[6]);
+function getLearningSummaryHeaders_() {
+  return [
+    'personal_id', 'lookup_id', 'attendance_date', 'battalion_number', 'full_name',
+    'email', 'episode', 'attitude', 'pre_test', 'post_test', 'knowledge_assessment',
+    'special_task', 'assessments', 'updated_at'
+  ];
+}
+
+function getAttendanceHeaders_() {
+  const headers = CONFIG.registrationHeaders.slice();
+  headers.splice(headers.indexOf('email') + 1, 0, 'subject');
+  headers.push('attendance_form_name');
+  return headers;
+}
+
+function getOrCreateLearningSummarySheet_() {
+  return getOrCreateSheet_(
+    getRegistrationSpreadsheet_(),
+    'LearningSummary',
+    getLearningSummaryHeaders_()
+  );
+}
+
+function ensureLearningSummaryInitialized_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const sheet = getRegistrationSpreadsheet_().getSheetByName('LearningSummary');
+    const expectedHeaders = getLearningSummaryHeaders_();
+    const currentHeaders = sheet && sheet.getLastRow() > 0
+      ? sheet.getRange(1, 1, 1, expectedHeaders.length).getDisplayValues()[0]
+      : [];
+    const initialized = PropertiesService.getScriptProperties()
+      .getProperty('LEARNING_SUMMARY_VERSION') === '1';
+    if (!initialized || currentHeaders.join('\u001f') !== expectedHeaders.join('\u001f')) {
+      rebuildLearningSummary_();
+    }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function rebuildLearningSummary() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    rebuildLearningSummary_();
+    return 'LearningSummary has been rebuilt from the source sheets.';
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function rebuildLearningSummary_() {
+  const spreadsheet = getRegistrationSpreadsheet_();
+  const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
+
+  const summaries = new Map();
+  const lookupToPersonalId = new Map();
+  const getRecord = (personalId, lookupId) => {
+    const id = normalizeValue_(personalId).replace(/^'/, '');
+    const lookup = normalizeLookupId_(lookupId);
+    if (!id) return null;
+    if (!summaries.has(id)) {
+      summaries.set(id, {
+        personal_id: id,
+        lookup_id: lookup,
+        attendance_date: '',
+        battalion_number: lookup,
+        full_name: '',
+        email: '',
+        episode: '',
+        attitude: '',
+        pre_test: '',
+        post_test: '',
+        knowledge_assessment: '',
+        special_task: '',
+        assessments: '[]',
+        updated_at: new Date()
+      });
+    }
+    const record = summaries.get(id);
+    if (!record.lookup_id && lookup) record.lookup_id = lookup;
+    if (lookup && !lookupToPersonalId.has(lookup)) lookupToPersonalId.set(lookup, id);
+    return record;
+  };
+
+  const attendanceRows = attendanceSheet && attendanceSheet.getLastRow() > 0
+    ? attendanceSheet.getDataRange().getDisplayValues()
+    : [];
+  const attendanceHeaders = (attendanceRows[0] || []).map(normalizeValue_);
+  const attendanceIndex = (name, fallback) => {
+    const index = attendanceHeaders.indexOf(name);
+    return index >= 0 ? index : fallback;
+  };
+  const attendanceIdIndex = attendanceIndex('registration_id', 0);
+  const attendanceLookupIndex = attendanceIndex('lookup_id', 2);
+  const attendanceEmailIndex = attendanceIndex('email', 7);
+  attendanceRows.slice(1).forEach((row) => {
+    const personalId = normalizeValue_(row[attendanceIdIndex]).replace(/^'/, '');
+    if (!personalId || summaries.has(personalId)) return;
+    const lookupId = normalizeLookupId_(row[attendanceLookupIndex]);
+    const record = getRecord(personalId, lookupId);
+    record.attendance_date = normalizeValue_(row[attendanceIndex('registered_at', 1)]);
+    record.battalion_number = normalizeValue_(row[attendanceLookupIndex]);
+    record.full_name = normalizeValue_(row[attendanceIndex('data_column_b', 4)]);
+    record.email = normalizeValue_(row[attendanceEmailIndex]).toLowerCase();
+    record.episode = normalizeValue_(row[attendanceIndex('episode', 9)]);
+  });
+
+  const registrationSheet = spreadsheet.getSheetByName(CONFIG.registrationSheetName);
+  if (registrationSheet && registrationSheet.getLastRow() > 1) {
+    registrationSheet.getRange(2, 1, registrationSheet.getLastRow() - 1, 3).getDisplayValues()
+      .forEach((row) => {
+        const personalId = normalizeValue_(row[0]).replace(/^'/, '');
+        const lookupId = normalizeLookupId_(row[2]);
+        if (personalId && lookupId && !lookupToPersonalId.has(lookupId)) {
+          lookupToPersonalId.set(lookupId, personalId);
+        }
+      });
   }
 
-  const resultsSheet = spreadsheet.getSheetByName('QuizResults');
-  if (resultsSheet && resultsSheet.getLastRow() > 1) {
-    const rows = resultsSheet.getDataRange().getDisplayValues();
-    const headers = rows[0].map(normalizeValue_);
-    const indexOf = (name) => headers.indexOf(name);
-    const studentIndex = indexOf('student_id');
-    const preIndex = indexOf('pre_score');
-    const postIndex = indexOf('post_score');
-    const scoreIndex = indexOf('score');
-    const phaseIndex = indexOf('phase');
+  const attitudeSheet = spreadsheet.getSheetByName('เจตคติ');
+  if (attitudeSheet && attitudeSheet.getLastRow() > 1) {
+    attitudeSheet.getRange(2, 1, attitudeSheet.getLastRow() - 1, 7).getDisplayValues()
+      .forEach((row) => {
+        const record = summaries.get(lookupToPersonalId.get(normalizeLookupId_(row[0])));
+        if (record && record.attitude === '') record.attitude = normalizeValue_(row[6]);
+      });
+  }
 
-    rows.slice(1).reverse().forEach((row) => {
-      if (studentIndex < 0 || normalizeValue_(row[studentIndex]).replace(/^'/, '') !== normalizeValue_(personalId).replace(/^'/, '')) return;
-      if (!scores.preTest && preIndex >= 0) scores.preTest = normalizeValue_(row[preIndex]);
-      if (!scores.postTest && postIndex >= 0) scores.postTest = normalizeValue_(row[postIndex]);
-      const phase = phaseIndex >= 0 ? normalizePhase_(row[phaseIndex]) : '';
-      if (!scores.knowledgeAssessment && scoreIndex >= 0 && phase === 'score') {
-        scores.knowledgeAssessment = normalizeValue_(row[scoreIndex]);
+  const quizSheet = spreadsheet.getSheetByName('QuizResults');
+  if (quizSheet && quizSheet.getLastRow() > 1) {
+    const values = quizSheet.getDataRange().getValues();
+    const headers = values[0].map(normalizeValue_);
+    const indexes = {
+      personalId: headers.indexOf('student_id'),
+      lookupId: headers.indexOf('เลขที่กองกัน'),
+      submittedAt: headers.indexOf('submitted_at'),
+      phase: headers.indexOf('phase'),
+      pre: headers.indexOf('pre_score'),
+      post: headers.indexOf('post_score'),
+      score: headers.indexOf('score')
+    };
+    const latest = new Map();
+    values.slice(1).forEach((row, offset) => {
+      const lookupId = indexes.lookupId >= 0 ? normalizeLookupId_(row[indexes.lookupId]) : '';
+      const personalId = (indexes.personalId >= 0
+        ? normalizeValue_(row[indexes.personalId]).replace(/^'/, '')
+        : '') || lookupToPersonalId.get(lookupId);
+      const record = summaries.get(personalId);
+      if (!record) return;
+      const phase = indexes.phase >= 0 ? normalizePhase_(row[indexes.phase]) : '';
+      const submittedAt = indexes.submittedAt >= 0 ? row[indexes.submittedAt] : '';
+      const timestamp = submittedAt instanceof Date
+        ? submittedAt.getTime()
+        : Date.parse(normalizeValue_(submittedAt));
+      const order = offset;
+      const updateLatest = (key, field, value) => {
+        if (indexes[key] < 0 || normalizeValue_(value) === '') return;
+        const previous = latest.get(personalId + ':' + field);
+        const isNewer = !previous
+          || (Number.isFinite(timestamp) && (!Number.isFinite(previous.timestamp) || timestamp >= previous.timestamp))
+          || (!Number.isFinite(timestamp) && !Number.isFinite(previous.timestamp) && order >= previous.order);
+        if (!isNewer) return;
+        record[field] = normalizeValue_(value);
+        latest.set(personalId + ':' + field, { timestamp: timestamp, order: order });
+      };
+      updateLatest('pre', 'pre_test', indexes.pre >= 0 ? row[indexes.pre] : '');
+      updateLatest('post', 'post_test', indexes.post >= 0 ? row[indexes.post] : '');
+      if (phase === 'score') {
+        updateLatest('score', 'knowledge_assessment', indexes.score >= 0 ? row[indexes.score] : '');
       }
     });
   }
 
-  const scoreSheet = spreadsheet.getSheetByName('ScooreT');
-  if (scoreSheet && scoreSheet.getLastRow() > 1) {
-    const rows = scoreSheet.getRange(2, 1, scoreSheet.getLastRow() - 1, 29).getDisplayValues();
-    const wantedLookupId = normalizeLookupId_(lookupId);
-    const match = rows.find((row) => normalizeLookupId_(row[0]) === wantedLookupId
-      && row.slice(3, 29).some((value) => normalizeValue_(value) !== ''));
-    if (match) scores.specialTask = normalizeValue_(match[28]);
+  const tacticalSheet = spreadsheet.getSheetByName('ScooreT');
+  if (tacticalSheet && tacticalSheet.getLastRow() > 1) {
+    tacticalSheet.getRange(2, 1, tacticalSheet.getLastRow() - 1, 29).getDisplayValues()
+      .forEach((row) => {
+        const record = summaries.get(lookupToPersonalId.get(normalizeLookupId_(row[0])));
+        if (record && record.special_task === ''
+          && row.slice(3, 29).some((value) => normalizeValue_(value) !== '')) {
+          record.special_task = normalizeValue_(row[28]);
+        }
+      });
   }
-  return scores;
+
+  const assessmentIndex = spreadsheet.getSheetByName(CONFIG.specialAssessmentIndexSheetName);
+  if (assessmentIndex && assessmentIndex.getLastRow() > 1) {
+    assessmentIndex.getRange(2, 1, assessmentIndex.getLastRow() - 1, 7).getDisplayValues()
+      .forEach((row) => {
+        const assessmentSheet = spreadsheet.getSheetByName(normalizeValue_(row[3]));
+        if (!assessmentSheet || assessmentSheet.getLastRow() < 2) return;
+        const assessmentRows = assessmentSheet.getDataRange().getDisplayValues();
+        assessmentRows.slice(1).forEach((assessmentRow) => {
+          const lookupId = normalizeLookupId_(assessmentRow[1]);
+          const record = summaries.get(lookupToPersonalId.get(lookupId));
+          if (!record) return;
+          const assessments = JSON.parse(record.assessments);
+          assessments.push({
+            assessmentId: normalizeValue_(row[0]),
+            title: normalizeValue_(row[2]),
+            score: normalizeValue_(assessmentRow[assessmentRow.length - 1]),
+            total: normalizeValue_(row[6]),
+            recordedAt: normalizeValue_(assessmentRow[0])
+          });
+          record.assessments = JSON.stringify(assessments);
+        });
+      });
+  }
+
+  const sheet = getOrCreateLearningSummarySheet_();
+  sheet.clearContents();
+  const headers = getLearningSummaryHeaders_();
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+  const outputRows = Array.from(summaries.values()).map((record) =>
+    headers.map((header) => record[header] === undefined ? '' : record[header]));
+  if (outputRows.length) {
+    sheet.getRange(2, 1, outputRows.length, 2).setNumberFormat('@');
+    sheet.getRange(2, 1, outputRows.length, headers.length).setValues(outputRows);
+  }
+  sheet.setFrozenRows(1);
+  PropertiesService.getScriptProperties().setProperty('LEARNING_SUMMARY_VERSION', '1');
+}
+
+function findLearningSummaryRowByPersonalId_(sheet, personalId) {
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  const match = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1)
+    .createTextFinder(normalizeValue_(personalId).replace(/^'/, ''))
+    .matchEntireCell(true)
+    .matchCase(true)
+    .findNext();
+  return match ? match.getRow() : 0;
+}
+
+function findLearningSummaryRowByLookupId_(sheet, lookupId) {
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  const match = sheet.getRange(2, 2, sheet.getLastRow() - 1, 1)
+    .createTextFinder(normalizeLookupId_(lookupId))
+    .matchEntireCell(true)
+    .matchCase(true)
+    .findNext();
+  return match ? match.getRow() : 0;
+}
+
+function writeLearningSummaryPatch_(personalId, lookupId, patch) {
+  const id = normalizeValue_(personalId).replace(/^'/, '');
+  if (!id) return;
+  const sheet = getOrCreateLearningSummarySheet_();
+  const headers = getLearningSummaryHeaders_();
+  let rowNumber = findLearningSummaryRowByPersonalId_(sheet, id);
+  let row;
+  if (rowNumber) {
+    row = sheet.getRange(rowNumber, 1, 1, headers.length).getValues()[0];
+  } else {
+    rowNumber = sheet.getLastRow() + 1;
+    row = headers.map(() => '');
+    row[headers.indexOf('personal_id')] = id;
+    row[headers.indexOf('assessments')] = '[]';
+  }
+  if (lookupId) patch.lookup_id = normalizeLookupId_(lookupId);
+  Object.keys(patch).forEach((key) => {
+    const index = headers.indexOf(key);
+    if (index >= 0) row[index] = patch[key];
+  });
+  row[headers.indexOf('updated_at')] = new Date();
+  sheet.getRange(rowNumber, 1, 1, 2).setNumberFormat('@');
+  sheet.getRange(rowNumber, 1, 1, headers.length).setValues([row]);
+}
+
+function updateLearningSummaryAfterSourceWrite_(update) {
+  try {
+    update();
+  } catch (error) {
+    throw new Error('บันทึกข้อมูลต้นทางแล้ว แต่ปรับปรุง LearningSummary ไม่สำเร็จ กรุณาแจ้งผู้ดูแลให้เรียก rebuildLearningSummary และอย่าส่งข้อมูลซ้ำ: '
+      + getErrorMessage_(error));
+  }
+}
+
+function syncLearningSummaryAttendance_(headers, values) {
+  const index = (name) => headers.indexOf(name);
+  const personalId = normalizeValue_(values[index('registration_id')]).replace(/^'/, '');
+  const lookupId = normalizeLookupId_(values[index('lookup_id')]);
+  if (!personalId) throw new Error('ไม่พบเลขประจำตัวในข้อมูล Attendance ที่เพิ่งบันทึก');
+  const sheet = getOrCreateLearningSummarySheet_();
+  const existingRow = findLearningSummaryRowByPersonalId_(sheet, personalId);
+  const patch = {
+    attendance_date: values[index('registered_at')] || '',
+    battalion_number: normalizeValue_(values[index('lookup_id')]),
+    full_name: values[index('data_column_b')] || '',
+    email: normalizeValue_(values[index('email')]).toLowerCase(),
+    episode: values[index('episode')] || ''
+  };
+  writeLearningSummaryPatch_(personalId, lookupId, patch);
+  if (!existingRow) refreshLearningSummaryScoresForStudent_(personalId, lookupId);
+}
+
+function syncLearningSummaryScoresByLookupId_(lookupId, patch) {
+  const normalizedLookupId = normalizeLookupId_(lookupId);
+  const summarySheet = getOrCreateLearningSummarySheet_();
+  const summaryRow = findLearningSummaryRowByLookupId_(summarySheet, normalizedLookupId);
+  if (!summaryRow) return;
+  const personalId = normalizeValue_(summarySheet.getRange(summaryRow, 1).getDisplayValue()).replace(/^'/, '');
+  writeLearningSummaryPatch_(personalId, normalizedLookupId, patch);
+}
+
+function syncLearningSummaryQuizResult_(result) {
+  const phase = normalizePhase_(result.phase);
+  const patch = {};
+  if (phase === 'pre-test') patch.pre_test = result.pre_score;
+  if (phase === 'post-test') patch.post_test = result.post_score;
+  if (phase === 'score') patch.knowledge_assessment = result.score;
+  syncLearningSummaryScoresByLookupId_(result.lookup_id, patch);
+}
+
+function syncLearningSummarySpecialAssessment_(lookupId, assessmentResult) {
+  const normalizedLookupId = normalizeLookupId_(lookupId);
+  const summarySheet = getOrCreateLearningSummarySheet_();
+  const summaryRow = findLearningSummaryRowByLookupId_(summarySheet, normalizedLookupId);
+  if (!summaryRow) return;
+  const personalId = normalizeValue_(summarySheet.getRange(summaryRow, 1).getDisplayValue()).replace(/^'/, '');
+  const headers = getLearningSummaryHeaders_();
+  const current = summarySheet.getRange(summaryRow, headers.indexOf('assessments') + 1).getDisplayValue();
+  let assessments;
+  try {
+    assessments = JSON.parse(current || '[]');
+  } catch (error) {
+    throw new Error('ข้อมูลแบบประเมินในชีต LearningSummary ไม่ถูกต้อง');
+  }
+  const index = assessments.findIndex((item) => item.assessmentId === assessmentResult.assessmentId);
+  if (index >= 0) assessments[index] = assessmentResult;
+  else assessments.push(assessmentResult);
+  writeLearningSummaryPatch_(personalId, normalizedLookupId, {
+    assessments: JSON.stringify(assessments)
+  });
+}
+
+function refreshLearningSummaryScoresForStudent_(personalId, lookupId) {
+  const spreadsheet = getRegistrationSpreadsheet_();
+  const record = {
+    attitude: '',
+    pre_test: '',
+    post_test: '',
+    knowledge_assessment: '',
+    special_task: '',
+    assessments: '[]'
+  };
+  const normalizedId = normalizeValue_(personalId).replace(/^'/, '');
+  const normalizedLookup = normalizeLookupId_(lookupId);
+  const attitudeSheet = spreadsheet.getSheetByName('เจตคติ');
+  if (attitudeSheet && attitudeSheet.getLastRow() > 1) {
+    const match = attitudeSheet.getRange(2, 1, attitudeSheet.getLastRow() - 1, 7).getDisplayValues()
+      .find((row) => normalizeLookupId_(row[0]) === normalizedLookup);
+    if (match) record.attitude = normalizeValue_(match[6]);
+  }
+  const quizSheet = spreadsheet.getSheetByName('QuizResults');
+  if (quizSheet && quizSheet.getLastRow() > 1) {
+    const values = quizSheet.getDataRange().getValues();
+    const headers = values[0].map(normalizeValue_);
+    const latest = new Map();
+    values.slice(1).forEach((row, offset) => {
+      const rowId = headers.indexOf('student_id') >= 0
+        ? normalizeValue_(row[headers.indexOf('student_id')]).replace(/^'/, '')
+        : '';
+      const rowLookup = headers.indexOf('เลขที่กองกัน') >= 0
+        ? normalizeLookupId_(row[headers.indexOf('เลขที่กองกัน')])
+        : '';
+      if (rowId !== normalizedId && rowLookup !== normalizedLookup) return;
+      const timestampValue = headers.indexOf('submitted_at') >= 0
+        ? row[headers.indexOf('submitted_at')]
+        : '';
+      const timestamp = timestampValue instanceof Date
+        ? timestampValue.getTime()
+        : Date.parse(normalizeValue_(timestampValue));
+      const phase = headers.indexOf('phase') >= 0
+        ? normalizePhase_(row[headers.indexOf('phase')])
+        : '';
+      const update = (field, value) => {
+        if (normalizeValue_(value) === '') return;
+        const previous = latest.get(field);
+        if (previous && Number.isFinite(previous.timestamp) && Number.isFinite(timestamp)
+          && timestamp < previous.timestamp) return;
+        if (previous && Number.isFinite(previous.timestamp) && !Number.isFinite(timestamp)) return;
+        if (previous && !Number.isFinite(previous.timestamp) && !Number.isFinite(timestamp)
+          && offset < previous.offset) return;
+        record[field] = normalizeValue_(value);
+        latest.set(field, { timestamp: timestamp, offset: offset });
+      };
+      if (headers.indexOf('pre_score') >= 0) update('pre_test', row[headers.indexOf('pre_score')]);
+      if (headers.indexOf('post_score') >= 0) update('post_test', row[headers.indexOf('post_score')]);
+      if (phase === 'score' && headers.indexOf('score') >= 0) {
+        update('knowledge_assessment', row[headers.indexOf('score')]);
+      }
+    });
+  }
+  const tacticalSheet = spreadsheet.getSheetByName('ScooreT');
+  if (tacticalSheet && tacticalSheet.getLastRow() > 1) {
+    const match = tacticalSheet.getRange(2, 1, tacticalSheet.getLastRow() - 1, 29).getDisplayValues()
+      .find((row) => normalizeLookupId_(row[0]) === normalizedLookup
+        && row.slice(3, 29).some((value) => normalizeValue_(value) !== ''));
+    if (match) record.special_task = normalizeValue_(match[28]);
+  }
+  const assessmentIndex = spreadsheet.getSheetByName(CONFIG.specialAssessmentIndexSheetName);
+  if (assessmentIndex && assessmentIndex.getLastRow() > 1) {
+    assessmentIndex.getRange(2, 1, assessmentIndex.getLastRow() - 1, 7).getDisplayValues()
+      .forEach((row) => {
+        const assessmentSheet = spreadsheet.getSheetByName(normalizeValue_(row[3]));
+        if (!assessmentSheet || assessmentSheet.getLastRow() < 2) return;
+        const match = assessmentSheet.getDataRange().getDisplayValues().slice(1)
+          .find((assessmentRow) => normalizeLookupId_(assessmentRow[1]) === normalizedLookup);
+        if (!match) return;
+        const assessments = JSON.parse(record.assessments);
+        assessments.push({
+          assessmentId: normalizeValue_(row[0]),
+          title: normalizeValue_(row[2]),
+          score: normalizeValue_(match[match.length - 1]),
+          total: normalizeValue_(row[6]),
+          recordedAt: normalizeValue_(match[0])
+        });
+        record.assessments = JSON.stringify(assessments);
+      });
+  }
+  writeLearningSummaryPatch_(normalizedId, normalizedLookup, record);
 }
 
 function findRegistrationRecord_(registrationId) {
@@ -2562,6 +3023,10 @@ function removeRegistrationSubjectColumn_(sheet) {
 
 function getRegistrationSpreadsheet_() {
   try {
+    const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    if (activeSpreadsheet && activeSpreadsheet.getId() === CONFIG.spreadsheetId) {
+      return activeSpreadsheet;
+    }
     return SpreadsheetApp.openById(CONFIG.spreadsheetId);
   } catch (error) {
     throw new Error('ไม่สามารถเปิด Spreadsheet ต้นทางได้ กรุณาตรวจสอบสิทธิ์การเข้าถึง');
