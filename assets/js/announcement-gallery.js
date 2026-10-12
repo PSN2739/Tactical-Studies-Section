@@ -282,6 +282,8 @@
   let autoplayTimer = 0;
   let requestController = null;
   let requestId = 0;
+  let displayImageRequestId = 0;
+  let nextImagePreload = null;
   let isPlaying = true;
   const requestTimeoutMs = 20000;
 
@@ -318,25 +320,62 @@
     autoplayTimer = window.setInterval(() => showImage(currentIndex + 1), 6000);
   }
 
+  function cancelNextImagePreload() {
+    if (!nextImagePreload) return;
+    nextImagePreload.onload = null;
+    nextImagePreload.onerror = null;
+    nextImagePreload.src = '';
+    nextImagePreload = null;
+  }
+
+  function preloadNextImage() {
+    if (images.length < 2 || popup.classList.contains('d-none')) return;
+    const nextImage = images[(currentIndex + 1) % images.length];
+    const preload = new Image();
+    nextImagePreload = preload;
+    preload.onload = () => {
+      if (nextImagePreload === preload) nextImagePreload = null;
+    };
+    preload.onerror = () => {
+      if (nextImagePreload === preload) nextImagePreload = null;
+    };
+    preload.src = `https://drive.google.com/thumbnail?id=${encodeURIComponent(nextImage.id)}&sz=w1600`;
+  }
+
   function showImage(index) {
     if (!images.length) return;
     currentIndex = (index + images.length) % images.length;
     const image = images[currentIndex];
+    const imageUrl = `https://drive.google.com/thumbnail?id=${encodeURIComponent(image.id)}&sz=w1600`;
+    const imageRequestId = ++displayImageRequestId;
+    cancelNextImagePreload();
     imageElement.classList.remove('d-none');
     imageElement.alt = image.name;
-    imageElement.src = `https://drive.google.com/thumbnail?id=${encodeURIComponent(image.id)}&sz=w1600`;
+    imageElement.onload = () => {
+      if (imageRequestId === displayImageRequestId && !popup.classList.contains('d-none')) {
+        preloadNextImage();
+      }
+    };
+    imageElement.onerror = () => {
+      if (imageRequestId === displayImageRequestId && !popup.classList.contains('d-none')) {
+        setStatus('โหลดภาพนี้ไม่สำเร็จ กรุณาเลือกภาพถัดไปหรือลองใหม่', true);
+      }
+    };
+    imageElement.src = imageUrl;
     counter.textContent = `${currentIndex + 1} / ${images.length} - ${image.name}`;
     setStatus('', false);
-
-    const nextImage = images[(currentIndex + 1) % images.length];
-    const preload = new Image();
-    preload.src = `https://drive.google.com/thumbnail?id=${encodeURIComponent(nextImage.id)}&sz=w1600`;
   }
 
   function closeGallery() {
     requestId += 1;
+    displayImageRequestId += 1;
     requestController?.abort();
     requestController = null;
+    cancelNextImagePreload();
+    imageElement.onload = null;
+    imageElement.onerror = null;
+    imageElement.removeAttribute('src');
+    imageElement.alt = '';
     stopAutoplay();
     popup.classList.add('d-none');
     document.body.classList.remove('announcement-gallery-open');

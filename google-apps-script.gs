@@ -57,7 +57,14 @@ function doGet(e) {
       return listAnnouncements_();
     }
     if (String(params.action || '').toLowerCase() === 'get-quiz') {
-      return getQuiz_(params.quizId || '', params.studentId || '', params.phase || 'pre-test', params.title || '');
+      return getQuiz_(
+        params.quizId || '',
+        params.studentId || '',
+        params.phase || 'pre-test',
+        params.title || '',
+        params.locationLatitude || '',
+        params.locationLongitude || ''
+      );
     }
     if (String(params.action || '').toLowerCase() === 'approve-teacher') {
       return approveTeacherByToken_(params.token || '');
@@ -109,6 +116,13 @@ function doPost(e) {
       return formName === 'teacher-attitude-lookup-many'
         ? lookupAttitudeScores_(data.lookupIds)
         : lookupAttitudeScore_(data.lookupId);
+    } catch (error) {
+      return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
+    }
+  }
+  if (formName === 'tactical-score-student-lookup-many' || formName === 'special-assessment-student-lookup-many') {
+    try {
+      return lookupScoreStudents_(formName, data);
     } catch (error) {
       return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
     }
@@ -171,7 +185,7 @@ function doPost(e) {
     if (!/^\d{4}$/.test(lookupId)) {
       return jsonResponse_({
         ok: false,
-        message: 'กรุณาระบุเลขค้นหาให้ครบ 4 หลัก'
+        message: 'ก่อนบันทึก กรุณาระบุเลขที่ให้ครบ 4 หลัก'
       });
     }
 
@@ -209,15 +223,20 @@ function doPost(e) {
     }
 
     const sheet = getOrCreateRegistrationSheet_();
-    if (registrationExists_(sheet, lookupId, registrationId)) {
+    const duplicates = findRegistrationDuplicates_(sheet, email, registrationId);
+    if (duplicates.email || duplicates.registrationId) {
+      const duplicateFields = [];
+      if (duplicates.email) duplicateFields.push('อีเมลนี้');
+      if (duplicates.registrationId) duplicateFields.push('เลขประจำตัว 13 หลักนี้');
       return jsonResponse_({
         ok: false,
         code: 'DUPLICATE_REGISTRATION',
-        message: 'ข้อมูลนี้ลงทะเบียนไว้แล้ว'
+        message: duplicateFields.join('และ') + 'ลงทะเบียนแล้ว'
       });
     }
 
     const nextRow = sheet.getLastRow() + 1;
+    sheet.getRange(nextRow, 1, 1, 1).setNumberFormat('@');
     sheet.getRange(nextRow, CONFIG.lookupIdColumn, 1, 2).setNumberFormat('@');
     sheet.getRange(nextRow, 1, 1, CONFIG.registrationHeaders.length).setValues([[
       registrationId,
@@ -675,7 +694,8 @@ function getQuizIndexHeaders_() {
   return [
     'quiz_id', 'title', 'sheet_name', 'created_at', 'created_by', 'duration_minutes',
     'open_at', 'close_at', 'question_count', 'attempts_allowed', 'phase', 'pass_type',
-    'pass_value', 'pass_score', 'active'
+    'pass_value', 'pass_score', 'active', 'location_restricted', 'location_latitude',
+    'location_longitude', 'location_radius_meters'
   ];
 }
 
@@ -731,11 +751,19 @@ function createQuiz_(data) {
   const title = normalizeValue_(data.title);
   const duration = Number(data.duration || 30);
   const questionCount = Number(data.questionCount || 0);
-  const attemptsAllowed = Number(data.attemptsAllowed || 1);
+  const attemptsAllowed = Number(normalizeValue_(data.attemptsAllowed) || 1);
   const phase = normalizePhase_(data.phase);
   const questionType = normalizeValue_(data.questionType) === 'yes-no' ? 'yes-no' : 'multiple-choice';
-  const passType = normalizeValue_(data.passType) === 'count' ? 'count' : 'percent';
-  const passValue = Number(data.passValue ?? data.passScore ?? 0);
+  const requestedPassType = normalizeValue_(data.passType).toLowerCase();
+  const passType = requestedPassType === 'none' ? 'none' : (requestedPassType === 'count' ? 'count' : 'percent');
+  const passValueText = normalizeValue_(data.passValue ?? data.passScore);
+  const passValue = passType === 'none' || passValueText === '' ? null : Number(passValueText);
+  const locationRestricted = normalizeValue_(data.locationRestricted).toLowerCase() === 'true';
+  const locationLatitude = locationRestricted && normalizeValue_(data.locationLatitude) !== ''
+    ? Number(data.locationLatitude) : NaN;
+  const locationLongitude = locationRestricted && normalizeValue_(data.locationLongitude) !== ''
+    ? Number(data.locationLongitude) : NaN;
+  const locationRadius = locationRestricted ? Number(data.locationRadius) : '';
   const openAt = normalizeValue_(data.openAt);
   const closeAt = normalizeValue_(data.closeAt);
   let rows;
@@ -748,11 +776,14 @@ function createQuiz_(data) {
   });
   if (!title || !validRows || !Number.isInteger(duration) || duration < 1
     || !Number.isInteger(questionCount) || questionCount < 1 || questionCount > rows.length
-    || !Number.isInteger(attemptsAllowed) || attemptsAllowed < 1
+    || !Number.isInteger(attemptsAllowed) || attemptsAllowed < 1 || attemptsAllowed > 999
     || !isValidDateRange_(openAt, closeAt) || !phase
-    || !Number.isFinite(passValue) || passValue < 0
+    || (passType !== 'none' && (!Number.isFinite(passValue) || passValue < 0))
     || (passType === 'percent' && (passValue < 0 || passValue > 100))
-    || (passType === 'count' && (passValue < 1 || passValue > questionCount))) {
+    || (passType === 'count' && (passValue < 1 || passValue > questionCount))
+    || (locationRestricted && (!Number.isFinite(locationLatitude) || locationLatitude < -90 || locationLatitude > 90
+      || !Number.isFinite(locationLongitude) || locationLongitude < -180 || locationLongitude > 180
+      || !Number.isInteger(locationRadius) || locationRadius < 10 || locationRadius > 50000))) {
     return jsonResponse_({ ok: false, message: 'ตรวจสอบชื่อเรื่อง ตัวเลือก เฉลย เกณฑ์ผ่าน และค่าการสอบให้ครบถ้วน' });
   }
   const spreadsheet = getRegistrationSpreadsheet_();
@@ -769,7 +800,10 @@ function createQuiz_(data) {
   sheet.getRange(2, 1, values.length, headers.length).setValues(values);
   const indexSheet = getOrCreateQuizIndexSheet_();
   indexSheet.appendRow([quizId, title, sheetName, new Date(), email, duration, openAt, closeAt,
-    questionCount, attemptsAllowed, phase, passType, String(passValue), String(passValue), 'TRUE']);
+    questionCount, attemptsAllowed, phase, passType, passValue === null ? '' : String(passValue),
+    passValue === null ? '' : String(passValue), 'TRUE',
+    locationRestricted ? 'TRUE' : 'FALSE', locationRestricted ? locationLatitude : '',
+    locationRestricted ? locationLongitude : '', locationRestricted ? locationRadius : '']);
   return jsonResponse_({ ok: true, quizId: quizId, message: 'สร้างข้อสอบเรียบร้อยแล้ว' });
 }
 
@@ -782,25 +816,57 @@ function listQuizzes_() {
     .filter((row) => row[14] !== 'FALSE')
     .map((row) => ({ quizId: row[0], title: row[1], duration: row[5], openAt: row[6], closeAt: row[7],
       questionCount: row[8], attemptsAllowed: row[9], phase: normalizePhase_(row[10]) || 'pre-test',
-      passType: normalizeValue_(row[11]) === 'count' ? 'count' : 'percent', passValue: Number(row[12] || row[13] || 70) }));
+      passType: normalizeValue_(row[11]) === 'none' ? 'none' : (normalizeValue_(row[11]) === 'count' ? 'count' : 'percent'),
+      passValue: normalizeValue_(row[11]) === 'none' ? null : Number(row[12] || row[13] || 70),
+      locationRestricted: row[15] === 'TRUE', locationRadius: Number(row[18]) || 0 }));
   return jsonResponse_({ ok: true, quizzes: rows });
 }
 
-function getQuiz_(quizId, studentId, phase, title) {
+function getQuiz_(quizId, studentId, phase, title, locationLatitude, locationLongitude) {
   const quiz = quizId ? findQuizMetadata_(quizId) : findQuizMetadataByTitle_(title, phase);
   if (!quiz) return jsonResponse_({ ok: false, message: 'ไม่พบแบบทดสอบ' });
   const requestedPhase = normalizePhase_(phase);
   if (!requestedPhase) return jsonResponse_({ ok: false, message: 'ไม่พบช่วงสอบที่ถูกต้อง' });
   if (!isQuizOpen_(quiz)) return jsonResponse_({ ok: false, message: 'แบบทดสอบยังไม่เปิดหรือปิดแล้ว' });
+  if (quiz.locationRestricted) {
+    if (!Number.isFinite(quiz.locationLatitude) || quiz.locationLatitude < -90 || quiz.locationLatitude > 90
+      || !Number.isFinite(quiz.locationLongitude) || quiz.locationLongitude < -180 || quiz.locationLongitude > 180
+      || !Number.isInteger(quiz.locationRadius) || quiz.locationRadius < 10 || quiz.locationRadius > 50000) {
+      return jsonResponse_({ ok: false, message: 'การตั้งค่าพื้นที่สอบไม่ถูกต้อง กรุณาติดต่อครูผู้สร้างแบบทดสอบ' });
+    }
+    if (normalizeValue_(locationLatitude) === '' || normalizeValue_(locationLongitude) === '') {
+      return jsonResponse_({ ok: false, message: 'ข้อสอบนี้กำหนดพื้นที่เข้าสอบ กรุณาอนุญาต GPS แล้วลองใหม่' });
+    }
+    const latitude = Number(locationLatitude);
+    const longitude = Number(locationLongitude);
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
+      || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      return jsonResponse_({ ok: false, message: 'ข้อสอบนี้กำหนดพื้นที่เข้าสอบ กรุณาอนุญาต GPS แล้วลองใหม่' });
+    }
+    const distance = distanceBetweenCoordinatesMeters_(
+      latitude, longitude, quiz.locationLatitude, quiz.locationLongitude
+    );
+    if (distance > quiz.locationRadius) {
+      return jsonResponse_({
+        ok: false,
+        message: `อยู่นอกพื้นที่สอบ ระยะห่างประมาณ ${Math.round(distance)} เมตร (กำหนดไม่เกิน ${quiz.locationRadius} เมตร)`
+      });
+    }
+  }
   const student = findRegistrationRecord_(normalizeValue_(studentId));
   if (!student) return jsonResponse_({ ok: false, message: 'ไม่พบข้อมูลผู้เข้าสอบในชีต Registration' });
   const quizAttemptCount = countQuizAttempts_(studentId, quiz.quizId || normalizeValue_(quizId), requestedPhase);
-  const unlimitedUntilPass = requestedPhase === 'post-test';
-  const attemptsRemaining = unlimitedUntilPass ? -1 : Math.max(0, Number(quiz.attemptsAllowed || 1) - quizAttemptCount);
-  if (unlimitedUntilPass && hasPassedPostTest_(studentId, quiz.quizId || normalizeValue_(quizId))) {
-    return jsonResponse_({ ok: false, message: 'ท่านสอบหลังเรียนผ่านเกณฑ์ 80% แล้ว ไม่สามารถสอบซ้ำได้', remainingAttempts: 0, attemptsUsed: quizAttemptCount });
+  const attemptsAllowed = Number(quiz.attemptsAllowed || 1);
+  const isPostTest = requestedPhase === 'post-test';
+  const passRule = getQuizPassRule_(quiz, requestedPhase);
+  const retryPostTestUntilPassed = isPostTest && passRule.passType !== 'none';
+  const effectiveAttemptsAllowed = isPostTest && !retryPostTestUntilPassed ? 1 : attemptsAllowed;
+  const attemptsRemaining = retryPostTestUntilPassed ? -1 : Math.max(0, effectiveAttemptsAllowed - quizAttemptCount);
+  if (retryPostTestUntilPassed && hasPassedPostTest_(studentId, quiz.quizId || normalizeValue_(quizId), quiz)) {
+    return jsonResponse_({ ok: false, message: 'ท่านสอบหลังเรียนผ่านเกณฑ์แล้ว ไม่สามารถสอบซ้ำได้', remainingAttempts: 0, attemptsUsed: quizAttemptCount });
   }
-  if (!unlimitedUntilPass && hasQuizAttempt_(studentId, quiz.quizId || normalizeValue_(quizId), requestedPhase, quiz.attemptsAllowed)) {
+  if (!retryPostTestUntilPassed
+    && hasQuizAttempt_(studentId, quiz.quizId || normalizeValue_(quizId), requestedPhase, effectiveAttemptsAllowed)) {
     return jsonResponse_({ ok: false, message: `คุณได้ใช้สิทธิ์สอบ${formatPhaseLabel_(requestedPhase)}ครบแล้ว ไม่สามารถสอบซ้ำได้`, remainingAttempts: 0, attemptsAllowed: quiz.attemptsAllowed, attemptsUsed: quizAttemptCount });
   }
   const sheet = getRegistrationSpreadsheet_().getSheetByName(quiz.sheetName);
@@ -827,11 +893,9 @@ function getQuiz_(quizId, studentId, phase, title) {
     quizId: resolvedQuizId, studentId: normalizeValue_(studentId), phase: requestedPhase,
     questionIds: selected.map((item) => item.rowNumber)
   }), Math.max(300, quiz.duration * 60 + 300));
-  const passType = unlimitedUntilPass ? 'percent' : (quiz.passType || 'percent');
-  const passValue = unlimitedUntilPass ? 80 : Number(quiz.passValue ?? quiz.passScore ?? 70);
   return jsonResponse_({ ok: true, quizId: resolvedQuizId, attemptToken: attemptToken, duration: quiz.duration,
-    attemptsAllowed: unlimitedUntilPass ? 0 : quiz.attemptsAllowed, attemptsUsed: quizAttemptCount, remainingAttempts: attemptsRemaining, student: student.examInfo,
-    passType: passType, passValue: passValue, passScore: passValue,
+    attemptsAllowed: effectiveAttemptsAllowed, attemptsUsed: quizAttemptCount, remainingAttempts: attemptsRemaining, student: student.examInfo,
+    passType: passRule.passType, passValue: passRule.passValue, passScore: passRule.passValue,
     questions: selected.map((item) => ({ id: item.rowNumber, question: item.row[0], choices: item.row.slice(1, 5) })) });
 }
 
@@ -849,11 +913,15 @@ function submitQuiz_(data) {
   if (!quiz || !isQuizOpen_(quiz)) return jsonResponse_({ ok: false, message: 'แบบทดสอบยังไม่เปิดหรือปิดแล้ว' });
   if (!studentId) return jsonResponse_({ ok: false, message: 'กรุณาระบุเลขประจำตัว' });
   const resultsSheet = getOrCreateQuizResultsSheet_();
-  const unlimitedUntilPass = phase === 'post-test';
-  if (unlimitedUntilPass && hasPassedPostTest_(studentId, quizId)) {
-    return jsonResponse_({ ok: false, message: 'ท่านสอบหลังเรียนผ่านเกณฑ์ 80% แล้ว ไม่สามารถสอบซ้ำได้' });
+  const attemptsAllowed = Number(quiz.attemptsAllowed || 1);
+  const isPostTest = phase === 'post-test';
+  const passRule = getQuizPassRule_(quiz, phase);
+  const retryPostTestUntilPassed = isPostTest && passRule.passType !== 'none';
+  const effectiveAttemptsAllowed = isPostTest && !retryPostTestUntilPassed ? 1 : attemptsAllowed;
+  if (retryPostTestUntilPassed && hasPassedPostTest_(studentId, quizId, quiz)) {
+    return jsonResponse_({ ok: false, message: 'ท่านสอบหลังเรียนผ่านเกณฑ์แล้ว ไม่สามารถสอบซ้ำได้' });
   }
-  if (!unlimitedUntilPass && hasQuizAttempt_(studentId, quizId, phase, quiz.attemptsAllowed)) {
+  if (!retryPostTestUntilPassed && hasQuizAttempt_(studentId, quizId, phase, effectiveAttemptsAllowed)) {
     return jsonResponse_({ ok: false, message: 'ผู้เข้าสอบใช้สิทธิ์ช่วงนี้ครบแล้ว' });
   }
   let answers;
@@ -869,8 +937,11 @@ function submitQuiz_(data) {
     if (normalizeValue_(answers[String(item.id)]).toLowerCase() === normalizeValue_(item.row[5]).toLowerCase()) score += 1;
   });
   const student = findRegistrationRecord_(studentId);
-  const resultPassType = unlimitedUntilPass ? 'percent' : (quiz.passType || 'percent');
-  const resultPassValue = unlimitedUntilPass ? 80 : Number(quiz.passValue ?? quiz.passScore ?? 70);
+  const resultPassType = passRule.passType;
+  const resultPassValue = passRule.passValue;
+  const passed = resultPassType === 'none' ? null : (resultPassType === 'count'
+    ? score >= resultPassValue
+    : (rows.length > 0 && (score / rows.length) * 100 >= resultPassValue));
   const resultPayload = {
     result_id: 'R' + String(Date.now()),
     submitted_at: new Date(),
@@ -878,10 +949,8 @@ function submitQuiz_(data) {
     quiz_id: quizId,
     phase: phase,
     pass_type: resultPassType,
-    pass_value: resultPassValue,
-    passed: resultPassType === 'count'
-      ? score >= resultPassValue
-      : (rows.length > 0 && (score / rows.length) * 100 >= resultPassValue),
+    pass_value: resultPassValue === null ? '' : resultPassValue,
+    passed: passed,
     pre_score: phase === 'pre-test' ? score : '',
     post_score: phase === 'post-test' ? score : '',
     score: score,
@@ -896,13 +965,13 @@ function submitQuiz_(data) {
   appendQuizResult_(resultsSheet, resultPayload);
   CacheService.getScriptCache().remove('quiz-attempt:' + attemptToken);
   const summary = getQuizPhaseSummary_(studentId, quizId);
+  const attemptsRemaining = retryPostTestUntilPassed
+    ? -1 : Math.max(0, effectiveAttemptsAllowed - countQuizAttempts_(studentId, quizId, phase));
   return jsonResponse_({ ok: true, score: score, total: rows.length, phase: phase,
     passType: resultPayload.pass_type, passValue: resultPayload.pass_value, passScore: resultPayload.pass_value,
-    passed: resultPayload.passed,
+    passed: resultPayload.passed, remainingAttempts: attemptsRemaining,
     student: student ? student.examInfo : null, phaseSummary: summary,
-    message: unlimitedUntilPass && !resultPayload.passed
-      ? 'ท่านไม่ผ่านเกณฑ์ 80% สามารถเข้าสอบใหม่ได้'
-      : 'ส่งคำตอบเรียบร้อยแล้ว' });
+    message: 'ส่งคำตอบเรียบร้อยแล้ว' });
 }
 
 function getQuizPhaseSummary_(studentId, quizId) {
@@ -989,15 +1058,27 @@ function countQuizAttempts_(studentId, quizId, phase) {
   return getQuizAttemptHistoryRows_(studentId, quizId, phase).length;
 }
 
-function hasPassedPostTest_(studentId, quizId) {
-  return getQuizAttemptHistoryRows_(studentId, quizId, 'post-test')
-    .some((row) => isPostTestPassed_(row.score, row.total));
+function getQuizPassRule_(quiz, phase) {
+  const passType = quiz.passType || 'percent';
+  return {
+    passType: passType,
+    passValue: passType === 'none' ? null : Number(quiz.passValue ?? quiz.passScore ?? 70)
+  };
 }
 
-function isPostTestPassed_(scoreValue, totalValue) {
+function hasPassedPostTest_(studentId, quizId, quiz) {
+  const passRule = getQuizPassRule_(quiz, 'post-test');
+  return getQuizAttemptHistoryRows_(studentId, quizId, 'post-test')
+    .some((row) => isQuizScorePassed_(row[6], row[7], passRule));
+}
+
+function isQuizScorePassed_(scoreValue, totalValue, passRule) {
   const score = Number(scoreValue);
   const total = Number(totalValue);
-  return Number.isFinite(score) && Number.isFinite(total) && total > 0 && score / total >= 0.8;
+  if (!Number.isFinite(score) || !Number.isFinite(total) || total <= 0 || passRule.passType === 'none') return false;
+  return passRule.passType === 'count'
+    ? score >= passRule.passValue
+    : (score / total) * 100 >= passRule.passValue;
 }
 
 function getQuizAttemptHistoryRows_(studentId, quizId, phase) {
@@ -1050,7 +1131,8 @@ function appendQuizAttemptHistory_(result) {
   const lookupId = student ? normalizeLookupId_(student.examInfo.lookupId) : normalizeLookupId_(result.lookup_id || '');
   sheet.appendRow([
     result.result_id, result.submitted_at, result.student_id, lookupId, result.quiz_id,
-    result.phase, result.score, result.total, result.passed ? 'TRUE' : 'FALSE'
+    result.phase, result.score, result.total,
+    result.passed === null || result.passed === undefined ? '' : (result.passed ? 'TRUE' : 'FALSE')
   ]);
   updateQuizAttemptPhaseViews_(sheet);
 }
@@ -1081,18 +1163,18 @@ function updateQuizAttemptPhaseViews_(sheet) {
     ['post-test', []],
     ['score', []]
   ]);
+  const passedIndex = 8;
   rows.forEach((row) => {
     const phase = normalizePhase_(row[5]);
     const records = phaseRows.get(phase);
     if (!records || !normalizeValue_(row[3])) return;
-    const passed = phase === 'post-test'
-      ? isPostTestPassed_(row[6], row[7])
-      : normalizeValue_(row[8]).toUpperCase() === 'TRUE';
+    const passedValue = normalizeValue_(row[passedIndex]).toUpperCase();
+    const passed = passedValue === 'TRUE' ? 'TRUE' : (passedValue === 'FALSE' ? 'FALSE' : '');
     records.push([
       normalizeLookupId_(row[3]),
       row[6],
       row[7],
-      passed ? 'TRUE' : 'FALSE'
+      passed
     ]);
   });
 
@@ -1166,7 +1248,8 @@ function appendQuizResult_(sheet, result) {
   row[headers.indexOf('phase')] = result.phase;
   row[headers.indexOf('pass_type')] = result.pass_type;
   row[headers.indexOf('pass_value')] = result.pass_value;
-  row[headers.indexOf('passed')] = result.passed ? 'TRUE' : 'FALSE';
+  row[headers.indexOf('passed')] = result.passed === null || result.passed === undefined
+    ? '' : (result.passed ? 'TRUE' : 'FALSE');
   row[headers.indexOf('pre_score')] = result.pre_score || row[headers.indexOf('pre_score')] || '';
   row[headers.indexOf('post_score')] = result.post_score || row[headers.indexOf('post_score')] || '';
   row[headers.indexOf('score')] = result.score ?? row[headers.indexOf('score')] ?? '';
@@ -1199,12 +1282,17 @@ function findQuizMetadata_(quizId) {
   const rows = sheet.getDataRange().getDisplayValues();
   for (let index = 1; index < rows.length; index += 1) {
     if (rows[index][0] !== normalizeValue_(quizId)) continue;
-    const passType = normalizeValue_(rows[index][11]) === 'count' ? 'count' : 'percent';
-    const passValue = Number(rows[index][12] || rows[index][13] || 70);
+    const passTypeValue = normalizeValue_(rows[index][11]).toLowerCase();
+    const passType = passTypeValue === 'none' ? 'none' : (passTypeValue === 'count' ? 'count' : 'percent');
+    const passValue = passType === 'none' ? null : Number(rows[index][12] || rows[index][13] || 70);
     return { sheetName: rows[index][2], duration: Number(rows[index][5]) || 30,
       openAt: rows[index][6], closeAt: rows[index][7], questionCount: Number(rows[index][8]) || 1,
       attemptsAllowed: Number(rows[index][9]) || 1, phase: normalizePhase_(rows[index][10]) || 'pre-test',
       passType: passType, passValue: passValue, passScore: passValue,
+      locationRestricted: rows[index][15] === 'TRUE',
+      locationLatitude: normalizeValue_(rows[index][16]) === '' ? NaN : Number(rows[index][16]),
+      locationLongitude: normalizeValue_(rows[index][17]) === '' ? NaN : Number(rows[index][17]),
+      locationRadius: Number(rows[index][18]) || 0,
       active: rows[index][14] !== 'FALSE' };
   }
   return null;
@@ -1221,13 +1309,18 @@ function findQuizMetadataByTitle_(title, phase) {
     const phaseMatches = requestedPhase === 'pre-post'
       ? (savedPhase === 'pre-test' || savedPhase === 'post-test')
       : savedPhase === requestedPhase;
-    const passType = normalizeValue_(rows[index][11]) === 'count' ? 'count' : 'percent';
-    const passValue = Number(rows[index][12] || rows[index][13] || 70);
+    const passTypeValue = normalizeValue_(rows[index][11]).toLowerCase();
+    const passType = passTypeValue === 'none' ? 'none' : (passTypeValue === 'count' ? 'count' : 'percent');
+    const passValue = passType === 'none' ? null : Number(rows[index][12] || rows[index][13] || 70);
     if (normalizeQuizTitle_(rows[index][1]) !== requestedTitle || !phaseMatches || rows[index][14] === 'FALSE') continue;
     return { quizId: rows[index][0], title: rows[index][1], sheetName: rows[index][2],
       duration: Number(rows[index][5]) || 30, openAt: rows[index][6], closeAt: rows[index][7],
       questionCount: Number(rows[index][8]) || 1, attemptsAllowed: Number(rows[index][9]) || 1,
       phase: requestedPhase, passType: passType, passValue: passValue, passScore: passValue,
+      locationRestricted: rows[index][15] === 'TRUE',
+      locationLatitude: normalizeValue_(rows[index][16]) === '' ? NaN : Number(rows[index][16]),
+      locationLongitude: normalizeValue_(rows[index][17]) === '' ? NaN : Number(rows[index][17]),
+      locationRadius: Number(rows[index][18]) || 0,
       active: true };
   }
   return null;
@@ -1238,6 +1331,16 @@ function isQuizOpen_(quiz) {
   const open = quiz.openAt ? new Date(quiz.openAt).getTime() : 0;
   const close = quiz.closeAt ? new Date(quiz.closeAt).getTime() : Number.MAX_SAFE_INTEGER;
   return quiz.active && !Number.isNaN(open) && !Number.isNaN(close) && now >= open && now <= close;
+}
+
+function distanceBetweenCoordinatesMeters_(latitude1, longitude1, latitude2, longitude2) {
+  const radians = (degrees) => degrees * Math.PI / 180;
+  const latitudeDifference = radians(latitude2 - latitude1);
+  const longitudeDifference = radians(longitude2 - longitude1);
+  const haversine = Math.sin(latitudeDifference / 2) ** 2
+    + Math.cos(radians(latitude1)) * Math.cos(radians(latitude2))
+    * Math.sin(longitudeDifference / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 }
 
 function isValidDateRange_(openAt, closeAt) {
@@ -1847,8 +1950,7 @@ function getTeacherDashboard_(token) {
   const lookupIndex = historyHeaders.indexOf('lookup_id');
   const quizIndexColumn = historyHeaders.indexOf('quiz_id');
   const phaseIndex = historyHeaders.indexOf('phase');
-  const scoreIndex = historyHeaders.indexOf('score');
-  const totalIndex = historyHeaders.indexOf('total');
+  const passedIndex = historyHeaders.indexOf('passed');
   const quizParticipants = new Map();
   const quizById = new Map();
   quizzes.forEach((quiz) => {
@@ -1877,7 +1979,7 @@ function getTeacherDashboard_(token) {
     if (attemptPhase === 'pre-test') courseLearners.preTest.add(studentId);
     if (attemptPhase === 'post-test') {
       courseLearners.postTest.add(studentId);
-      if (isPostTestPassed_(row[scoreIndex], row[totalIndex])) {
+      if (normalizeValue_(row[passedIndex]).toUpperCase() === 'TRUE') {
         courseLearners.passedPostTest.add(studentId);
       }
     }
@@ -2184,11 +2286,11 @@ function submitSpecialAssessment_(data) {
 }
 
 function lookupStudent_(studentId) {
-  const requestedId = normalizeValue_(studentId);
+  const requestedId = normalizeLookupId_(studentId);
   if (!/^\d{4}$/.test(requestedId)) {
     return jsonResponse_({
       ok: false,
-      message: 'กรุณากรอกเลขค้นหาให้ครบ 4 หลัก'
+      message: 'กรุณากรอกเลขค้นหา 1-4 หลัก'
     });
   }
 
@@ -2206,6 +2308,66 @@ function lookupStudent_(studentId) {
       columns: student.columns
     }
   });
+}
+
+function lookupScoreStudents_(formName, data) {
+  let lookupIds;
+  try {
+    lookupIds = JSON.parse(data.lookupIds || '[]');
+  } catch (error) {
+    lookupIds = null;
+  }
+  if (!Array.isArray(lookupIds) || lookupIds.length < 1) {
+    return jsonResponse_({ ok: false, message: 'กรุณาระบุรายการเลขที่เพื่อค้นหา' });
+  }
+
+  let maximumCount = 12;
+  if (formName === 'tactical-score-student-lookup-many') {
+    const submittedCode = normalizeValue_(data.accessCode);
+    const currentCode = getCurrentTacticalScoreAccessCode_();
+    if (!/^\d{6}$/.test(submittedCode) || submittedCode !== currentCode) {
+      return jsonResponse_({ ok: false, message: 'รหัสการใช้งานไม่ถูกต้องหรือหมดอายุ กรุณาเริ่มใหม่' });
+    }
+  } else {
+    const assessment = findSpecialAssessment_(data.assessmentId);
+    if (!assessment) return jsonResponse_({ ok: false, message: 'ไม่พบแบบประเมินนี้' });
+    if (!assessment.requiresCode || normalizeValue_(data.accessCode) !== assessment.accessCode) {
+      return jsonResponse_({ ok: false, message: 'การค้นหาหลายรายการต้องใช้รหัสแบบประเมินที่ถูกต้อง' });
+    }
+    maximumCount = Math.min(100, assessment.recordCount);
+  }
+  if (lookupIds.length > maximumCount) {
+    return jsonResponse_({ ok: false, message: 'จำนวนรายการค้นหาเกินขีดจำกัด' });
+  }
+
+  const sheet = getSourceSheet_();
+  const lastRow = sheet.getLastRow();
+  const rows = lastRow > 0 ? sheet.getRange(1, 1, lastRow, 4).getDisplayValues() : [];
+  const headers = rows[0] || [];
+  const studentsById = new Map();
+  rows.slice(1).forEach((row) => {
+    const id = normalizeLookupId_(row[0]);
+    if (!id || studentsById.has(id)) return;
+    studentsById.set(id, {
+      columns: row.map((value, columnIndex) => ({
+        label: normalizeValue_(headers[columnIndex]) || `คอลัมน์ ${String.fromCharCode(65 + columnIndex)}`,
+        value: normalizeValue_(value)
+      }))
+    });
+  });
+
+  const results = lookupIds.map((rawId) => {
+    const lookupId = normalizeValue_(rawId);
+    if (!/^\d{4}$/.test(lookupId)) {
+      return { lookupId: lookupId, ok: false, message: 'กรุณากรอกเลขค้นหาให้ครบ 4 หลัก' };
+    }
+    const student = studentsById.get(normalizeLookupId_(lookupId));
+    if (!student) {
+      return { lookupId: lookupId, ok: false, message: 'ไม่พบหมายเลขประจำตัวในชีต Data' };
+    }
+    return { lookupId: lookupId, ok: true, data: { columns: student.columns } };
+  });
+  return jsonResponse_({ ok: true, results: results });
 }
 
 function lookupAttendance_(registrationId) {
@@ -2417,15 +2579,20 @@ function createUniqueRegistrationId_(sheet) {
   return id;
 }
 
-function registrationExists_(sheet, lookupId, registrationId) {
+function findRegistrationDuplicates_(sheet, email, registrationId) {
   const dataRowCount = sheet.getLastRow() - 1;
-  if (dataRowCount < 1) return false;
-  const existing = sheet.getRange(2, 1, dataRowCount, CONFIG.lookupIdColumn).getDisplayValues();
-  const requestedLookupId = normalizeLookupId_(lookupId);
+  if (dataRowCount < 1) return { email: false, registrationId: false };
+  const emailColumn = CONFIG.registrationHeaders.indexOf('email') + 1;
+  const existing = sheet.getRange(2, 1, dataRowCount, emailColumn).getDisplayValues();
+  const requestedEmail = normalizeValue_(email).toLowerCase();
   const requestedRegistrationId = normalizeValue_(registrationId).replace(/^'/, '');
-  return existing.some((row) =>
-    normalizeLookupId_(row[CONFIG.lookupIdColumn - 1]) === requestedLookupId
-    || normalizeValue_(row[0]).replace(/^'/, '') === requestedRegistrationId);
+  return existing.reduce((duplicates, row) => {
+    duplicates.email = duplicates.email
+      || normalizeValue_(row[emailColumn - 1]).toLowerCase() === requestedEmail;
+    duplicates.registrationId = duplicates.registrationId
+      || normalizeValue_(row[0]).replace(/^'/, '') === requestedRegistrationId;
+    return duplicates;
+  }, { email: false, registrationId: false });
 }
 
 function normalizeRegistrationLookupColumns_(sheet) {

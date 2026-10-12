@@ -19,6 +19,8 @@
   let accessCode = '';
   let lastPromptedCopyRequest = '';
   let pendingCopy = null;
+  let lookupBatchTimer = 0;
+  let lookupBatchSequence = 0;
 
   function createCopyConfirmation() {
     const overlay = document.createElement('div');
@@ -187,40 +189,74 @@
     return total;
   }
 
-  async function lookupStudent(row) {
-    const input = row.querySelector('[data-lookup-id]');
-    const lookupId = input.value.trim();
+  function clearStudentRow(row) {
     const nameCell = row.querySelector('.student-name');
     const affiliationCell = row.querySelector('.student-affiliation');
-    if (!lookupId) {
-      nameCell.textContent = '-';
-      affiliationCell.textContent = '-';
-      return;
-    }
-    if (!/^\d{4}$/.test(lookupId)) {
-      nameCell.textContent = '-';
-      affiliationCell.textContent = '-';
-      setStatus(scoreStatus, 'กรุณากรอกเลขที่ให้ครบ 4 หลัก', false);
-      return;
-    }
+    nameCell.textContent = '-';
+    affiliationCell.textContent = '-';
+    row.dataset.lookupState = '';
+    row.dataset.lookupRevision = String((Number(row.dataset.lookupRevision) || 0) + 1);
+  }
 
+  function scheduleStudentLookups() {
+    window.clearTimeout(lookupBatchTimer);
+    lookupBatchTimer = window.setTimeout(lookupStudents, 200);
+  }
+
+  async function lookupStudents() {
+    const pending = Array.from(scoreBody.querySelectorAll('tr')).flatMap((row) => {
+      const input = row.querySelector('[data-lookup-id]');
+      const lookupId = input.value.trim();
+      if (!/^\d{4}$/.test(lookupId) || row.dataset.lookupState === 'loaded'
+        || row.dataset.lookupState === 'loading') return [];
+      const request = { row, input, lookupId, revision: row.dataset.lookupRevision || '0' };
+      row.dataset.lookupState = 'loading';
+      return [request];
+    });
+    if (!pending.length) return;
+
+    const sequence = ++lookupBatchSequence;
     try {
-      const response = await fetch(`${endpoint}?action=lookup&lookupId=${encodeURIComponent(lookupId)}`);
-      const result = await response.json();
-      if (!response.ok || !result.ok) throw new Error(result.message || 'ไม่พบข้อมูลผู้เรียน');
-      if (input.value.trim() !== lookupId) return;
-      const columns = result.data.columns;
-      nameCell.textContent = columns[1].value || '-';
-      affiliationCell.textContent = columns[2].value || '-';
-      setStatus(scoreStatus, '', false);
+      const result = await post({
+        formName: 'tactical-score-student-lookup-many',
+        accessCode,
+        lookupIds: JSON.stringify(pending.map(({ lookupId }) => lookupId))
+      });
+      if (!Array.isArray(result.results) || result.results.length !== pending.length) {
+        throw new Error('ผลการค้นหาผู้เรียนไม่ครบถ้วน กรุณาลองใหม่');
+      }
+      const missing = [];
+      pending.forEach(({ row, input, lookupId, revision }, index) => {
+        if (row.dataset.lookupRevision !== revision || input.value.trim() !== lookupId) return;
+        const student = result.results[index];
+        if (student.ok) {
+          const columns = student.data.columns;
+          row.querySelector('.student-name').textContent = columns[1].value || '-';
+          row.querySelector('.student-affiliation').textContent = columns[2].value || '-';
+          row.dataset.lookupState = 'loaded';
+        } else {
+          row.querySelector('.student-name').textContent = '-';
+          row.querySelector('.student-affiliation').textContent = '-';
+          row.dataset.lookupState = 'missing';
+          missing.push(lookupId);
+        }
+      });
+      if (sequence === lookupBatchSequence) {
+        setStatus(scoreStatus, missing.length ? 'ไม่พบเลขที่ ' + missing.join(', ') + ' ในข้อมูลผู้เรียน' : '', false);
+      }
     } catch (error) {
-      nameCell.textContent = '-';
-      affiliationCell.textContent = '-';
-      setStatus(scoreStatus, error.message || 'ค้นหาข้อมูลผู้เรียนไม่สำเร็จ', false);
+      pending.forEach(({ row, revision }) => {
+        if (row.dataset.lookupRevision === revision) row.dataset.lookupState = '';
+      });
+      if (sequence === lookupBatchSequence) {
+        setStatus(scoreStatus, error.message || 'ค้นหาข้อมูลผู้เรียนไม่สำเร็จ', false);
+      }
     }
   }
 
   function closeModal() {
+    window.clearTimeout(lookupBatchTimer);
+    lookupBatchSequence += 1;
     copyConfirmation.overlay.classList.add('d-none');
     pendingCopy = null;
     modal.classList.add('d-none');
@@ -276,12 +312,23 @@
   });
 
   scoreBody.addEventListener('focusout', (event) => {
-    if (event.target.matches('[data-lookup-id]')) lookupStudent(event.target.closest('tr'));
+    if (!event.target.matches('[data-lookup-id]')) return;
+    const lookupId = event.target.value.trim();
+    if (lookupId && !/^\d{4}$/.test(lookupId)) {
+      setStatus(scoreStatus, 'กรุณากรอกเลขที่ให้ครบ 4 หลัก', false);
+      return;
+    }
+    scheduleStudentLookups();
   });
   scoreBody.addEventListener('input', (event) => {
     if (!event.target.matches('[data-score-index], [data-lookup-id]')) return;
     const row = event.target.closest('tr');
-    if (event.target.matches('[data-score-index]')) updateRowTotal(row);
+    if (event.target.matches('[data-lookup-id]')) {
+      clearStudentRow(row);
+      scheduleStudentLookups();
+    } else {
+      updateRowTotal(row);
+    }
     confirmAndCopyFirstRowScores();
   });
 

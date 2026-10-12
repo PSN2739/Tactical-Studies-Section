@@ -36,7 +36,8 @@
   let currentQuestionIndex = 0;
   let collectedAnswers = {};
   let examTimedOut = false;
-  let retryPostTestAutomatically = false;
+  let retryAutomatically = false;
+  const quizzesById = new Map();
 
   function syncPhaseSelector(phase) {
     if (!phaseSelect) return;
@@ -90,6 +91,10 @@
     try {
       const data = await request('?action=quiz-list');
       const quizzes = Array.isArray(data.quizzes) ? data.quizzes : [];
+      quizzesById.clear();
+      quizzes.forEach((quiz) => {
+        if (quiz.quizId) quizzesById.set(quiz.quizId, quiz);
+      });
       quizMenu.querySelectorAll(':scope > .quiz-menu-generated').forEach((item) => item.remove());
 
       const latestQuizzes = new Map();
@@ -149,6 +154,9 @@
     const data = await request('?action=quiz-list');
     const normalizedTitle = selectedTitle.replace(/^เรื่อง\s*/i, '').replace(/\s+/g, '');
     const quizzes = data.quizzes.slice().reverse();
+    quizzes.forEach((quiz) => {
+      if (quiz.quizId) quizzesById.set(quiz.quizId, quiz);
+    });
     const phaseMatches = (itemPhase) => !itemPhase || itemPhase === selectedPhase;
     const quiz = quizzes.find((item) => {
       const itemTitle = String(item.title || '').replace(/^เรื่อง\s*/i, '').replace(/\s+/g, '');
@@ -160,6 +168,25 @@
     });
     if (!quiz && !sharedQuiz) throw new Error(`ไม่พบแบบทดสอบเรื่อง ${selectedTitle} (${formatPhaseLabel(selectedPhase)})`);
     return (quiz || sharedQuiz).quizId;
+  }
+
+  async function getCurrentCoordinates() {
+    if (!navigator.geolocation) {
+      throw new Error('อุปกรณ์นี้ไม่รองรับ GPS จึงไม่สามารถเข้าสอบในพื้นที่ที่กำหนดได้');
+    }
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition((position) => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        });
+      }, (error) => {
+        const message = error.code === error.PERMISSION_DENIED
+          ? 'กรุณาอนุญาตการเข้าถึงตำแหน่ง GPS เพื่อเข้าสอบในพื้นที่ที่กำหนด'
+          : 'อ่านตำแหน่ง GPS ไม่สำเร็จ กรุณาเปิด GPS และลองอีกครั้ง';
+        reject(new Error(message));
+      }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    });
   }
 
   async function loadStudentInfo(studentId) {
@@ -215,7 +242,7 @@
     currentQuestionIndex = 0;
     collectedAnswers = {};
     examTimedOut = false;
-    retryPostTestAutomatically = false;
+    retryAutomatically = false;
     timeoutPopup.classList.add('d-none');
     retryButton.classList.add('d-none');
     resultBox.textContent = '';
@@ -366,7 +393,28 @@
       const student = await loadStudentInfo(studentId);
       renderStudentInfo(student);
       activeQuizId = selectedQuizId || await findQuizId();
-      const data = await request(`?action=get-quiz&quizId=${encodeURIComponent(activeQuizId)}&phase=${encodeURIComponent(selectedPhase)}&studentId=${encodeURIComponent(studentId)}`);
+      let quizMetadata = quizzesById.get(activeQuizId);
+      if (!quizMetadata) {
+        const quizList = await request('?action=quiz-list');
+        quizList.quizzes.forEach((quiz) => {
+          if (quiz.quizId) quizzesById.set(quiz.quizId, quiz);
+        });
+        quizMetadata = quizzesById.get(activeQuizId);
+      }
+      if (!quizMetadata) throw new Error('ไม่พบข้อมูลพื้นที่ของแบบทดสอบ กรุณาปิดแล้วเลือกข้อสอบใหม่');
+      const parameters = new URLSearchParams({
+        action: 'get-quiz',
+        quizId: activeQuizId,
+        phase: selectedPhase,
+        studentId
+      });
+      if (quizMetadata.locationRestricted) {
+        setError(`ข้อสอบนี้กำหนดพื้นที่เข้าสอบรัศมี ${quizMetadata.locationRadius} เมตร กำลังตรวจตำแหน่ง GPS...`);
+        const coordinates = await getCurrentCoordinates();
+        parameters.set('locationLatitude', String(coordinates.latitude));
+        parameters.set('locationLongitude', String(coordinates.longitude));
+      }
+      const data = await request(`?${parameters.toString()}`);
       activeQuizId = data.quizId || activeQuizId;
       attemptToken = data.attemptToken;
       const remaining = Number(data.remainingAttempts ?? data.attemptsLeft ?? 0);
@@ -377,18 +425,18 @@
       pendingQuestions = data.questions;
       answerForm.dataset.duration = data.duration || 30;
       answerForm.dataset.passType = data.passType || 'percent';
-      answerForm.dataset.passValue = data.passValue ?? data.passScore ?? 70;
-      answerForm.dataset.passScore = data.passScore || 70;
+      answerForm.dataset.passValue = data.passType === 'none' ? '' : (data.passValue ?? data.passScore ?? 70);
+      answerForm.dataset.passScore = answerForm.dataset.passValue;
       startForm.classList.add('d-none');
-      if (retryPostTestAutomatically) {
-        retryPostTestAutomatically = false;
+      if (retryAutomatically) {
+        retryAutomatically = false;
         beginExam();
       } else {
         startActions.classList.remove('d-none');
       }
     } catch (error) {
-      if (retryPostTestAutomatically) {
-        retryPostTestAutomatically = false;
+      if (retryAutomatically) {
+        retryAutomatically = false;
         startForm.classList.remove('d-none');
       }
       setError(error.message);
@@ -415,23 +463,36 @@
         }).toString()
       });
       const passType = data.passType || answerForm.dataset.passType || 'percent';
-      const passValue = Number(data.passValue ?? data.passScore ?? answerForm.dataset.passValue ?? answerForm.dataset.passScore ?? 70);
+      const hasPassThreshold = passType !== 'none';
+      const passValue = hasPassThreshold
+        ? Number(data.passValue ?? data.passScore ?? answerForm.dataset.passValue ?? answerForm.dataset.passScore ?? 70)
+        : null;
       const score = Number(data.score || 0);
       const total = Number(data.total || 0);
       const percentage = total ? (score / total) * 100 : 0;
-      const passed = typeof data.passed === 'boolean'
-        ? data.passed
-        : (passType === 'count' ? score >= passValue : percentage >= passValue);
+      const passed = hasPassThreshold
+        ? (typeof data.passed === 'boolean'
+          ? data.passed
+          : (passType === 'count' ? score >= passValue : percentage >= passValue))
+        : null;
       const thresholdText = passType === 'count' ? `${passValue} ข้อ` : `${passValue}%`;
-      const canRetryPostTest = selectedPhase === 'post-test' && !passed;
+      const canRetry = selectedPhase === 'post-test'
+        ? passed === false
+        : Number(data.remainingAttempts || 0) > 0;
       resultBox.innerHTML = `
         <strong>ผลคะแนน ${formatPhaseLabel(data.phase)}:</strong>
         ${score}/${total} คะแนน
-        <span class="${passed ? 'success-message' : 'error-message'}">(${passed ? 'ผ่าน' : 'ไม่ผ่าน'} - เกณฑ์ ${thresholdText})</span>
-        ${canRetryPostTest ? '<p>ท่านไม่ผ่านเกณฑ์ 80% สามารถเข้าสอบใหม่ได้</p>' : ''}
+        ${hasPassThreshold
+          ? `<span class="${passed ? 'success-message' : 'error-message'}">(${passed ? 'ผ่าน' : 'ไม่ผ่าน'} - เกณฑ์ ${thresholdText})</span>`
+          : '<span>(ไม่ได้กำหนดเกณฑ์ผ่าน แสดงคะแนนตามที่ทำได้)</span>'}
+        ${canRetry
+          ? (selectedPhase === 'post-test'
+            ? '<p>สอบหลังเรียนไม่ผ่าน สามารถสอบซ้ำได้จนกว่าจะผ่านเกณฑ์</p>'
+            : `<p>ยังสอบได้อีก ${Number(data.remainingAttempts)} ครั้ง</p>`)
+          : ''}
       `;
       resultBox.classList.add('registration-result');
-      retryButton.classList.toggle('d-none', !canRetryPostTest);
+      retryButton.classList.toggle('d-none', !canRetry);
       answerForm.classList.add('d-none');
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     } catch (error) {
@@ -442,7 +503,7 @@
   });
 
   retryButton.addEventListener('click', () => {
-    retryPostTestAutomatically = true;
+    retryAutomatically = true;
     retryButton.classList.add('d-none');
     resultBox.textContent = '';
     resultBox.classList.remove('registration-result');

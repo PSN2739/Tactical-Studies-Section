@@ -28,9 +28,86 @@
   const previewBox = document.getElementById('quiz-preview-box');
   const downloadTemplateButton = document.getElementById('download-quiz-template');
   const currentTeacherEmail = document.getElementById('current-teacher-email');
+  const locationRestrictedInput = document.getElementById('quiz-location-restricted');
+  const locationPanel = document.getElementById('quiz-location-panel');
+  const locationMapElement = document.getElementById('quiz-location-map');
+  const locationLatitudeInput = document.getElementById('quiz-location-latitude');
+  const locationLongitudeInput = document.getElementById('quiz-location-longitude');
+  const locationRadiusInput = document.getElementById('quiz-location-radius');
+  const locationCoordinates = document.getElementById('quiz-location-coordinates');
+  const locationUseCurrentButton = document.getElementById('quiz-location-use-current');
   const tokenKey = 'tacticalTeacherToken';
   const pendingRequests = new Set();
   const requestTimeoutMs = 30000;
+  let locationMap = null;
+  let locationMarker = null;
+  let locationCircle = null;
+  let mapLibraryPromise = null;
+
+  function loadMapLibrary() {
+    if (window.L) return Promise.resolve(window.L);
+    if (mapLibraryPromise) return mapLibraryPromise;
+
+    mapLibraryPromise = new Promise((resolve, reject) => {
+      const css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(css);
+
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = () => window.L ? resolve(window.L) : reject(new Error('โหลดแผนที่ไม่สำเร็จ'));
+      script.onerror = () => reject(new Error('โหลดแผนที่ไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต'));
+      document.head.appendChild(script);
+    }).catch((error) => {
+      mapLibraryPromise = null;
+      throw error;
+    });
+    return mapLibraryPromise;
+  }
+
+  function updateLocationMarker(latitude, longitude) {
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90
+      || !Number.isFinite(lng) || lng < -180 || lng > 180) {
+      throw new Error('พิกัดแผนที่ไม่ถูกต้อง');
+    }
+
+    locationLatitudeInput.value = String(lat);
+    locationLongitudeInput.value = String(lng);
+    locationCoordinates.textContent = `พิกัดจุดสอบ: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    const position = [lat, lng];
+    if (locationMarker) locationMarker.setLatLng(position);
+    else locationMarker = window.L.marker(position).addTo(locationMap);
+    if (locationCircle) locationCircle.setLatLng(position);
+    else locationCircle = window.L.circle(position, { radius: Number(locationRadiusInput.value) }).addTo(locationMap);
+    locationMap.setView(position, Math.max(locationMap.getZoom(), 16));
+  }
+
+  async function showLocationMap() {
+    locationPanel.classList.remove('d-none');
+    try {
+      await loadMapLibrary();
+      if (!locationMap) {
+        locationMap = window.L.map(locationMapElement).setView([12.570, 99.958], 13);
+        window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(locationMap);
+        locationMap.on('click', (event) => {
+          updateLocationMarker(event.latlng.lat, event.latlng.lng);
+        });
+      }
+      window.setTimeout(() => locationMap.invalidateSize(), 0);
+      if (locationLatitudeInput.value && locationLongitudeInput.value) {
+        updateLocationMarker(locationLatitudeInput.value, locationLongitudeInput.value);
+      }
+    } catch (error) {
+      setStatus(uploadForm, 'error-message', error.message || 'เปิดแผนที่ไม่สำเร็จ');
+      throw error;
+    }
+  }
 
   function setCurrentTeacherEmail(email) {
     if (currentTeacherEmail) currentTeacherEmail.textContent = email
@@ -39,23 +116,45 @@
   }
 
   function syncPassingControls() {
-    const countMode = uploadForm.elements.passType.value === 'count';
+    const passType = uploadForm.elements.passType.value;
+    const countMode = passType === 'count';
+    const hasPassThreshold = passType !== 'none';
     const questionCount = Number(uploadForm.elements.questionCount.value) || 0;
     const passValue = uploadForm.elements.passValue;
     const passLabel = document.getElementById('quiz-pass-value-label');
+    const passValueField = document.getElementById('quiz-pass-value-field');
 
     if (passLabel) passLabel.textContent = countMode ? 'จำนวนข้อที่ต้องผ่าน' : 'เกณฑ์ผ่าน (%)';
     passValue.min = countMode ? '1' : '0';
     passValue.max = countMode ? (questionCount > 0 ? String(questionCount) : '') : '100';
     passValue.step = '1';
+    passValue.disabled = !hasPassThreshold;
+    passValue.required = hasPassThreshold;
+    passValueField.classList.toggle('d-none', !hasPassThreshold);
 
     if (countMode) {
       passValue.value = questionCount > 0
         ? String(Math.min(Number(passValue.value) || questionCount, questionCount))
         : '';
     }
+  }
 
-    uploadForm.elements.attemptsAllowed.disabled = countMode;
+  function resetLocationSettings() {
+    locationRestrictedInput.checked = false;
+    locationRadiusInput.value = '100';
+    locationRadiusInput.required = false;
+    locationPanel.classList.add('d-none');
+    locationLatitudeInput.value = '';
+    locationLongitudeInput.value = '';
+    locationCoordinates.textContent = 'ยังไม่ได้ปักหมุด';
+    if (locationMarker) {
+      locationMap.removeLayer(locationMarker);
+      locationMarker = null;
+    }
+    if (locationCircle) {
+      locationMap.removeLayer(locationCircle);
+      locationCircle = null;
+    }
   }
 
   function showModal() {
@@ -160,6 +259,7 @@
     applicationForm.reset();
     loginForm.reset();
     uploadForm.reset();
+    resetLocationSettings();
     syncPassingControls();
     if (previewBox) {
       previewBox.classList.add('d-none');
@@ -523,19 +623,35 @@
     event.preventDefault();
     try {
       const passType = uploadForm.elements.passType.value;
-      const passValue = Number(uploadForm.elements.passValue.value);
+      const hasPassThreshold = passType !== 'none';
+      const passValue = hasPassThreshold ? Number(uploadForm.elements.passValue.value) : null;
+      const attemptsAllowed = Number(uploadForm.elements.attemptsAllowed.value || 1);
       const questionCount = Number(uploadForm.elements.questionCount.value || 0);
       const quizTitle = uploadForm.elements.title.value.trim();
       const quizPhase = uploadForm.elements.phase.value;
 
-      if (!Number.isFinite(passValue) || passValue < 0) {
+      if (!Number.isInteger(attemptsAllowed) || attemptsAllowed < 1 || attemptsAllowed > 999) {
+        throw new Error('จำนวนครั้งสอบต้องเป็นจำนวนเต็มตั้งแต่ 1 ถึง 999 ครั้ง');
+      }
+      if (hasPassThreshold && (!Number.isFinite(passValue) || passValue < 0)) {
         throw new Error('ค่าเกณฑ์ผ่านต้องเป็นจำนวนที่ถูกต้อง');
       }
-      if (passType === 'percent' && (passValue < 0 || passValue > 100)) {
+      if (hasPassThreshold && passType === 'percent' && (passValue < 0 || passValue > 100)) {
         throw new Error('เกณฑ์ผ่านแบบเปอร์เซ็นต์ต้องอยู่ระหว่าง 0 ถึง 100');
       }
       if (passType === 'count' && (passValue < 1 || passValue > questionCount || passValue > 999)) {
         throw new Error('จำนวนข้อเกณฑ์ผ่านต้องไม่เกินจำนวนข้อที่สุ่ม');
+      }
+      const locationRestricted = locationRestrictedInput.checked;
+      const locationLatitude = locationLatitudeInput.value;
+      const locationLongitude = locationLongitudeInput.value;
+      const locationRadius = Number(locationRadiusInput.value);
+      if (locationRestricted && (!locationLatitude || !locationLongitude
+        || !Number.isFinite(locationRadius) || locationRadius < 10 || locationRadius > 50000)) {
+        throw new Error('กรุณาปักหมุดสนามสอบและกำหนดรัศมีระหว่าง 10 ถึง 50,000 เมตร');
+      }
+      if (locationRestricted && !locationRadiusInput.validity.valid) {
+        throw new Error('รัศมีพื้นที่สอบต้องเป็นจำนวน 10 ถึง 50,000 เมตร');
       }
 
       setLoading(true);
@@ -545,25 +661,32 @@
         title: quizTitle, duration: uploadForm.elements.duration.value,
         openAt: uploadForm.elements.openAt.value, closeAt: uploadForm.elements.closeAt.value,
         questionCount: uploadForm.elements.questionCount.value,
-        attemptsAllowed: uploadForm.elements.attemptsAllowed.value,
+        attemptsAllowed: String(attemptsAllowed),
         phase: uploadForm.elements.phase.value,
         questionType: uploadForm.elements.questionType.value,
         passType,
-        passValue: String(passValue),
-        passScore: String(passValue),
+        passValue: hasPassThreshold ? String(passValue) : '',
+        passScore: hasPassThreshold ? String(passValue) : '',
+        locationRestricted: String(locationRestricted),
+        locationLatitude: locationRestricted ? locationLatitude : '',
+        locationLongitude: locationRestricted ? locationLongitude : '',
+        locationRadius: locationRestricted ? String(locationRadius) : '',
         questions: JSON.stringify(questions)
       }) });
       window.dispatchEvent(new CustomEvent('quiz-list-updated', {
         detail: { quizId: data.quizId, title: quizTitle, phase: quizPhase }
       }));
       uploadForm.reset();
+      resetLocationSettings();
       syncPassingControls();
       if (previewBox) {
         previewBox.classList.add('d-none');
         previewBox.innerHTML = '';
       }
-      const displayText = passType === 'count' ? `จำนวน ${passValue} ข้อ` : `${passValue}%`;
-      showQuizSuccessPopup(`สร้างแบบทดสอบสำเร็จ (เกณฑ์ผ่าน ${displayText})`);
+      const displayText = !hasPassThreshold
+        ? 'ไม่กำหนดเกณฑ์ผ่าน'
+        : (passType === 'count' ? `จำนวน ${passValue} ข้อ` : `${passValue}%`);
+      showQuizSuccessPopup(`สร้างแบบทดสอบสำเร็จ (${displayText}, สอบได้ ${attemptsAllowed} ครั้ง)`);
     } catch (error) {
       if (error.name !== 'AbortError') setStatus(uploadForm, 'error-message', error.message);
     } finally {
@@ -583,6 +706,42 @@
   uploadForm.elements.passType.addEventListener('change', syncPassingControls);
   uploadForm.elements.questionCount.addEventListener('input', syncPassingControls);
   uploadForm.elements.questionCount.addEventListener('change', syncPassingControls);
+  locationRestrictedInput.addEventListener('change', () => {
+    locationRadiusInput.required = locationRestrictedInput.checked;
+    if (!locationRestrictedInput.checked) {
+      locationPanel.classList.add('d-none');
+      return;
+    }
+    showLocationMap().catch(() => {});
+  });
+  locationRadiusInput.addEventListener('input', () => {
+    if (locationCircle && Number(locationRadiusInput.value) >= 10) {
+      locationCircle.setRadius(Number(locationRadiusInput.value));
+    }
+  });
+  locationUseCurrentButton.addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      setStatus(uploadForm, 'error-message', 'อุปกรณ์นี้ไม่รองรับการอ่านตำแหน่ง GPS');
+      return;
+    }
+    locationUseCurrentButton.disabled = true;
+    navigator.geolocation.getCurrentPosition((position) => {
+      try {
+        updateLocationMarker(position.coords.latitude, position.coords.longitude);
+        setStatus(uploadForm, 'error-message', '');
+      } catch (error) {
+        setStatus(uploadForm, 'error-message', error.message);
+      } finally {
+        locationUseCurrentButton.disabled = false;
+      }
+    }, (error) => {
+      const message = error.code === error.PERMISSION_DENIED
+        ? 'ไม่ได้รับอนุญาตให้เข้าถึงตำแหน่ง GPS'
+        : 'อ่านตำแหน่ง GPS ไม่สำเร็จ กรุณาปักหมุดบนแผนที่';
+      setStatus(uploadForm, 'error-message', message);
+      locationUseCurrentButton.disabled = false;
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  });
   syncPassingControls();
 
   uploadForm.elements.questionType.addEventListener('change', async () => {

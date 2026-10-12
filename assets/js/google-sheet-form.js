@@ -131,9 +131,17 @@
   }
 
   function validateLookupId() {
+    const enteredId = lookupStudentIdField.value.trim();
+    if (!/^\d{1,4}$/.test(enteredId)) {
+      throw new Error('กรุณากรอกเลขค้นหา 1-4 หลัก');
+    }
+    return enteredId;
+  }
+
+  function validateRegistrationLookupId() {
     const lookupId = lookupStudentIdField.value.trim();
     if (!/^\d{4}$/.test(lookupId)) {
-      throw new Error('กรุณากรอกเลขค้นหาให้ครบ 4 หลัก');
+      throw new Error('ก่อนบันทึก กรุณากรอกเลขที่ให้ครบ 4 หลักและตรวจสอบข้อมูลอีกครั้ง');
     }
     return lookupId;
   }
@@ -214,7 +222,7 @@
     try {
       setGlobalLoading(true);
       const registrationId = validateRegistrationId();
-      const lookupId = validateLookupId();
+      const lookupId = validateRegistrationLookupId();
       if (!verifiedLookupId || lookupId !== verifiedLookupId) {
         throw new Error('กรุณาตรวจสอบข้อมูลผู้เรียนก่อนบันทึก');
       }
@@ -237,9 +245,8 @@
         body: payload.toString()
       });
       const data = parseResponse(await response.text());
-      if (data.code === 'DUPLICATE_REGISTRATION'
-        || /ลงทะเบียนไว้แล้ว/.test(data.message || '')) {
-        showRegistrationPopup('ท่านลงทะเบียนแล้ว');
+      if (data.code === 'DUPLICATE_REGISTRATION') {
+        showRegistrationPopup(data.message || 'อีเมลหรือเลขประจำตัว 13 หลักนี้ลงทะเบียนแล้ว');
         return;
       }
       if (!response.ok || !data.ok) throw new Error(data.message || 'บันทึกข้อมูลไม่สำเร็จ');

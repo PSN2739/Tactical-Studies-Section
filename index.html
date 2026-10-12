@@ -10,7 +10,7 @@
 
   <!-- Favicons -->
   <link href="assets/img/favicon.png?v=20261002-logo" rel="icon" type="image/png">
-  <link href="assets/img/logo.png?v=20261002" rel="apple-touch-icon">
+  <link href="assets/img/logo-optimized.png?v=20261009" rel="apple-touch-icon">
 
   <!-- Fonts -->
   <link href="https://fonts.googleapis.com" rel="preconnect">
@@ -27,8 +27,8 @@
   <link href="assets/swiper/swiper-bundle.min.css" rel="stylesheet">
 
   <!-- Main CSS File -->
-  <link href="assets/css/main.css?v=20261005-attitude-batch-entry" rel="stylesheet">
-  <link rel="preload" href="assets/img/hero-bg-2.jpg" as="image" fetchpriority="high">
+  <link href="assets/css/main.css?v=20261009-performance" rel="stylesheet">
+  <link rel="preload" href="assets/img/hero-bg-2-1600.jpg" imagesrcset="assets/img/hero-bg-2-768.jpg 768w, assets/img/hero-bg-2-1600.jpg 1600w" imagesizes="100vw" as="image" fetchpriority="high">
 
   <!-- =======================================================
   * Template Name: Bootslander
@@ -152,12 +152,12 @@
 
     <!-- Hero Section -->
     <section id="hero" class="hero section dark-background">
-      <img src="assets/img/hero-bg-2.jpg" alt="" class="hero-bg" fetchpriority="high" decoding="async">
+      <img src="assets/img/hero-bg-2-1600.jpg" srcset="assets/img/hero-bg-2-768.jpg 768w, assets/img/hero-bg-2-1600.jpg 1600w" sizes="100vw" alt="" class="hero-bg" fetchpriority="high" decoding="async">
 
       <div class="container">
         <div class="row gy-4 justify-content-between">
           <div class="col-lg-4 order-lg-last hero-img" data-aos="zoom-out" data-aos-delay="100">
-            <img src="assets/img/logo.png" class="img-fluid animated" alt="">
+            <img src="assets/img/logo-optimized.png" class="img-fluid animated" alt="" decoding="async">
           </div>
 
           <div class="col-lg-6  d-flex flex-column justify-content-center" data-aos="fade-in">
@@ -212,8 +212,8 @@
             action="https://script.google.com/macros/s/AKfycbwc8GrsggUQenFkeH5wYfHPzkPDFJ0XhtHAKts27axlNDhWaYbBIhocXobu5XkNV0YN/exec"
             data-form-name="class-registration">
             <div class="registration-fields registration-lookup-fields">
-              <label><span>ค้นหาด้วยเลข 4 หลัก</span><input type="text" id="lookup-student-id" inputmode="numeric"
-                  pattern="[0-9]{4}" maxlength="4" minlength="4" autocomplete="off"></label>
+              <label><span>ค้นหาด้วยเลข 1-4 หลัก</span><input type="text" id="lookup-student-id" inputmode="numeric"
+                 pattern="[0-9]{1,4}" maxlength="4" minlength="1" autocomplete="off"></label>
             </div>
             <div id="student-result" class="student-result" aria-live="polite"></div>
             <div id="registration-lookup-actions" class="registration-actions">
@@ -382,7 +382,7 @@
               <label><span>เปิดสอบ</span><input type="datetime-local" name="openAt" required></label>
               <label><span>ปิดสอบ</span><input type="datetime-local" name="closeAt" required></label>
               <label><span>จำนวนข้อที่สุ่ม</span><input type="number" name="questionCount" min="1" required></label>
-              <label><span>สอบได้กี่ครั้ง</span><input type="number" name="attemptsAllowed" min="1" value="1" required></label>
+              <label><span>สอบได้กี่ครั้ง (เว้นว่างใช้ 1 ครั้ง; หลังเรียนสอบซ้ำจนกว่าจะผ่าน)</span><input type="number" name="attemptsAllowed" min="1" max="999" value="1"></label>
               <label><span>ช่วงสอบ</span>
                 <select name="phase" required>
                   <option value="pre-test">ก่อนเรียน</option>
@@ -399,13 +399,38 @@
                 </select>
               </label>
               <label><span>เกณฑ์ผ่าน</span>
-                <select name="passType" required>
+                <select name="passType">
+                  <option value="none" selected>ไม่กำหนด (แสดงคะแนนที่ทำได้)</option>
                   <option value="percent">เปอร์เซ็นต์ (%)</option>
                   <option value="count">จำนวนข้อ</option>
                 </select>
               </label>
-              <label><span id="quiz-pass-value-label">เกณฑ์ผ่าน (%)</span><input type="number" name="passValue" min="0" max="100" value="70" required></label>
+              <label id="quiz-pass-value-field"><span id="quiz-pass-value-label">เกณฑ์ผ่าน (%)</span><input type="number" name="passValue" min="0" max="100" value="70"></label>
             </div>
+            <fieldset class="quiz-location-settings">
+              <legend>กำหนดพื้นที่เข้าสอบ</legend>
+              <label class="quiz-location-toggle">
+                <input type="checkbox" name="locationRestricted" id="quiz-location-restricted">
+                <span>จำกัดการเข้าสอบตามพิกัด GPS</span>
+              </label>
+              <div id="quiz-location-panel" class="quiz-location-panel d-none">
+                <p class="quiz-hint">คลิกบนแผนที่เพื่อปักหมุดสนามสอบ หรือใช้ตำแหน่งปัจจุบันของอุปกรณ์ ระบบจะขออนุญาต GPS จากผู้เข้าสอบก่อนเริ่มทำข้อสอบ</p>
+                <div class="quiz-location-fields">
+                  <label><span>รัศมีพื้นที่เข้าสอบ (เมตร)</span>
+                    <input type="number" name="locationRadius" id="quiz-location-radius" min="10" max="50000" step="1" value="100">
+                  </label>
+                </div>
+                <div class="quiz-location-actions">
+                  <button type="button" id="quiz-location-use-current" class="registration-button registration-button-secondary">ใช้ตำแหน่งปัจจุบันเป็นจุดสอบ</button>
+                  <span id="quiz-location-coordinates" class="quiz-location-coordinates">ยังไม่ได้ปักหมุด</span>
+                </div>
+                <div id="quiz-location-map" class="quiz-location-map" role="application" aria-label="แผนที่กำหนดจุดและพื้นที่เข้าสอบ"></div>
+                <p class="quiz-hint">แผนที่และภาพแผนที่ให้บริการโดย OpenStreetMap และจะโหลดเมื่อเปิดใช้การจำกัดพิกัด</p>
+                <input type="hidden" name="locationLatitude" id="quiz-location-latitude">
+                <input type="hidden" name="locationLongitude" id="quiz-location-longitude">
+                <p class="quiz-hint">ตำแหน่งตรวจเมื่อเริ่มสอบเท่านั้น ค่าพิกัดอาจคลาดเคลื่อนตาม GPS และไม่สามารถป้องกันการปลอมตำแหน่งจากอุปกรณ์ได้</p>
+              </div>
+            </fieldset>
             <label class="quiz-source"><span>ไฟล์ Excel หรือ CSV</span><input type="file" id="quiz-file" accept=".xlsx,.xls,.csv"></label>
             <label class="quiz-source"><span>หรือ URL Google Sheet ที่เปิดให้ดูได้</span><input type="url" name="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/.../edit"></label>
             <p class="quiz-hint">คอลัมน์: A คำถาม, B-E ตัวเลือก 1-4, F เฉลยเป็น 1-4 หรือระบุ “ตัวเลือก 3”, G คำอธิบาย (ถ้ามี) | สำหรับแบบ “ทำได้ไหม” ใช้ตัวเลือก 1=ได้, 2=ไม่ได้ และเฉลยเป็น 1 หรือ 2</p>
@@ -463,7 +488,7 @@
           </div>
           <div id="exam-result" class="quiz-result" aria-live="polite"></div>
           <div class="registration-actions">
-            <button type="button" id="exam-retry" class="registration-button d-none">เข้าสอบใหม่</button>
+            <button type="button" id="exam-retry" class="registration-button d-none">สอบอีกครั้ง</button>
           </div>
         </div>
       </div>
@@ -481,7 +506,7 @@
     <section id="teaching-management" class="teaching-management-shell d-none" role="dialog" aria-modal="true" aria-labelledby="teaching-login-title">
       <div id="teaching-login-view" class="teaching-login-view">
         <aside class="teaching-login-brand">
-          <img src="assets/img/logo.png" alt="ตราสัญลักษณ์ Tactical Studies Section">
+          <img src="assets/img/logo-optimized.png" alt="ตราสัญลักษณ์ Tactical Studies Section" loading="lazy" decoding="async">
           <p class="teaching-management-kicker">TACTICAL STUDIES SECTION</p>
           <h1>ข้อมูลการเรียน</h1>
         </aside>
@@ -504,7 +529,7 @@
       <div id="teaching-app-view" class="teaching-app-view d-none">
         <aside class="teaching-sidebar" aria-label="เมนูระบบ">
           <a class="teaching-sidebar-brand" href="#teaching-management" aria-label="ข้อมูลการเรียน">
-            <img src="assets/img/logo.png" alt="">
+            <img src="assets/img/logo-optimized.png" alt="" loading="lazy" decoding="async">
             <span><strong>Tactical Studies</strong><small>Management</small></span>
           </a>
           <div class="teaching-sidebar-section-label">เมนูหลัก</div>
@@ -1079,7 +1104,7 @@
         <div class="col-lg-2 col-md-3 footer-links">
           <a href="https://info.flagcounter.com/LYtL"><img
               src="https://s11.flagcounter.com/count2/LYtL/bg_FFFFFF/txt_000000/border_CCCCCC/columns_2/maxflags_10/viewers_0/labels_0/pageviews_0/flags_0/percent_0/"
-              alt="Flag Counter" border="0" loading="eager"></a>
+              alt="Flag Counter" border="0" loading="lazy" decoding="async" fetchpriority="low"></a>
         </div>
 
 
@@ -1088,7 +1113,7 @@
 
     <div class="container copyright text-center ">
 
-      <img src="assets/img/logo.png" class="card-img-top" alt="Product Logo"
+      <img src="assets/img/logo-optimized.png" class="card-img-top" alt="Product Logo" loading="lazy" decoding="async"
         style="max-width: 5%; border-radius: 50%; object-fit: cover;">
       <br>
       <br>
@@ -1119,9 +1144,9 @@
   <!-- Google Sheets form handler -->
   <script defer src="assets/js/google-sheet-form.js?v=20260918-separate-forms"></script>
   <script defer src="assets/js/attendance-registration.js?v=20261004-attendance-subject"></script>
-  <script defer src="assets/js/quiz-builder.js?v=20261004-show-tactical-score-code"></script>
+  <script defer src="assets/js/quiz-builder.js?v=20261011-optional-quiz-rules"></script>
   <script defer src="assets/js/teacher-attitude.js?v=20261006-attitude-auth-feedback"></script>
-  <script defer src="assets/js/exam.js?v=20260929-posttest-80-retake"></script>
+  <script defer src="assets/js/exam.js?v=20261011-optional-quiz-rules"></script>
   <script defer src="assets/js/tactical-score.js?v=20260930-centered-copy-prompt"></script>
   <script defer src="assets/js/special-assessment.js?v=20261001-special-assessment"></script>
   <script defer src="assets/js/teaching-management.js?v=20260930-attendance-login"></script>
