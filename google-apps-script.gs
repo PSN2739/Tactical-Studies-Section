@@ -686,24 +686,45 @@ function onEdit(e) {
   if (!e || !e.range) return;
   const range = e.range;
   const sheet = range.getSheet();
-  const sheetName = sheet.getName();
-  if (range.getRow() < 2 || sheetName === 'LearningSummary') return;
+  if (sheet.getName() !== 'เจตคติ' || range.getRow() < 2
+    || range.getColumn() > 6 || range.getLastColumn() < 6) return;
+  recalculateAttitudeScoreRows_(sheet, range.getRow(), range.getNumRows());
+}
 
-  const isAttitudeEdit = sheetName === 'เจตคติ' && range.getColumn() <= 8;
-  const isLearningSourceEdit = isAttitudeEdit
-    || (sheetName === CONFIG.attendanceSheetName && range.getColumn() <= 10)
-    || (sheetName === 'QuizResults' && range.getColumn() <= 17)
-    || (sheetName === 'ScooreT' && range.getColumn() <= 29)
-    || sheetName === 'Registration'
-    || sheetName === CONFIG.specialAssessmentIndexSheetName
-    || sheetName.indexOf('Assessment_') === 0;
-  if (!isLearningSourceEdit) return;
+function setupLearningSummarySync() {
+  const spreadsheet = getRegistrationSpreadsheet_();
+  const triggers = ScriptApp.getProjectTriggers();
+  const alreadyInstalled = triggers.some((trigger) =>
+    trigger.getHandlerFunction() === 'syncLearningSummaryOnEdit'
+      && trigger.getEventType() === ScriptApp.EventType.ON_EDIT
+  );
+  if (!alreadyInstalled) {
+    ScriptApp.newTrigger('syncLearningSummaryOnEdit')
+      .forSpreadsheet(spreadsheet)
+      .onEdit()
+      .create();
+  }
+  return 'LearningSummary source-sheet sync is installed.';
+}
+
+function syncLearningSummaryOnEdit(e) {
+  if (!e || !e.range || e.range.getRow() < 2) return;
+  const sheet = e.range.getSheet();
+  const name = sheet.getName();
+  const relevant = name === 'เจตคติ'
+    || name === CONFIG.attendanceSheetName
+    || name === CONFIG.registrationSheetName
+    || name === 'QuizResults'
+    || name === 'ScooreT'
+    || name === CONFIG.specialAssessmentIndexSheetName
+    || name.indexOf('Assessment_') === 0;
+  if (!relevant || name === 'LearningSummary') return;
 
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    if (isAttitudeEdit && range.getColumn() <= 6 && range.getLastColumn() >= 6) {
-      recalculateAttitudeScoreRows_(sheet, range.getRow(), range.getNumRows());
+    if (name === 'เจตคติ' && e.range.getColumn() <= 6 && e.range.getLastColumn() >= 6) {
+      recalculateAttitudeScoreRows_(sheet, e.range.getRow(), e.range.getNumRows());
     }
     rebuildLearningSummary_();
   } finally {
