@@ -3262,6 +3262,7 @@ function getRegistrationSpreadsheet_() {
   }
 }
 
+// TODO: Confirm no legacy registration flow needs this helper before removing it.
 function createUniqueRegistrationId_(sheet) {
   const existingIds = sheet.getLastRow() > 1
     ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getDisplayValues().flat()
@@ -3289,6 +3290,7 @@ function findRegistrationDuplicates_(sheet, email, registrationId) {
   }, { email: false, registrationId: false });
 }
 
+// TODO: Confirm no legacy migration depends on this helper before removing it.
 function normalizeRegistrationLookupColumns_(sheet) {
   const rowCount = sheet.getLastRow() - 1;
   if (rowCount < 1) {
