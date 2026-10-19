@@ -74,6 +74,8 @@
     setValue('teaching-score-post', scores.postTest);
     setValue('teaching-score-knowledge', scores.knowledgeAssessment);
     setValue('teaching-score-special', scores.specialTask);
+    setValue('teaching-score-total', scores.totalScore);
+    setValue('teaching-score-net', scores.netScore);
     renderAssessments(scores.assessments);
     if (connectionState) {
       connectionState.innerHTML = '<i aria-hidden="true"></i> เชื่อมต่อแล้ว';
@@ -112,7 +114,8 @@
       }
       ['teaching-profile-id', 'teaching-profile-attendance', 'teaching-profile-battalion',
         'teaching-profile-name', 'teaching-profile-email', 'teaching-profile-episode',
-        'teaching-score-pre', 'teaching-score-post', 'teaching-score-knowledge', 'teaching-score-special']
+        'teaching-score-pre', 'teaching-score-post', 'teaching-score-knowledge', 'teaching-score-special',
+        'teaching-score-total', 'teaching-score-net']
         .forEach((id) => setValue(id, ''));
       setValue('teaching-score-attitude', '', 'ยังไม่ระบุแหล่งข้อมูล');
       renderAssessments([]);

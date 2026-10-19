@@ -4,7 +4,7 @@ Audit date: 2026-10-14
 
 ## Scope and method
 
-Scanned function declarations in `google-apps-script.gs` and `assets/js/*.js`, excluding vendor/minified assets. For each function, counted identifier text in the same file, excluding its declaration, using regex. This is a heuristic, not an AST/call graph; comments/string literals may count, and runtime/dynamic callers may not. Counts are signals, not grounds to delete by themselves. Apps Script entry points, trigger handlers, editor-invoked admin functions, and README references were checked separately.
+Scanned function declarations in `google-apps-script.gs` and `assets/js/*.js`, excluding vendor/minified assets. For each function, counted identifier text in the same file, excluding its declaration, using regex. This is a heuristic, not an AST/call graph; comments/string literals may count, and runtime/dynamic callers may not. Counts are signals, not grounds to delete by themselves. Apps Script entry points, trigger handlers, editor-invoked admin functions, and README references were checked separately. This inventory predates `ensureLearningSummaryDerivedColumns_`, which manages the LearningSummary calculations and email copy in columns O/Q.
 
 Inventory: 134 Apps Script + 134 front-end JavaScript = 268 functions. All front-end functions have at least one identifier reference within their own file.
 

@@ -41,6 +41,8 @@ const CONFIG = {
   ]
 };
 
+const LEARNING_SUMMARY_VERSION = '4';
+
 function doGet(e) {
   try {
     const params = (e && e.parameter) || {};
@@ -2676,10 +2678,14 @@ function attendanceStudentLogin_(data) {
   if (!summaryRow) {
     return jsonResponse_({ ok: false, message: 'ไม่พบข้อมูลสำหรับเข้าสู่ระบบ' });
   }
-  const row = sheet.getRange(summaryRow, 1, 1, getLearningSummaryHeaders_().length).getDisplayValues()[0];
-  const headers = getLearningSummaryHeaders_();
-  const value = (name) => normalizeValue_(row[headers.indexOf(name)]);
-  if (value('email').toLowerCase() !== email) {
+  const derivedHeaders = ['total_score', 'total_score_ratio', 'email'];
+  const headers = getLearningSummaryHeaders_().concat(derivedHeaders);
+  const row = sheet.getRange(summaryRow, 1, 1, headers.length).getDisplayValues()[0];
+  const value = (name) => {
+    const index = name === 'email' ? headers.lastIndexOf(name) : headers.indexOf(name);
+    return normalizeValue_(row[index]);
+  };
+  if (!value('email') || value('email').toLowerCase() !== email) {
     return jsonResponse_({ ok: false, message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
   }
   let assessments;
@@ -2706,6 +2712,8 @@ function attendanceStudentLogin_(data) {
         postTest: value('post_test'),
         knowledgeAssessment: value('knowledge_assessment'),
         specialTask: value('special_task'),
+        totalScore: value('total_score'),
+        netScore: value('total_score_ratio'),
         assessments: assessments
       }
     }
@@ -2718,6 +2726,56 @@ function getLearningSummaryHeaders_() {
     'email', 'episode', 'attitude', 'pre_test', 'post_test', 'knowledge_assessment',
     'special_task', 'assessments', 'updated_at'
   ];
+}
+
+function ensureLearningSummaryDerivedColumns_(sheet) {
+  const totalColumn = 15;
+  const ratioColumn = 16;
+  const emailColumn = 17;
+  ensureSheetColumns_(sheet, emailColumn);
+  sheet.getRange(1, totalColumn).setValue('total_score').setFontWeight('bold');
+  sheet.getRange(1, ratioColumn).setValue('total_score_ratio').setFontWeight('bold');
+
+  const totalFormula = '=ARRAYFORMULA(IF(A2:A="","",IFERROR(VALUE(H2:H),0)+IFERROR(VALUE(I2:I),0)+IFERROR(VALUE(J2:J),0)+IFERROR(VALUE(K2:K),0)+IFERROR(VALUE(L2:L),0)))';
+  const totalFormulaCell = sheet.getRange(2, totalColumn);
+  if (totalFormulaCell.getFormula() !== totalFormula) {
+    sheet.getRange(2, totalColumn, sheet.getMaxRows() - 1, 1).clearContent();
+    totalFormulaCell.setFormula(totalFormula);
+  }
+  sheet.getRange(2, totalColumn, sheet.getMaxRows() - 1, 1).setNumberFormat('0.##');
+
+  const ratioFormula = '=ARRAYFORMULA(IF(A2:A="","",IFERROR(VALUE(O2:O)/100,0)))';
+  const ratioFormulaCell = sheet.getRange(2, ratioColumn);
+  if (ratioFormulaCell.getFormula() !== ratioFormula) {
+    sheet.getRange(2, ratioColumn, sheet.getMaxRows() - 1, 1).clearContent();
+    ratioFormulaCell.setFormula(ratioFormula);
+  }
+  sheet.getRange(2, ratioColumn, sheet.getMaxRows() - 1, 1).setNumberFormat('0.##');
+
+  const emailHeader = sheet.getRange(1, emailColumn).getDisplayValue();
+  const emailFormula = '=ARRAYFORMULA(IF(A2:A="","",F2:F))';
+  const emailFormulaCell = sheet.getRange(2, emailColumn);
+  const existingEmailFormula = emailFormulaCell.getFormula();
+  const previousTotalFormula = totalFormula;
+  const hasUnlabeledEmailValues = !emailHeader && !existingEmailFormula && sheet.getLastRow() > 1
+    && sheet.getRange(2, emailColumn, sheet.getLastRow() - 1, 1)
+      .getDisplayValues().some((row) => normalizeValue_(row[0]));
+  if (hasUnlabeledEmailValues) {
+    throw new Error('พบข้อมูลในคอลัมน์ Q ที่ไม่มีหัวข้อ กรุณาตรวจสอบก่อนติดตั้งคอลัมน์ email');
+  }
+  if (emailHeader && emailHeader !== 'email'
+    && !(emailHeader === 'total_score' && existingEmailFormula === previousTotalFormula)) {
+    throw new Error('คอลัมน์ Q ใน LearningSummary มีข้อมูลหรือหัวข้อที่ไม่คาดหมาย กรุณาตรวจสอบก่อนติดตั้งคอลัมน์ email');
+  }
+  if (existingEmailFormula && existingEmailFormula !== emailFormula
+    && existingEmailFormula !== previousTotalFormula) {
+    throw new Error('พบสูตรที่ไม่รู้จักในคอลัมน์ Q ของ LearningSummary กรุณาตรวจสอบก่อนติดตั้งคอลัมน์ email');
+  }
+  sheet.getRange(1, emailColumn).setValue('email').setFontWeight('bold');
+  if (existingEmailFormula !== emailFormula) {
+    sheet.getRange(2, emailColumn, sheet.getMaxRows() - 1, 1).clearContent();
+    emailFormulaCell.setFormula(emailFormula);
+  }
 }
 
 function getAttendanceHeaders_() {
@@ -2745,7 +2803,7 @@ function ensureLearningSummaryInitialized_() {
       ? sheet.getRange(1, 1, 1, expectedHeaders.length).getDisplayValues()[0]
       : [];
     const initialized = PropertiesService.getScriptProperties()
-      .getProperty('LEARNING_SUMMARY_VERSION') === '1';
+      .getProperty('LEARNING_SUMMARY_VERSION') === LEARNING_SUMMARY_VERSION;
     if (!initialized || currentHeaders.join('\u001f') !== expectedHeaders.join('\u001f')) {
       rebuildLearningSummary_();
     }
@@ -2959,7 +3017,8 @@ function rebuildLearningSummary_() {
     sheet.getRange(requiredRows + 1, 1, previousLastRow - requiredRows, headers.length).clearContent();
   }
   sheet.setFrozenRows(1);
-  PropertiesService.getScriptProperties().setProperty('LEARNING_SUMMARY_VERSION', '1');
+  ensureLearningSummaryDerivedColumns_(sheet);
+  PropertiesService.getScriptProperties().setProperty('LEARNING_SUMMARY_VERSION', LEARNING_SUMMARY_VERSION);
 }
 
 function findLearningSummaryRowByPersonalId_(sheet, personalId) {
