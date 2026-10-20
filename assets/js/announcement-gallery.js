@@ -272,8 +272,8 @@
   const nextButton = document.getElementById('announcement-gallery-next');
   const autoplayButton = document.getElementById('announcement-gallery-autoplay');
   const downloadButton = document.getElementById('announcement-gallery-download');
-  const downloadNotice = document.getElementById('announcement-gallery-download-notice');
-  const downloadNoticeClose = document.getElementById('announcement-gallery-download-notice-close');
+  const downloadPopup = document.getElementById('announcement-gallery-download-popup');
+  const downloadCloseButton = document.getElementById('announcement-gallery-download-close');
   const imageElement = document.getElementById('announcement-gallery-image');
   const counter = document.getElementById('announcement-gallery-counter');
   const status = document.getElementById('announcement-gallery-status');
@@ -293,20 +293,20 @@
     status.classList.toggle('d-none', !message);
   }
 
-  function closeDownloadNotice() {
-    downloadNotice.classList.add('d-none');
+  function closeDownloadPopup() {
+    downloadPopup.classList.add('d-none');
     downloadButton.setAttribute('aria-expanded', 'false');
     downloadButton.focus();
   }
 
   downloadButton.addEventListener('click', () => {
-    downloadNotice.classList.remove('d-none');
+    downloadPopup.classList.remove('d-none');
     downloadButton.setAttribute('aria-expanded', 'true');
-    downloadNoticeClose.focus();
+    downloadCloseButton.focus();
   });
-  downloadNoticeClose.addEventListener('click', closeDownloadNotice);
-  downloadNotice.addEventListener('click', (event) => {
-    if (event.target === downloadNotice) closeDownloadNotice();
+  downloadCloseButton.addEventListener('click', closeDownloadPopup);
+  downloadPopup.addEventListener('click', (event) => {
+    if (event.target === downloadPopup) closeDownloadPopup();
   });
 
   function stopAutoplay() {
@@ -457,8 +457,8 @@
   });
   document.addEventListener('keydown', (event) => {
     if (popup.classList.contains('d-none')) return;
-    if (event.key === 'Escape' && !downloadNotice.classList.contains('d-none')) {
-      closeDownloadNotice();
+    if (event.key === 'Escape' && !downloadPopup.classList.contains('d-none')) {
+      closeDownloadPopup();
       return;
     }
     if (event.key === 'Escape') closeGallery();
