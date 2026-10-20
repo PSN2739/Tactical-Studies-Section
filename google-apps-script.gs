@@ -38,10 +38,35 @@ const CONFIG = {
     'email',
     'episode',
     'form_name'
+  ],
+  dataRegistrationHeaders: [
+    'registration_email',
+    'registration_id',
+    'registration_episode',
+    'registration_registered_at'
+  ],
+  dataAttendanceHeaders: [
+    'registered_at',
+    'form_name',
+    'attendance_form_name'
+  ],
+  attendanceSubjects: [
+    'รูปขบวน หมู่ ปล.',
+    'แบบฝึกทำการรบ',
+    'MOUT',
+    'ตั้งรับ',
+    'ระเบียบนำหน่วย คำสั่งฯ',
+    'รบด้วยวิธีรุก-ตีกลางวัน',
+    'ป้อมสนาม',
+    'ถอนตัว',
+    'เครื่องกีดขวาง',
+    'รบด้วยวิธีรุก-ตีกลางคืน',
+    'Unit School',
+    'Drone Tactical'
   ]
 };
 
-const LEARNING_SUMMARY_VERSION = '4';
+const LEARNING_SUMMARY_VERSION = '5';
 
 function doGet(e) {
   try {
@@ -206,6 +231,40 @@ function doPost(e) {
       });
     }
 
+    const student = findStudentRecord_(lookupId);
+    if (!student) {
+      return jsonResponse_({
+        ok: false,
+        message: 'ไม่พบหมายเลขประจำตัวในชีต Data'
+      });
+    }
+    if (student.ambiguous) {
+      return jsonResponse_({
+        ok: false,
+        message: 'พบเลขค้นหานี้ซ้ำในชีต Data กรุณาแจ้งผู้ดูแลตรวจสอบก่อนลงทะเบียน'
+      });
+    }
+
+    const spreadsheet = getRegistrationSpreadsheet_();
+    const dataSheet = getSourceSheet_();
+    const dataColumns = ensureDataRegistrationColumns_(dataSheet);
+    const registrationRange = dataSheet.getRange(
+      student.rowNumber,
+      dataColumns.email,
+      1,
+      dataColumns.registeredAt - dataColumns.email + 1
+    );
+    const existingRegistration = registrationRange.getDisplayValues()[0];
+    const registrationFormulas = registrationRange.getFormulas()[0];
+    if (existingRegistration.some((value) => normalizeValue_(value) !== '')
+      || registrationFormulas.some(Boolean)) {
+      return jsonResponse_({
+        ok: false,
+        code: 'DUPLICATE_REGISTRATION',
+        message: 'ท่านได้ลงทะเบียนแล้ว'
+      });
+    }
+
     if (!/^\d{13}$/.test(registrationId)) {
       return jsonResponse_({
         ok: false,
@@ -231,16 +290,13 @@ function doPost(e) {
       });
     }
 
-    const student = findStudentRecord_(lookupId);
-    if (!student) {
-      return jsonResponse_({
-        ok: false,
-        message: 'ไม่พบหมายเลขประจำตัวในชีต Data'
-      });
-    }
-
-    const sheet = getOrCreateRegistrationSheet_();
-    const duplicates = findRegistrationDuplicates_(sheet, email, registrationId);
+    const registrationSheet = spreadsheet.getSheetByName(CONFIG.registrationSheetName);
+    const dataDuplicates = findDataRegistrationDuplicates_(dataSheet, dataColumns, email, registrationId);
+    const legacyDuplicates = findRegistrationDuplicates_(registrationSheet, email, registrationId);
+    const duplicates = {
+      email: dataDuplicates.email || legacyDuplicates.email,
+      registrationId: dataDuplicates.registrationId || legacyDuplicates.registrationId
+    };
     if (duplicates.email || duplicates.registrationId) {
       const duplicateFields = [];
       if (duplicates.email) duplicateFields.push('อีเมลนี้');
@@ -252,22 +308,10 @@ function doPost(e) {
       });
     }
 
-    const nextRow = sheet.getLastRow() + 1;
-    sheet.getRange(nextRow, 1, 1, 1).setNumberFormat('@');
-    sheet.getRange(nextRow, CONFIG.lookupIdColumn, 1, 2).setNumberFormat('@');
-    sheet.getRange(nextRow, 1, 1, CONFIG.registrationHeaders.length).setValues([[
-      registrationId,
-      new Date(),
-      lookupId,
-      lookupId,
-      student.columns[1].value,
-      student.columns[2].value,
-      student.columns[3].value,
-      email,
-      episode,
-      normalizeValue_(data.formName) || 'class-registration'
-    ]]);
-    sortRegistrationSheet_(sheet);
+    const registeredAt = new Date();
+    writeDataRegistrationFields_(dataSheet, student.rowNumber, dataColumns, [
+      email, registrationId, episode, registeredAt
+    ]);
 
     return jsonResponse_({
       ok: true,
@@ -1681,25 +1725,42 @@ function saveAttendance_(data) {
   const registrationId = normalizeValue_(data.registrationId);
   const attendanceFormName = normalizeValue_(data.attendanceFormName);
   const attendanceSubject = normalizeValue_(data.attendanceSubject);
-  const validSubjects = [
-    'รูปขบวน หมู่ ปล.',
-    'แบบฝึกทำการรบ',
-    'MOUT',
-    'ตั้งรับ',
-    'ระเบียบนำหน่วย คำสั่งฯ',
-    'รบด้วยวิธีรุก-ตีกลางวัน',
-    'ป้อมสนาม',
-    'ถอนตัว',
-    'เครื่องกีดขวาง',
-    'รบด้วยวิธีรุก-ตีกลางคืน',
-    'Unit School',
-    'Drone Tactical'
-  ];
 
   if (!/^\d{13}$/.test(registrationId)) {
     return jsonResponse_({
       ok: false,
       message: 'กรุณาระบุหมายเลขประจำตัวให้ครบ 13 หลัก'
+    });
+  }
+
+  const source = findDataAttendanceStudent_(registrationId);
+  if (!source) {
+    return jsonResponse_({
+      ok: false,
+      message: 'ไม่พบหมายเลขประจำตัวในคอลัมน์ F ของชีต Data'
+    });
+  }
+  if (source.ambiguous) {
+    return jsonResponse_({
+      ok: false,
+      message: 'พบหมายเลขประจำตัวซ้ำในคอลัมน์ F ของชีต Data กรุณาแจ้งผู้ดูแลตรวจสอบ'
+    });
+  }
+
+  const dataSheet = getSourceSheet_();
+  const attendanceColumns = ensureDataAttendanceColumns_(dataSheet);
+  const existingAttendance = getDataAttendanceRecord_(dataSheet, source.rowNumber, attendanceColumns);
+  const attendanceFormulas = dataSheet.getRange(
+    source.rowNumber,
+    9,
+    1,
+    CONFIG.dataAttendanceHeaders.length
+  ).getFormulas()[0];
+  if (existingAttendance.some((value) => value !== '') || attendanceFormulas.some(Boolean)) {
+    return jsonResponse_({
+      ok: false,
+      code: 'DUPLICATE_ATTENDANCE',
+      message: 'ท่านได้ลงทะเบียนแล้ว'
     });
   }
 
@@ -1709,44 +1770,23 @@ function saveAttendance_(data) {
       message: 'กรุณาเลือกครั้งที่ 1-4'
     });
   }
-  if (validSubjects.indexOf(attendanceSubject) === -1) {
+  if (CONFIG.attendanceSubjects.indexOf(attendanceSubject) === -1) {
     return jsonResponse_({
       ok: false,
       message: 'กรุณาเลือกเรื่องจากรายการ'
     });
   }
 
-  const source = findRegistrationRecord_(registrationId);
-  if (!source) {
-    return jsonResponse_({
-      ok: false,
-      message: 'ไม่พบหมายเลขประจำตัวในชีต Registration'
-    });
-  }
-
-  const sheet = getOrCreateAttendanceSheet_();
-  if (attendanceDuplicateExists_(sheet, source.values[0], attendanceFormName, attendanceSubject)) {
-    return jsonResponse_({
-      ok: false,
-      code: 'DUPLICATE_ATTENDANCE',
-      message: 'ข้อมูลนี้ลงทะเบียนไว้แล้ว'
-    });
-  }
-
-  const attendanceValues = source.values.slice();
-  attendanceValues.splice(CONFIG.registrationHeaders.indexOf('email') + 1, 0, attendanceSubject);
-  attendanceValues[CONFIG.registrationHeaders.indexOf('form_name') + 1] = attendanceSubject;
-  const nextRow = sheet.getLastRow() + 1;
-  sheet.getRange(nextRow, CONFIG.lookupIdColumn, 1, 2).setNumberFormat('@');
-  sheet.getRange(nextRow, 1, 1, attendanceValues.length + 1)
-    .setValues([attendanceValues.concat([attendanceFormName])]);
+  const registeredAt = new Date().toISOString();
+  appendDataAttendanceRecord_(
+    dataSheet,
+    source.rowNumber,
+    existingAttendance,
+    [registeredAt, attendanceSubject, attendanceFormName]
+  );
   updateLearningSummaryAfterSourceWrite_(() => {
-    syncLearningSummaryAttendance_(
-      getAttendanceHeaders_(),
-      attendanceValues.concat([attendanceFormName])
-    );
+    syncLearningSummaryAttendance_(CONFIG.registrationHeaders, source.values, registeredAt);
   });
-  sortAttendanceSheet_(sheet);
   return jsonResponse_({
     ok: true,
     registrationId: registrationId,
@@ -1761,6 +1801,345 @@ function setupRegistrationSheet() {
   normalizeAllLookupIds();
   sortRegistrationSheet_(sheet);
   return 'Registration sheet is ready.';
+}
+
+function migrateRegistrationToData() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const registrationSheet = getRegistrationSpreadsheet_().getSheetByName(CONFIG.registrationSheetName);
+    if (!registrationSheet) throw new Error('ไม่พบชีต Registration');
+    if (registrationSheet.getLastColumn() < 1 || registrationSheet.getLastRow() < 2) {
+      return 'ไม่พบข้อมูลสำหรับย้ายในชีต Registration';
+    }
+    const dataSheet = getSourceSheet_();
+    const dataColumns = ensureDataRegistrationColumns_(dataSheet);
+    const registrationValues = registrationSheet.getDataRange().getValues();
+    const registrationHeaders = registrationSheet.getRange(1, 1, 1, registrationSheet.getLastColumn())
+      .getDisplayValues()[0].map((header) => normalizeValue_(header).toLowerCase());
+    const registrationIndexes = {
+      registrationId: registrationHeaders.indexOf('registration_id'),
+      registeredAt: registrationHeaders.indexOf('registered_at'),
+      lookupId: registrationHeaders.indexOf('lookup_id'),
+      email: registrationHeaders.indexOf('email'),
+      episode: registrationHeaders.indexOf('episode')
+    };
+    if (Object.keys(registrationIndexes).some((key) => registrationIndexes[key] < 0)) {
+      throw new Error('หัวคอลัมน์ใน Registration ไม่ครบ กรุณาตรวจสอบก่อนย้ายข้อมูล');
+    }
+
+    const dataLastRow = dataSheet.getLastRow();
+    const dataWidth = Math.max(4, dataSheet.getLastColumn());
+    const dataValues = dataLastRow > 0
+      ? dataSheet.getRange(1, 1, dataLastRow, dataWidth).getValues()
+      : [];
+    const dataLookupIds = dataLastRow > 1
+      ? dataSheet.getRange(2, 1, dataLastRow - 1, 1).getDisplayValues()
+      : [];
+    const dataRowsByLookup = new Map();
+    dataLookupIds.forEach((row, index) => {
+      const lookupId = normalizeLookupId_(row[0]);
+      if (!lookupId) return;
+      if (!dataRowsByLookup.has(lookupId)) dataRowsByLookup.set(lookupId, []);
+      dataRowsByLookup.get(lookupId).push(index + 2);
+    });
+
+    const report = {
+      migrated: 0,
+      alreadyPresent: 0,
+      noDataMatch: 0,
+      duplicateRegistrationLookup: 0,
+      duplicateDataLookup: 0,
+      conflictingData: 0,
+      invalidRegistration: 0
+    };
+    const registrationsByLookup = new Map();
+    registrationValues.slice(1).forEach((row) => {
+      const lookupId = normalizeLookupId_(row[registrationIndexes.lookupId]);
+      const registrationId = normalizeValue_(row[registrationIndexes.registrationId]).replace(/^'/, '');
+      const email = normalizeValue_(row[registrationIndexes.email]);
+      const episode = normalizeValue_(row[registrationIndexes.episode]);
+      if (!lookupId || !registrationId || !isValidEmail_(email)
+        || !/^ตอนที่ (?:[1-9]|1[0-8])$/.test(episode)) {
+        if (row.some((value) => normalizeValue_(value))) report.invalidRegistration += 1;
+        if (lookupId) {
+          if (!registrationsByLookup.has(lookupId)) registrationsByLookup.set(lookupId, []);
+          registrationsByLookup.get(lookupId).push({ valid: false });
+        }
+        return;
+      }
+      if (!registrationsByLookup.has(lookupId)) registrationsByLookup.set(lookupId, []);
+      registrationsByLookup.get(lookupId).push({
+        valid: true,
+        email: email,
+        registrationId: registrationId,
+        episode: episode,
+        registeredAt: row[registrationIndexes.registeredAt]
+      });
+    });
+
+    const pendingUpdates = [];
+    registrationsByLookup.forEach((registrations, lookupId) => {
+      if (registrations.length !== 1) {
+        report.duplicateRegistrationLookup += registrations.length;
+        return;
+      }
+      const registration = registrations[0];
+      if (!registration.valid) return;
+      const matches = dataRowsByLookup.get(lookupId) || [];
+      if (!matches.length) {
+        report.noDataMatch += 1;
+        return;
+      }
+      if (matches.length !== 1) {
+        report.duplicateDataLookup += 1;
+        return;
+      }
+
+      const dataRow = matches[0];
+      const sourceValues = [
+        registration.email,
+        registration.registrationId,
+        registration.episode,
+        registration.registeredAt
+      ];
+      const targetColumns = [
+        dataColumns.email,
+        dataColumns.registrationId,
+        dataColumns.episode,
+        dataColumns.registeredAt
+      ];
+      const currentValues = targetColumns.map((column) => dataValues[dataRow - 1][column - 1]);
+      const conflicts = sourceValues.some((sourceValue, index) =>
+        normalizeValue_(sourceValue) !== ''
+        && normalizeValue_(currentValues[index]) !== ''
+        && !(index === 0
+          ? normalizeValue_(sourceValue).toLowerCase() === normalizeValue_(currentValues[index]).toLowerCase()
+          : areRegistrationValuesEqual_(sourceValue, currentValues[index], index === 3)));
+      if (conflicts) {
+        report.conflictingData += 1;
+        return;
+      }
+
+      const valuesToWrite = sourceValues.map((sourceValue, index) =>
+        normalizeValue_(currentValues[index]) === '' ? sourceValue : currentValues[index]);
+      if (valuesToWrite.every((value, index) =>
+        normalizeValue_(value) === normalizeValue_(currentValues[index]))) {
+        report.alreadyPresent += 1;
+        return;
+      }
+      pendingUpdates.push({ rowNumber: dataRow, values: valuesToWrite });
+    });
+
+    if (pendingUpdates.length) {
+      const firstRow = Math.min.apply(null, pendingUpdates.map((item) => item.rowNumber));
+      const lastRow = Math.max.apply(null, pendingUpdates.map((item) => item.rowNumber));
+      const columnGroups = groupContiguousColumns_([
+        dataColumns.email,
+        dataColumns.registrationId,
+        dataColumns.episode,
+        dataColumns.registeredAt
+      ]);
+      const columnWrites = [];
+      columnGroups.forEach((group) => {
+        const range = dataSheet.getRange(firstRow, group.start, lastRow - firstRow + 1, group.columns.length);
+        const existingValues = range.getValues();
+        const formulas = range.getFormulas();
+        if (formulas.some((row) => row.some(Boolean))) {
+          throw new Error('พบสูตรในคอลัมน์ข้อมูลลงทะเบียนของชีต Data กรุณาตรวจสอบก่อนย้ายข้อมูล');
+        }
+        pendingUpdates.forEach((update) => {
+          const rowIndex = update.rowNumber - firstRow;
+          group.columns.forEach((column, groupIndex) => {
+            const registrationIndex = [
+              dataColumns.email,
+              dataColumns.registrationId,
+              dataColumns.episode,
+              dataColumns.registeredAt
+            ].indexOf(column);
+            const incomingValue = update.values[registrationIndex];
+            if (normalizeValue_(existingValues[rowIndex][groupIndex]) === ''
+              && normalizeValue_(incomingValue) !== '') {
+              existingValues[rowIndex][groupIndex] = incomingValue;
+            }
+          });
+        });
+        columnWrites.push({ range: range, values: existingValues });
+      });
+      columnWrites.forEach((write) => write.range.setValues(write.values));
+      report.migrated = pendingUpdates.length;
+    }
+
+    const result = [
+      'ย้ายข้อมูล Registration ไป Data เสร็จแล้ว',
+      'ย้ายใหม่: ' + report.migrated,
+      'มีข้อมูลอยู่แล้ว: ' + report.alreadyPresent,
+      'ไม่พบเลขที่ใน Data: ' + report.noDataMatch,
+      'เลขค้นหาซ้ำใน Registration (ข้าม): ' + report.duplicateRegistrationLookup,
+      'เลขค้นหาซ้ำใน Data (ข้าม): ' + report.duplicateDataLookup,
+      'ข้อมูลปลายทางขัดแย้ง (ข้าม): ' + report.conflictingData,
+      'ข้อมูล Registration ไม่ครบ (ข้าม): ' + report.invalidRegistration
+    ].join('\n');
+    Logger.log(result);
+    return result;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function migrateAttendanceToData() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const spreadsheet = getRegistrationSpreadsheet_();
+    const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
+    if (!attendanceSheet || attendanceSheet.getLastRow() < 2) {
+      return 'ไม่พบข้อมูลสำหรับย้ายในชีต Attendance';
+    }
+
+    const dataSheet = getSourceSheet_();
+    const dataColumns = getDataRegistrationColumns_(dataSheet);
+    if (dataColumns.registrationId !== 6) {
+      throw new Error('คอลัมน์ F ของชีต Data ต้องเป็น registration_id ก่อนย้ายข้อมูล Attendance');
+    }
+    const attendanceColumns = ensureDataAttendanceColumns_(dataSheet);
+    const dataLastRow = dataSheet.getLastRow();
+    const dataValues = dataSheet.getRange(1, 1, dataLastRow, dataSheet.getLastColumn()).getDisplayValues();
+    const dataAttendanceRange = dataLastRow > 1
+      ? dataSheet.getRange(2, 9, dataLastRow - 1, CONFIG.dataAttendanceHeaders.length)
+      : null;
+    const dataAttendanceValues = dataAttendanceRange
+      ? dataAttendanceRange.getDisplayValues().map((row) => row.map((value) => normalizeValue_(value)))
+      : [];
+    const dataAttendanceFormulas = dataAttendanceRange
+      ? dataAttendanceRange.getFormulas()
+      : [];
+    const dataRowsByRegistrationId = new Map();
+    dataValues.slice(1).forEach((row, index) => {
+      const registrationId = normalizeValue_(row[5]).replace(/^'/, '');
+      if (!registrationId) return;
+      if (!dataRowsByRegistrationId.has(registrationId)) {
+        dataRowsByRegistrationId.set(registrationId, []);
+      }
+      dataRowsByRegistrationId.get(registrationId).push(index + 2);
+    });
+
+    const attendanceValues = attendanceSheet.getDataRange().getDisplayValues();
+    const attendanceHeaders = attendanceValues[0].map((header) => normalizeValue_(header).toLowerCase());
+    const indexes = {
+      registrationId: attendanceHeaders.indexOf('registration_id'),
+      registeredAt: attendanceHeaders.indexOf('registered_at'),
+      formName: attendanceHeaders.indexOf('form_name'),
+      attendanceFormName: attendanceHeaders.indexOf('attendance_form_name')
+    };
+    if (Object.keys(indexes).some((key) => indexes[key] < 0)) {
+      throw new Error('หัวคอลัมน์ใน Attendance ไม่ครบ ต้องมี registration_id, registered_at, form_name และ attendance_form_name');
+    }
+
+    const report = {
+      migrated: 0,
+      alreadyPresent: 0,
+      noDataMatch: 0,
+      duplicateDataId: 0,
+      duplicateAttendance: 0,
+      invalidAttendance: 0
+    };
+    const rowsToUpdate = new Map();
+    const seenAttendance = new Set();
+    attendanceValues.slice(1).forEach((row) => {
+      const registrationId = normalizeValue_(row[indexes.registrationId]).replace(/^'/, '');
+      const registeredAt = normalizeValue_(row[indexes.registeredAt]);
+      const formName = normalizeValue_(row[indexes.formName]);
+      const attendanceFormName = normalizeValue_(row[indexes.attendanceFormName]);
+      if (!registrationId && !registeredAt && !formName && !attendanceFormName) return;
+      if (!/^\d{13}$/.test(registrationId)
+        || !registeredAt
+        || CONFIG.attendanceSubjects.indexOf(formName) < 0
+        || !/^ครั้งที่ [1-4]$/.test(attendanceFormName)) {
+        report.invalidAttendance += 1;
+        return;
+      }
+
+      const eventKey = registrationId + ':' + formName + ':' + attendanceFormName;
+      if (seenAttendance.has(eventKey)) {
+        report.duplicateAttendance += 1;
+        return;
+      }
+      seenAttendance.add(eventKey);
+
+      const dataRows = dataRowsByRegistrationId.get(registrationId) || [];
+      if (!dataRows.length) {
+        report.noDataMatch += 1;
+        return;
+      }
+      if (dataRows.length !== 1) {
+        report.duplicateDataId += 1;
+        return;
+      }
+      const rowNumber = dataRows[0];
+      if (!rowsToUpdate.has(rowNumber)) {
+        const current = CONFIG.dataAttendanceHeaders.map((header) =>
+          dataAttendanceValues[rowNumber - 2][attendanceColumns.get(header) - 9]);
+        rowsToUpdate.set(rowNumber, {
+          current: current,
+          records: [],
+          seen: getAttendanceRecordKeys_(current)
+        });
+      }
+      const update = rowsToUpdate.get(rowNumber);
+      const recordKey = getAttendanceRecordKey_(formName, attendanceFormName);
+      if (update.seen.has(recordKey)) {
+        report.alreadyPresent += 1;
+        return;
+      }
+      update.seen.add(recordKey);
+      update.records.push([registeredAt, formName, attendanceFormName]);
+    });
+
+    const changedRows = [];
+    rowsToUpdate.forEach((update, rowNumber) => {
+      if (!update.records.length) return;
+      const rowIndex = rowNumber - 2;
+      if (dataAttendanceFormulas[rowIndex].some(Boolean)) {
+        throw new Error('พบสูตรในคอลัมน์ I:K ของชีต Data กรุณาตรวจสอบก่อนย้ายข้อมูล');
+      }
+      let values = update.current;
+      update.records.forEach((record) => {
+        values = values.map((value, index) =>
+          value ? value + '\n' + record[index] : record[index]);
+      });
+      changedRows.push({ rowNumber: rowNumber, values: values });
+      report.migrated += update.records.length;
+    });
+
+    changedRows.sort((left, right) => left.rowNumber - right.rowNumber);
+    for (let index = 0; index < changedRows.length;) {
+      const first = index;
+      while (index + 1 < changedRows.length
+        && changedRows[index + 1].rowNumber === changedRows[index].rowNumber + 1) {
+        index += 1;
+      }
+      const rows = changedRows.slice(first, index + 1);
+      dataSheet.getRange(rows[0].rowNumber, 9, rows.length, CONFIG.dataAttendanceHeaders.length)
+        .setNumberFormat('@')
+        .setValues(rows.map((row) => row.values));
+      index += 1;
+    }
+
+    const result = [
+      'ย้ายข้อมูล Attendance ไป Data เสร็จแล้ว',
+      'ย้ายใหม่: ' + report.migrated,
+      'มีข้อมูลอยู่แล้ว: ' + report.alreadyPresent,
+      'ไม่พบเลขประจำตัวใน Data: ' + report.noDataMatch,
+      'เลขประจำตัวซ้ำใน Data (ข้าม): ' + report.duplicateDataId,
+      'รายการ Attendance ซ้ำ (ข้าม): ' + report.duplicateAttendance,
+      'ข้อมูล Attendance ไม่ครบหรือไม่ถูกต้อง (ข้าม): ' + report.invalidAttendance
+    ].join('\n');
+    Logger.log(result);
+    return result;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function normalizeAllLookupIds() {
@@ -1959,6 +2338,7 @@ function submitTacticalScores_(data) {
 
     const student = findStudentRecord_(lookupId);
     if (!student) return jsonResponse_({ ok: false, message: 'ไม่พบเลขที่ ' + lookupId + ' ในชีต Data' });
+    if (student.ambiguous) return jsonResponse_({ ok: false, message: 'พบเลขที่ ' + lookupId + ' ซ้ำในชีต Data กรุณาแจ้งผู้ดูแล' });
     if (!Array.isArray(entry.scores) || entry.scores.length !== 25) {
       return jsonResponse_({ ok: false, message: 'ข้อมูลคะแนนต้องมี 25 ช่องต่อคน' });
     }
@@ -2297,16 +2677,19 @@ function getTeacherDashboard_(token) {
     .filter(Boolean));
   const tacticalScoreCode = getCurrentTacticalScoreAccessCode_();
 
-  const registrationCount = countUniqueLearnersInSheet_(spreadsheet.getSheetByName(CONFIG.registrationSheetName));
-  const attendanceCount = countUniqueLearnersInSheet_(
-    spreadsheet.getSheetByName(CONFIG.attendanceSheetName),
-    'subject',
+  const registrationCount = countUniqueRegistrationLearners_(spreadsheet);
+  const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
+  const dataSheet = spreadsheet.getSheetByName(CONFIG.sourceSheetName);
+  const attendanceCount = countUniqueAttendanceLearners_(
+    attendanceSheet,
+    dataSheet,
     'รบด้วยวิธีรุก-ตีกลางวัน'
   );
   const attendanceByEpisode = countUniqueLearnersByEpisode_(
-    spreadsheet.getSheetByName(CONFIG.attendanceSheetName),
+    attendanceSheet,
     'รบด้วยวิธีรุก-ตีกลางวัน',
-    spreadsheet.getSheetByName(CONFIG.registrationSheetName)
+    spreadsheet.getSheetByName(CONFIG.registrationSheetName),
+    dataSheet
   );
 
   return jsonResponse_({
@@ -2358,16 +2741,100 @@ function countUniqueLearnersInSheet_(sheet, filterHeader, filterValue) {
   return learners.size;
 }
 
-function countUniqueLearnersByEpisode_(sheet, subject, registrationSheet) {
+function countUniqueAttendanceLearners_(attendanceSheet, dataSheet, subject) {
+  const learners = new Set();
+  if (attendanceSheet && attendanceSheet.getLastRow() > 1) {
+    const values = attendanceSheet.getDataRange().getDisplayValues();
+    const headers = values[0].map((header) => normalizeValue_(header).toLowerCase());
+    const learnerIndex = headers.indexOf('lookup_id');
+    const subjectIndex = headers.indexOf('subject');
+    if (learnerIndex >= 0 && subjectIndex >= 0) {
+      values.slice(1).forEach((row) => {
+        const learnerId = normalizeLookupId_(row[learnerIndex]);
+        if (learnerId && normalizeValue_(row[subjectIndex]) === subject) learners.add(learnerId);
+      });
+    }
+  }
+
+  if (dataSheet && dataSheet.getLastRow() > 1) {
+    const dataRows = dataSheet.getDataRange().getDisplayValues();
+    const headers = dataRows[0].map((header) => normalizeValue_(header));
+    const lookupIds = dataRows.slice(1).map((row) => normalizeLookupId_(row[0]));
+    const formNameIndex = headers.indexOf('form_name');
+    const attendanceFormNameIndex = headers.indexOf('attendance_form_name');
+    if (formNameIndex >= 0 && attendanceFormNameIndex >= 0) {
+      dataRows.slice(1).forEach((row, index) => {
+        if (dataHasAttendanceForm_(row, formNameIndex, attendanceFormNameIndex, subject)) {
+          learners.add(lookupIds[index]);
+        }
+      });
+    }
+  }
+  learners.delete('');
+  return learners.size;
+}
+
+function dataHasAttendanceForm_(row, formNameIndex, attendanceFormNameIndex, subject) {
+  const formNames = normalizeValue_(row[formNameIndex]).split(/\r?\n/).filter(Boolean);
+  const attendanceFormNames = normalizeValue_(row[attendanceFormNameIndex]).split(/\r?\n/).filter(Boolean);
+  if (formNames.length !== attendanceFormNames.length) {
+    throw new Error('ข้อมูล Attendance ในคอลัมน์ J:K ไม่ตรงจำนวนรายการ กรุณาตรวจสอบ');
+  }
+  return formNames.some((formName, index) =>
+    formName === subject && /^ครั้งที่ [1-4]$/.test(attendanceFormNames[index]));
+}
+
+function countUniqueRegistrationLearners_(spreadsheet) {
+  const learners = new Set();
+  const dataSheet = spreadsheet.getSheetByName(CONFIG.sourceSheetName);
+  if (dataSheet && dataSheet.getLastRow() > 1) {
+    const columns = getDataRegistrationColumns_(dataSheet);
+    if (columns.registrationId > 0) {
+      const lookupIds = dataSheet.getRange(2, 1, dataSheet.getLastRow() - 1, 1).getDisplayValues();
+      const personalIds = dataSheet.getRange(2, columns.registrationId, dataSheet.getLastRow() - 1, 1)
+        .getDisplayValues();
+      lookupIds.forEach((row, index) => {
+        const personalId = normalizeValue_(personalIds[index][0]).replace(/^'/, '');
+        const lookupId = normalizeLookupId_(row[0]);
+        if (personalId && lookupId) learners.add(lookupId);
+      });
+    }
+  }
+  const registrationSheet = spreadsheet.getSheetByName(CONFIG.registrationSheetName);
+  if (registrationSheet && registrationSheet.getLastRow() > 1) {
+    registrationSheet.getRange(2, 1, registrationSheet.getLastRow() - 1, 3).getDisplayValues()
+      .forEach((row) => {
+        const personalId = normalizeValue_(row[0]).replace(/^'/, '');
+        const lookupId = normalizeLookupId_(row[2]);
+        if (personalId && lookupId) learners.add(lookupId);
+      });
+  }
+  return learners.size;
+}
+
+function countUniqueLearnersByEpisode_(sheet, subject, registrationSheet, dataSheet) {
   const episodeLearners = Array.from({ length: 18 }, (_, index) => ({
     episode: 'ตอนที่ ' + (index + 1),
     learners: new Set()
   }));
-  if (!sheet || sheet.getLastRow() < 2) {
-    return episodeLearners.map((item) => ({ episode: item.episode, count: 0 }));
-  }
 
   const registrationEpisodes = new Map();
+  let dataRows = [];
+  let dataHeaders = [];
+  if (dataSheet && dataSheet.getLastRow() > 1) {
+    const dataColumns = getDataRegistrationColumns_(dataSheet);
+    if (dataColumns.episode > 0) {
+      dataRows = dataSheet.getDataRange().getDisplayValues();
+      dataHeaders = dataRows[0].map((header) => normalizeValue_(header));
+      dataRows.slice(1).forEach((row) => {
+        const learnerId = normalizeLookupId_(row[0]);
+        const episode = normalizeValue_(row[dataColumns.episode - 1]);
+        if (learnerId && episode && !registrationEpisodes.has(learnerId)) {
+          registrationEpisodes.set(learnerId, episode);
+        }
+      });
+    }
+  }
   if (registrationSheet && registrationSheet.getLastRow() > 1) {
     const registrationRows = registrationSheet.getDataRange().getDisplayValues();
     const registrationHeaders = registrationRows[0].map((header) => normalizeValue_(header).toLowerCase());
@@ -2384,24 +2851,40 @@ function countUniqueLearnersByEpisode_(sheet, subject, registrationSheet) {
     }
   }
 
-  const values = sheet.getDataRange().getDisplayValues();
-  const headers = values[0].map((header) => normalizeValue_(header).toLowerCase());
-  const learnerIndex = headers.indexOf('lookup_id');
-  const subjectIndex = headers.indexOf('subject');
-  const episodeIndex = headers.indexOf('episode');
-  if (learnerIndex < 0 || subjectIndex < 0) {
-    return episodeLearners.map((item) => ({ episode: item.episode, count: 0 }));
+  const learnersByEpisode = new Map(episodeLearners.map((item) => [item.episode, item.learners]));
+  if (sheet && sheet.getLastRow() > 1) {
+    const values = sheet.getDataRange().getDisplayValues();
+    const headers = values[0].map((header) => normalizeValue_(header).toLowerCase());
+    const learnerIndex = headers.indexOf('lookup_id');
+    const subjectIndex = headers.indexOf('subject');
+    const episodeIndex = headers.indexOf('episode');
+    if (learnerIndex >= 0 && subjectIndex >= 0) {
+      values.slice(1).forEach((row) => {
+        if (normalizeValue_(row[subjectIndex]) !== subject) return;
+        const learnerId = normalizeLookupId_(row[learnerIndex]);
+        const attendanceEpisode = episodeIndex >= 0 ? normalizeValue_(row[episodeIndex]) : '';
+        const episode = attendanceEpisode || registrationEpisodes.get(learnerId) || '';
+        const learners = learnersByEpisode.get(episode);
+        if (learners && learnerId) learners.add(learnerId);
+      });
+    }
   }
 
-  const learnersByEpisode = new Map(episodeLearners.map((item) => [item.episode, item.learners]));
-  values.slice(1).forEach((row) => {
-    if (normalizeValue_(row[subjectIndex]) !== subject) return;
-    const learnerId = normalizeLookupId_(row[learnerIndex]);
-    const attendanceEpisode = episodeIndex >= 0 ? normalizeValue_(row[episodeIndex]) : '';
-    const episode = attendanceEpisode || registrationEpisodes.get(learnerId) || '';
-    const learners = learnersByEpisode.get(episode);
-    if (learners && learnerId) learners.add(learnerId);
-  });
+  if (dataRows.length > 1) {
+    const dataColumns = getDataRegistrationColumns_(dataSheet);
+    const formNameIndex = dataHeaders.indexOf('form_name');
+    const attendanceFormNameIndex = dataHeaders.indexOf('attendance_form_name');
+    if (formNameIndex >= 0 && attendanceFormNameIndex >= 0) {
+      dataRows.slice(1).forEach((row) => {
+        if (dataHasAttendanceForm_(row, formNameIndex, attendanceFormNameIndex, subject)) {
+          const learnerId = normalizeLookupId_(row[0]);
+          const episode = normalizeValue_(row[dataColumns.episode - 1]);
+          const learners = learnersByEpisode.get(episode);
+          if (learners && learnerId) learners.add(learnerId);
+        }
+      });
+    }
+  }
 
   return episodeLearners.map((item) => ({ episode: item.episode, count: item.learners.size }));
 }
@@ -2524,6 +3007,7 @@ function submitSpecialAssessment_(data) {
     }
     const student = findStudentRecord_(lookupId);
     if (!student) return jsonResponse_({ ok: false, message: 'ไม่พบเลขที่ ' + lookupId + ' ในชีต Data' });
+    if (student.ambiguous) return jsonResponse_({ ok: false, message: 'พบเลขที่ ' + lookupId + ' ซ้ำในชีต Data กรุณาแจ้งผู้ดูแล' });
 
     let total = 0;
     const scores = entry.scores.map((rawScore) => {
@@ -2573,6 +3057,12 @@ function lookupStudent_(studentId) {
       message: 'ไม่พบหมายเลขประจำตัวในชีต Data'
     });
   }
+  if (student.ambiguous) {
+    return jsonResponse_({
+      ok: false,
+      message: 'พบเลขค้นหานี้ซ้ำในชีต Data กรุณาแจ้งผู้ดูแลตรวจสอบ'
+    });
+  }
 
   return jsonResponse_({
     ok: true,
@@ -2617,9 +3107,14 @@ function lookupScoreStudents_(formName, data) {
   const rows = lastRow > 0 ? sheet.getRange(1, 1, lastRow, 4).getDisplayValues() : [];
   const headers = rows[0] || [];
   const studentsById = new Map();
+  const duplicateIds = new Set();
   rows.slice(1).forEach((row) => {
     const id = normalizeLookupId_(row[0]);
-    if (!id || studentsById.has(id)) return;
+    if (!id) return;
+    if (studentsById.has(id)) {
+      duplicateIds.add(id);
+      return;
+    }
     studentsById.set(id, {
       columns: row.map((value, columnIndex) => ({
         label: normalizeValue_(headers[columnIndex]) || `คอลัมน์ ${String.fromCharCode(65 + columnIndex)}`,
@@ -2633,7 +3128,11 @@ function lookupScoreStudents_(formName, data) {
     if (!/^\d{4}$/.test(lookupId)) {
       return { lookupId: lookupId, ok: false, message: 'กรุณากรอกเลขค้นหาให้ครบ 4 หลัก' };
     }
-    const student = studentsById.get(normalizeLookupId_(lookupId));
+    const normalizedLookupId = normalizeLookupId_(lookupId);
+    if (duplicateIds.has(normalizedLookupId)) {
+      return { lookupId: lookupId, ok: false, message: 'พบเลขค้นหาซ้ำในชีต Data กรุณาแจ้งผู้ดูแลตรวจสอบ' };
+    }
+    const student = studentsById.get(normalizedLookupId);
     if (!student) {
       return { lookupId: lookupId, ok: false, message: 'ไม่พบหมายเลขประจำตัวในชีต Data' };
     }
@@ -2651,11 +3150,17 @@ function lookupAttendance_(registrationId) {
     });
   }
 
-  const record = findRegistrationRecord_(requestedId);
+  const record = findDataAttendanceStudent_(requestedId);
   if (!record) {
     return jsonResponse_({
       ok: false,
-      message: 'ไม่พบหมายเลขประจำตัวในชีต Registration'
+      message: 'ไม่พบหมายเลขประจำตัวในคอลัมน์ F ของชีต Data'
+    });
+  }
+  if (record.ambiguous) {
+    return jsonResponse_({
+      ok: false,
+      message: 'พบหมายเลขประจำตัวซ้ำในคอลัมน์ F ของชีต Data กรุณาแจ้งผู้ดูแลตรวจสอบ'
     });
   }
 
@@ -2785,6 +3290,50 @@ function getAttendanceHeaders_() {
   return headers;
 }
 
+function ensureDataAttendanceColumns_(sheet) {
+  ensureSheetColumns_(sheet, 11);
+  const headers = sheet.getRange(1, 1, 1, Math.max(11, sheet.getLastColumn())).getDisplayValues()[0]
+    .map((header) => normalizeValue_(header));
+  const expectedHeaders = CONFIG.dataAttendanceHeaders;
+  const expectedIndexes = expectedHeaders.map((header) => headers.indexOf(header));
+  const targetIndexes = expectedHeaders.map((_, index) => 8 + index);
+  if (expectedIndexes.every((index, offset) => index === targetIndexes[offset])) {
+    return new Map(expectedHeaders.map((header, index) => [header, index + 9]));
+  }
+  throw new Error('หัวคอลัมน์ I:K ของชีต Data ต้องเป็น registered_at, form_name และ attendance_form_name ตามลำดับ');
+}
+
+function getDataAttendanceRecord_(sheet, rowNumber, columns) {
+  const values = sheet.getRange(rowNumber, 9, 1, CONFIG.dataAttendanceHeaders.length)
+    .getDisplayValues()[0]
+    .map((value) => normalizeValue_(value));
+  return CONFIG.dataAttendanceHeaders.map((header) => values[columns.get(header) - 9]);
+}
+
+function getAttendanceRecordKey_(formName, attendanceFormName) {
+  return normalizeValue_(formName) + '\u001f' + normalizeValue_(attendanceFormName);
+}
+
+function getAttendanceRecordKeys_(record) {
+  const formNames = normalizeValue_(record[1]).split(/\r?\n/).filter(Boolean);
+  const formRounds = normalizeValue_(record[2]).split(/\r?\n/).filter(Boolean);
+  if (formNames.length !== formRounds.length) {
+    throw new Error('ข้อมูล Attendance ในคอลัมน์ J:K ไม่ตรงจำนวนรายการ กรุณาตรวจสอบก่อนบันทึก');
+  }
+  return new Set(formNames.map((formName, index) =>
+    getAttendanceRecordKey_(formName, formRounds[index])));
+}
+
+function appendDataAttendanceRecord_(sheet, rowNumber, current, record) {
+  const range = sheet.getRange(rowNumber, 9, 1, CONFIG.dataAttendanceHeaders.length);
+  if (range.getFormulas()[0].some(Boolean)) {
+    throw new Error('พบสูตรในคอลัมน์ I:K ของชีต Data กรุณาตรวจสอบก่อนบันทึก');
+  }
+  const values = current.map((value, index) =>
+    value ? value + '\n' + record[index] : record[index]);
+  range.setNumberFormat('@').setValues([values]);
+}
+
 function getOrCreateLearningSummarySheet_() {
   return getOrCreateSheet_(
     getRegistrationSpreadsheet_(),
@@ -2895,6 +3444,40 @@ function rebuildLearningSummary_() {
     record.episode = normalizeValue_(row[attendanceIndex('episode', 9)]);
     latestAttendance.set(personalId, { timestamp: timestamp, offset: offset });
   });
+
+  const sourceSheet = spreadsheet.getSheetByName(CONFIG.sourceSheetName);
+  if (sourceSheet && sourceSheet.getLastRow() > 1) {
+    const dataRegistrationColumns = getDataRegistrationColumns_(sourceSheet);
+    if (dataRegistrationColumns.registrationId > 0) {
+      const sourceRows = sourceSheet.getDataRange().getDisplayValues();
+      const sourceHeaders = sourceRows[0].map((header) => normalizeValue_(header));
+      const attendanceDateIndex = sourceHeaders.indexOf('registered_at');
+      sourceRows.slice(1).forEach((row) => {
+        const personalId = normalizeValue_(row[dataRegistrationColumns.registrationId - 1]).replace(/^'/, '');
+        const lookupId = normalizeLookupId_(row[0]);
+        if (!personalId || !lookupId) return;
+        const record = getRecord(personalId, lookupId);
+        const attendanceDates = attendanceDateIndex >= 0
+          ? normalizeValue_(row[attendanceDateIndex]).split(/\r?\n/).filter(Boolean)
+          : [];
+        const registeredAt = attendanceDates.length
+          ? attendanceDates[attendanceDates.length - 1]
+          : normalizeValue_(row[dataRegistrationColumns.registeredAt - 1]);
+        const timestamp = Date.parse(registeredAt);
+        const previous = latestAttendance.get(personalId);
+        const isLatest = !previous
+          || (Number.isFinite(timestamp)
+            && (!Number.isFinite(previous.timestamp) || timestamp >= previous.timestamp));
+        if (!isLatest) return;
+        record.attendance_date = registeredAt;
+        record.battalion_number = lookupId;
+        record.full_name = normalizeValue_(row[1]);
+        record.email = normalizeValue_(row[dataRegistrationColumns.email - 1]).toLowerCase();
+        record.episode = normalizeValue_(row[dataRegistrationColumns.episode - 1]);
+        latestAttendance.set(personalId, { timestamp: timestamp, offset: -1 });
+      });
+    }
+  }
 
   const registrationSheet = spreadsheet.getSheetByName(CONFIG.registrationSheetName);
   if (registrationSheet && registrationSheet.getLastRow() > 1) {
@@ -3075,7 +3658,7 @@ function updateLearningSummaryAfterSourceWrite_(update) {
   }
 }
 
-function syncLearningSummaryAttendance_(headers, values) {
+function syncLearningSummaryAttendance_(headers, values, attendanceRegisteredAt) {
   const index = (name) => headers.indexOf(name);
   const personalId = normalizeValue_(values[index('registration_id')]).replace(/^'/, '');
   const lookupId = normalizeLookupId_(values[index('lookup_id')]);
@@ -3083,7 +3666,7 @@ function syncLearningSummaryAttendance_(headers, values) {
   const sheet = getOrCreateLearningSummarySheet_();
   const existingRow = findLearningSummaryRowByPersonalId_(sheet, personalId);
   const patch = {
-    attendance_date: values[index('registered_at')] || '',
+    attendance_date: attendanceRegisteredAt || values[index('registered_at')] || '',
     battalion_number: normalizeValue_(values[index('lookup_id')]),
     full_name: values[index('data_column_b')] || '',
     email: normalizeValue_(values[index('email')]).toLowerCase(),
@@ -3222,29 +3805,104 @@ function refreshLearningSummaryScoresForStudent_(personalId, lookupId) {
 }
 
 function findRegistrationRecord_(registrationId) {
-  const sheet = getRegistrationSheet_();
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return null;
+  const requestedId = normalizeValue_(registrationId).replace(/^'/, '');
+  const spreadsheet = getRegistrationSpreadsheet_();
+  const dataSheet = spreadsheet.getSheetByName(CONFIG.sourceSheetName);
+  if (dataSheet && dataSheet.getLastRow() > 1) {
+    const dataColumns = getDataRegistrationColumns_(dataSheet);
+    if (dataColumns.registrationId > 0 && dataColumns.email > 0
+      && dataColumns.episode > 0 && dataColumns.registeredAt > 0) {
+      const width = Math.max(4, dataSheet.getLastColumn());
+      const dataRows = dataSheet.getRange(2, 1, dataSheet.getLastRow() - 1, width).getDisplayValues();
+      const matches = dataRows.filter((row) =>
+        normalizeValue_(row[dataColumns.registrationId - 1]).replace(/^'/, '') === requestedId);
+      if (matches.length === 1) {
+        const row = matches[0];
+        const values = [
+          row[dataColumns.registrationId - 1],
+          row[dataColumns.registeredAt - 1],
+          row[0],
+          row[0],
+          row[1],
+          row[2],
+          row[3],
+          row[dataColumns.email - 1],
+          row[dataColumns.episode - 1],
+          'class-registration'
+        ];
+        return buildRegistrationRecord_(values);
+      }
+      if (matches.length > 1) return null;
+    }
+  }
+
+  const sheet = spreadsheet.getSheetByName(CONFIG.registrationSheetName);
+  if (!sheet || sheet.getLastRow() < 2) return null;
   const width = Math.max(sheet.getLastColumn(), CONFIG.registrationHeaders.length);
-  const headers = sheet.getRange(1, 1, 1, width).getDisplayValues()[0];
-  const registrationIds = sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues();
-  const rowOffset = registrationIds.findIndex((row) =>
-    normalizeValue_(row[0]).replace(/^'/, '') === normalizeValue_(registrationId).replace(/^'/, ''));
-  if (rowOffset < 0) return null;
-  const row = sheet.getRange(rowOffset + 2, 1, 1, width).getDisplayValues()[0];
-  const episodeIndex = headers.indexOf('episode');
+  const rows = sheet.getRange(1, 1, sheet.getLastRow(), width).getDisplayValues();
+  const headers = rows[0].map((header) => normalizeValue_(header));
+  const registrationIdColumn = headers.indexOf('registration_id');
+  if (registrationIdColumn < 0) return null;
+  const match = rows.slice(1).find((row) =>
+    normalizeValue_(row[registrationIdColumn]).replace(/^'/, '') === requestedId);
+  return match ? buildRegistrationRecord_(match.slice(0, CONFIG.registrationHeaders.length), headers) : null;
+}
+
+function findDataAttendanceStudent_(registrationId) {
+  const sheet = getSourceSheet_();
+  const columns = getDataRegistrationColumns_(sheet);
+  if (columns.registrationId !== 6) {
+    throw new Error('คอลัมน์ F ของชีต Data ต้องเป็น registration_id ก่อนใช้ระบบเข้าเรียน');
+  }
+  if ([columns.email, columns.episode, columns.registeredAt].some((column) => column < 1)) {
+    throw new Error('ไม่พบคอลัมน์ข้อมูลลงทะเบียนที่จำเป็นในชีต Data');
+  }
+  if (sheet.getLastRow() < 2) return null;
+
+  const width = Math.max(4, sheet.getLastColumn());
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, width).getDisplayValues();
+  const requestedId = normalizeValue_(registrationId).replace(/^'/, '');
+  const matches = [];
+  rows.forEach((row, index) => {
+    if (normalizeValue_(row[5]).replace(/^'/, '') === requestedId) {
+      matches.push({ rowNumber: index + 2, values: row });
+    }
+  });
+  if (matches.length > 1) return { ambiguous: true };
+  if (!matches.length) return null;
+
+  const match = matches[0];
+  const values = [
+    match.values[5],
+    match.values[columns.registeredAt - 1],
+    match.values[0],
+    match.values[0],
+    match.values[1],
+    match.values[2],
+    match.values[3],
+    match.values[columns.email - 1],
+    match.values[columns.episode - 1],
+    'class-registration'
+  ];
+  const record = buildRegistrationRecord_(values);
+  record.rowNumber = match.rowNumber;
+  return record;
+}
+
+function buildRegistrationRecord_(values, headers) {
+  const registrationHeaders = headers || CONFIG.registrationHeaders;
   return {
-    values: row.slice(0, CONFIG.registrationHeaders.length),
+    values: values.slice(0, CONFIG.registrationHeaders.length),
     examInfo: {
-      registrationId: normalizeValue_(row[0]),
-      lookupId: normalizeLookupId_(row[2]),
-      rankName: normalizeValue_(row[4]),
-      affiliation: normalizeValue_(row[5]),
-      email: normalizeValue_(row[7]),
-      formName: normalizeValue_(episodeIndex >= 0 ? row[episodeIndex] : '')
+      registrationId: normalizeValue_(values[0]),
+      lookupId: normalizeLookupId_(values[2]),
+      rankName: normalizeValue_(values[4]),
+      affiliation: normalizeValue_(values[5]),
+      email: normalizeValue_(values[7]),
+      formName: normalizeValue_(values[8])
     },
-    columns: row.slice(0, CONFIG.registrationHeaders.length).map((value, index) => ({
-      label: normalizeValue_(headers[index]) || `คอลัมน์ ${String.fromCharCode(65 + index)}`,
+    columns: values.slice(0, CONFIG.registrationHeaders.length).map((value, index) => ({
+      label: normalizeValue_(registrationHeaders[index]) || `คอลัมน์ ${String.fromCharCode(65 + index)}`,
       value: normalizeValue_(value)
     }))
   };
@@ -3256,15 +3914,117 @@ function findStudentRecord_(studentId) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return null;
   const lookupIds = sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues();
-  const rowOffset = lookupIds.findIndex((row) => normalizeLookupId_(row[0]) === requestedId);
-  if (rowOffset < 0) return null;
+  const rowOffsets = [];
+  lookupIds.forEach((row, index) => {
+    if (normalizeLookupId_(row[0]) === requestedId) rowOffsets.push(index);
+  });
+  if (!rowOffsets.length) return null;
+  if (rowOffsets.length > 1) return { ambiguous: true };
+  const rowOffset = rowOffsets[0];
   const row = sheet.getRange(rowOffset + 2, 1, 1, 4).getDisplayValues()[0];
   const headers = sheet.getRange(1, 1, 1, 4).getDisplayValues()[0];
   const columns = row.map((value, columnIndex) => ({
     label: normalizeValue_(headers[columnIndex]) || `คอลัมน์ ${String.fromCharCode(65 + columnIndex)}`,
     value: normalizeValue_(value)
   }));
-  return { columns: columns };
+  return { columns: columns, rowNumber: rowOffset + 2 };
+}
+
+function ensureDataRegistrationColumns_(sheet) {
+  ensureSheetColumns_(sheet, 8);
+  const headers = sheet.getRange(1, 1, 1, Math.max(8, sheet.getLastColumn())).getDisplayValues()[0]
+    .map((header) => normalizeValue_(header).toLowerCase());
+  const columns = CONFIG.dataRegistrationHeaders.map((header, index) => ({
+    header: header,
+    column: index + 5
+  }));
+  columns.forEach(({ header, column }) => {
+    if (headers[column - 1] !== header) {
+      throw new Error('หัวคอลัมน์ E:H ของชีต Data ต้องเป็น registration_email, registration_id, registration_episode และ registration_registered_at ตามลำดับ');
+    }
+  });
+  sheet.getRange(1, 6, sheet.getMaxRows(), 1).setNumberFormat('@');
+  return {
+    email: 5,
+    registrationId: 6,
+    episode: 7,
+    registeredAt: 8
+  };
+}
+
+function getDataRegistrationColumns_(sheet) {
+  const width = Math.max(4, sheet.getLastColumn());
+  const headers = sheet.getRange(1, 1, 1, width).getDisplayValues()[0]
+    .map((header) => normalizeValue_(header).toLowerCase());
+  const columns = {};
+  CONFIG.dataRegistrationHeaders.forEach((header) => {
+    columns[header] = headers.indexOf(header) + 1;
+  });
+  return {
+    email: columns.registration_email,
+    registrationId: columns.registration_id,
+    episode: columns.registration_episode,
+    registeredAt: columns.registration_registered_at
+  };
+}
+
+function findDataRegistrationDuplicates_(sheet, columns, email, registrationId) {
+  const rowCount = sheet.getLastRow() - 1;
+  if (rowCount < 1) return { email: false, registrationId: false };
+  const emails = sheet.getRange(2, columns.email, rowCount, 1).getDisplayValues();
+  const registrationIds = sheet.getRange(2, columns.registrationId, rowCount, 1).getDisplayValues();
+  const requestedEmail = normalizeValue_(email).toLowerCase();
+  const requestedRegistrationId = normalizeValue_(registrationId).replace(/^'/, '');
+  return {
+    email: emails.some((row) => normalizeValue_(row[0]).toLowerCase() === requestedEmail),
+    registrationId: registrationIds.some((row) =>
+      normalizeValue_(row[0]).replace(/^'/, '') === requestedRegistrationId)
+  };
+}
+
+function areRegistrationValuesEqual_(left, right, compareDates) {
+  if (!compareDates) return normalizeValue_(left) === normalizeValue_(right);
+  const leftTimestamp = left instanceof Date ? left.getTime() : Date.parse(normalizeValue_(left));
+  const rightTimestamp = right instanceof Date ? right.getTime() : Date.parse(normalizeValue_(right));
+  return Number.isFinite(leftTimestamp) && Number.isFinite(rightTimestamp)
+    ? leftTimestamp === rightTimestamp
+    : normalizeValue_(left) === normalizeValue_(right);
+}
+
+function groupContiguousColumns_(columns) {
+  const sorted = columns.slice().sort((left, right) => left - right);
+  const groups = [];
+  sorted.forEach((column) => {
+    const current = groups[groups.length - 1];
+    if (!current || column !== current.start + current.columns.length) {
+      groups.push({ start: column, columns: [column] });
+    } else {
+      current.columns.push(column);
+    }
+  });
+  return groups;
+}
+
+function writeDataRegistrationFields_(sheet, rowNumber, columns, values) {
+  const columnFields = [
+    { column: columns.email, value: values[0] },
+    { column: columns.registrationId, value: values[1] },
+    { column: columns.episode, value: values[2] },
+    { column: columns.registeredAt, value: values[3] }
+  ].sort((left, right) => left.column - right.column);
+  const groups = [];
+  columnFields.forEach((field) => {
+    const group = groups[groups.length - 1];
+    if (!group || field.column !== group.start + group.fields.length) {
+      groups.push({ start: field.column, fields: [field] });
+    } else {
+      group.fields.push(field);
+    }
+  });
+  groups.forEach((group) => {
+    sheet.getRange(rowNumber, group.start, 1, group.fields.length)
+      .setValues([group.fields.map((field) => field.value)]);
+  });
 }
 
 function getSourceSheet_() {
@@ -3334,6 +4094,7 @@ function createUniqueRegistrationId_(sheet) {
 }
 
 function findRegistrationDuplicates_(sheet, email, registrationId) {
+  if (!sheet) return { email: false, registrationId: false };
   const dataRowCount = sheet.getLastRow() - 1;
   if (dataRowCount < 1) return { email: false, registrationId: false };
   const emailColumn = CONFIG.registrationHeaders.indexOf('email') + 1;

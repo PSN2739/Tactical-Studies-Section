@@ -86,7 +86,7 @@
 
   function renderColumns(columns) {
     return `<div class="registration-result">
-      <strong>ข้อมูลจากชีต Registration</strong>
+      <strong>ข้อมูลจากชีต Data</strong>
       <dl>${columns.map((column) => `
         <div><dt>${escapeHtml(column.label)}</dt><dd>${escapeHtml(column.value || '-')}</dd></div>
       `).join('')}</dl>
@@ -152,7 +152,7 @@
       });
       const data = parseResponse(await response.text());
       if (data.code === 'DUPLICATE_ATTENDANCE') {
-        showPopup('ท่านลงทะเบียนครั้งนี้แล้ว');
+        showPopup(data.message || 'ท่านได้ลงทะเบียนแล้ว');
         resetForm();
         return;
       }
