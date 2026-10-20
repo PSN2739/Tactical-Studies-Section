@@ -12,6 +12,8 @@
   const loginButton = document.getElementById('teaching-login-submit');
   const userName = document.getElementById('teaching-user-name');
   const connectionState = document.getElementById('teaching-connection-state');
+  const scoreGrid = document.querySelector('.teaching-score-grid');
+  const learningEmpty = document.getElementById('teaching-learning-empty');
   const assessmentResults = document.getElementById('teaching-assessment-results');
   const assessmentList = document.getElementById('teaching-assessment-list');
   const endpoint = document.querySelector('#registration-form')?.getAttribute('action');
@@ -77,6 +79,17 @@
     setValue('teaching-score-total', scores.totalScore);
     setValue('teaching-score-net', scores.netScore);
     renderAssessments(scores.assessments);
+    const hasScoreData = [
+      scores.attitude,
+      scores.preTest,
+      scores.postTest,
+      scores.knowledgeAssessment,
+      scores.specialTask
+    ].some((value) => value !== null && value !== undefined && String(value).trim() !== '');
+    const hasAssessmentData = Array.isArray(scores.assessments) && scores.assessments.length > 0;
+    const hasLearningData = hasScoreData || hasAssessmentData;
+    if (scoreGrid) scoreGrid.classList.toggle('d-none', !hasLearningData);
+    if (learningEmpty) learningEmpty.classList.toggle('d-none', hasLearningData);
     if (connectionState) {
       connectionState.innerHTML = '<i aria-hidden="true"></i> เชื่อมต่อแล้ว';
       connectionState.classList.add('is-connected');
@@ -119,6 +132,8 @@
         .forEach((id) => setValue(id, ''));
       setValue('teaching-score-attitude', '', 'ยังไม่ระบุแหล่งข้อมูล');
       renderAssessments([]);
+      if (scoreGrid) scoreGrid.classList.remove('d-none');
+      if (learningEmpty) learningEmpty.classList.add('d-none');
       setLoginStatus('', false);
       showLogin();
     });
