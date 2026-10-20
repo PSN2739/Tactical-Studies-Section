@@ -272,6 +272,8 @@
   const nextButton = document.getElementById('announcement-gallery-next');
   const autoplayButton = document.getElementById('announcement-gallery-autoplay');
   const downloadButton = document.getElementById('announcement-gallery-download');
+  const downloadNotice = document.getElementById('announcement-gallery-download-notice');
+  const downloadNoticeClose = document.getElementById('announcement-gallery-download-notice-close');
   const imageElement = document.getElementById('announcement-gallery-image');
   const counter = document.getElementById('announcement-gallery-counter');
   const status = document.getElementById('announcement-gallery-status');
@@ -291,21 +293,20 @@
     status.classList.toggle('d-none', !message);
   }
 
-  downloadButton.addEventListener('click', () => {
-    const image = images[currentIndex];
-    if (!image) {
-      setStatus('ยังไม่มีภาพให้ดาวน์โหลด', true);
-      return;
-    }
+  function closeDownloadNotice() {
+    downloadNotice.classList.add('d-none');
+    downloadButton.setAttribute('aria-expanded', 'false');
+    downloadButton.focus();
+  }
 
-    const downloadLink = document.createElement('a');
-    downloadLink.href = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(image.id)}`;
-    downloadLink.download = image.name;
-    downloadLink.target = '_blank';
-    downloadLink.rel = 'noopener';
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    downloadLink.remove();
+  downloadButton.addEventListener('click', () => {
+    downloadNotice.classList.remove('d-none');
+    downloadButton.setAttribute('aria-expanded', 'true');
+    downloadNoticeClose.focus();
+  });
+  downloadNoticeClose.addEventListener('click', closeDownloadNotice);
+  downloadNotice.addEventListener('click', (event) => {
+    if (event.target === downloadNotice) closeDownloadNotice();
   });
 
   function stopAutoplay() {
@@ -456,6 +457,10 @@
   });
   document.addEventListener('keydown', (event) => {
     if (popup.classList.contains('d-none')) return;
+    if (event.key === 'Escape' && !downloadNotice.classList.contains('d-none')) {
+      closeDownloadNotice();
+      return;
+    }
     if (event.key === 'Escape') closeGallery();
     if (event.key === 'ArrowLeft') showImage(currentIndex - 1);
     if (event.key === 'ArrowRight') showImage(currentIndex + 1);
