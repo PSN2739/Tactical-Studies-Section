@@ -594,7 +594,12 @@ function saveAttitudeScore_(data) {
     'เครื่องแต่งกาย',
     'หลับ',
     'เล่นระหว่างเรียน',
-    'ทานขนมระหว่างเรียน'
+    'ทานขนมระหว่างเรียน',
+    'ยอดผิด',
+    'ไม่ปฏิบัติตามคำสั่ง',
+    'นั่งหลับ',
+    'คุย',
+    'ไม่ตรงเวลา'
   ];
   if (!/^\d{4}$/.test(lookupId)) {
     return jsonResponse_({ ok: false, message: 'กรุณากรอกเลขที่กองพันให้ครบ 4 หลัก' });
@@ -653,7 +658,12 @@ function saveAttitudeScores_(data) {
     'เครื่องแต่งกาย',
     'หลับ',
     'เล่นระหว่างเรียน',
-    'ทานขนมระหว่างเรียน'
+    'ทานขนมระหว่างเรียน',
+    'ยอดผิด',
+    'ไม่ปฏิบัติตามคำสั่ง',
+    'นั่งหลับ',
+    'คุย',
+    'ไม่ตรงเวลา'
   ];
   const sheet = getRegistrationSpreadsheet_().getSheetByName('เจตคติ');
   if (!sheet) return jsonResponse_({ ok: false, message: 'ไม่พบชีตเจตคติ' });
