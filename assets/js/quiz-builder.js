@@ -24,6 +24,7 @@
   const teacherMenuCloseButton = document.getElementById('teacher-menu-close');
   const teacherDashboardPopup = document.getElementById('teacher-dashboard-popup');
   const teacherDashboardStatus = document.getElementById('teacher-dashboard-status');
+  const teacherDashboardSubject = document.getElementById('teacher-dashboard-subject');
   const loadingOverlay = document.getElementById('quiz-loading-overlay');
   const previewBox = document.getElementById('quiz-preview-box');
   const downloadTemplateButton = document.getElementById('download-quiz-template');
@@ -194,13 +195,23 @@
   }
 
   function renderTeacherDashboard(data) {
+    const subjects = Array.isArray(data.subjects) ? data.subjects : [];
+    teacherDashboardSubject.replaceChildren(...subjects.map((subject) => {
+      const option = document.createElement('option');
+      option.value = subject;
+      option.textContent = subject;
+      return option;
+    }));
+    teacherDashboardSubject.value = data.selectedSubject || subjects[0] || '';
     document.getElementById('teacher-dashboard-name').textContent = data.teacher.name || 'ครู/อาจารย์';
     document.getElementById('teacher-dashboard-email').textContent = data.teacher.email || '';
     document.getElementById('teacher-dashboard-tactical-score-participant-count').textContent =
       Number(data.summary.tacticalScoreParticipantCount || 0).toLocaleString('th-TH');
     document.getElementById('teacher-dashboard-tactical-score-code').textContent =
       data.summary.tacticalScoreAccessCode || '-';
-    const courseSummary = data.summary.daytimeAttack || {};
+    const courseSummary = data.summary.selectedSubject || {};
+    document.getElementById('teacher-dashboard-topic-attendance-label').textContent =
+      `ลงทะเบียน ${data.selectedSubject || 'เรื่อง'}`;
     [
       ['pre-test-count', courseSummary.preTestCount],
       ['post-test-count', courseSummary.postTestCount],
@@ -240,7 +251,9 @@
     teacherDashboardStatus.classList.remove('d-none', 'error-message');
     try {
       const data = await request({ method: 'POST', body: new URLSearchParams({
-        formName: 'teacher-dashboard', token: localStorage.getItem(tokenKey) || ''
+        formName: 'teacher-dashboard',
+        token: localStorage.getItem(tokenKey) || '',
+        subject: teacherDashboardSubject.value
       }) });
       renderTeacherDashboard(data);
       teacherDashboardStatus.classList.add('d-none');
@@ -326,6 +339,25 @@
     } finally {
       window.clearTimeout(timeoutId);
       pendingRequests.delete(controller);
+    }
+  }
+
+  async function loadCourseSubjects() {
+    const subjectSelect = uploadForm.elements.subject;
+    if (subjectSelect.options.length > 1) return;
+    subjectSelect.disabled = true;
+    try {
+      const data = await request({ method: 'GET?action=course-list' });
+      const subjects = Array.isArray(data.subjects) ? data.subjects : [];
+      if (!subjects.length) throw new Error('ไม่พบรายการวิชา/เรื่องสำหรับสร้างข้อสอบ');
+      subjectSelect.replaceChildren(...subjects.map((subject) => {
+        const option = document.createElement('option');
+        option.value = subject;
+        option.textContent = subject;
+        return option;
+      }));
+    } finally {
+      subjectSelect.disabled = false;
     }
   }
 
@@ -541,6 +573,7 @@
   openButton.addEventListener('click', (event) => {
     event.preventDefault();
     showModal();
+    loadCourseSubjects().catch((error) => setStatus(uploadForm, 'error-message', error.message));
     if (localStorage.getItem(tokenKey) && uploadForm.classList.contains('d-none')) showTeacherMenu();
     else showAuthChoice();
   });
@@ -568,6 +601,7 @@
     teacherInfoMenuButton.focus();
   });
   document.getElementById('teacher-dashboard-refresh').addEventListener('click', loadTeacherDashboard);
+  teacherDashboardSubject.addEventListener('change', loadTeacherDashboard);
   teacherMenuCloseButton.addEventListener('click', () => {
     clearBuilderState();
     hideModal();
@@ -658,6 +692,7 @@
       const questions = await getQuestions(uploadForm);
       const data = await request({ method: 'POST', body: new URLSearchParams({
         formName: 'create-quiz', token: localStorage.getItem(tokenKey) || '',
+        subject: uploadForm.elements.subject.value,
         title: quizTitle, duration: uploadForm.elements.duration.value,
         openAt: uploadForm.elements.openAt.value, closeAt: uploadForm.elements.closeAt.value,
         questionCount: uploadForm.elements.questionCount.value,
@@ -773,6 +808,7 @@
     loginForm.classList.add('quiz-login-complete');
     closeButton.classList.add('d-none');
   }
+  loadCourseSubjects().catch((error) => setStatus(uploadForm, 'error-message', error.message));
 
   window.addEventListener('pagehide', clearBuilderState);
 })();

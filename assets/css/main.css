@@ -884,6 +884,26 @@ body.announcement-dashboard-open { overflow: hidden; }
 }
 .teacher-dashboard-profile span:first-child { color: var(--heading-color); font-weight: 700; }
 .teacher-dashboard-profile span:last-child { color: var(--default-color); overflow-wrap: anywhere; }
+.teacher-dashboard-subject-filter {
+  display: grid;
+  gap: 6px;
+  max-width: 420px;
+  color: var(--heading-color);
+  font-weight: 600;
+}
+.teacher-dashboard-subject-filter select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--default-color), transparent 70%);
+  border-radius: 8px;
+  background: var(--surface-color);
+  color: var(--default-color);
+}
+.teacher-dashboard-subject-hint {
+  margin: -12px 0 0;
+  color: color-mix(in srgb, var(--default-color), transparent 20%);
+  font-size: 13px;
+}
 .teacher-dashboard-category-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

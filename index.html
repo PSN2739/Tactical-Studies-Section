@@ -27,7 +27,7 @@
   <link href="assets/swiper/swiper-bundle.min.css" rel="stylesheet">
 
   <!-- Main CSS File -->
-  <link href="assets/css/main.css?v=20261012-learning-summary" rel="stylesheet">
+  <link href="assets/css/main.css?v=20261022-course-topic-dashboard" rel="stylesheet">
   <link rel="preload" href="assets/img/hero-bg-2-1600.jpg" imagesrcset="assets/img/hero-bg-2-768.jpg 768w, assets/img/hero-bg-2-1600.jpg 1600w" imagesizes="100vw" as="image" fetchpriority="high">
 
   <!-- =======================================================
@@ -377,6 +377,7 @@
             <h4>อัปโหลดข้อสอบ</h4>
             <p id="current-teacher-email" class="quiz-current-user">ชื่อผู้ใช้งานขณะนี้: -</p>
             <div class="registration-fields">
+              <label><span>วิชา/เรื่อง</span><select name="subject" required><option value="">กำลังโหลดรายการเรื่อง...</option></select></label>
               <label><span>ชื่อเรื่อง</span><input name="title" required></label>
               <label><span>เวลาสอบ (นาที)</span><input type="number" name="duration" min="1" max="180" value="30" required></label>
               <label><span>เปิดสอบ</span><input type="datetime-local" name="openAt" required></label>
@@ -856,6 +857,11 @@
         <span id="teacher-dashboard-name">กำลังโหลดข้อมูลครู...</span>
         <span id="teacher-dashboard-email"></span>
       </div>
+      <label class="teacher-dashboard-subject-filter" for="teacher-dashboard-subject">
+        <span>เลือกวิชา/เรื่องที่ต้องการดู</span>
+        <select id="teacher-dashboard-subject" required></select>
+      </label>
+      <p class="teacher-dashboard-subject-hint">ข้อสอบเดิมที่ไม่ตรงกับรายการวิชา/เรื่องจะแสดงใน “ไม่ระบุเรื่อง”</p>
       <div class="teacher-dashboard-category-grid">
         <section class="teacher-dashboard-category" aria-labelledby="teacher-dashboard-registration-title">
           <h4 id="teacher-dashboard-registration-title">งานทะเบียน</h4>
@@ -865,7 +871,7 @@
               <dd id="teacher-dashboard-department-registration-count">-</dd><span>คน</span>
             </div>
             <div class="teacher-dashboard-stat-card teacher-dashboard-stat-card-indigo">
-              <dt><i class="bi bi-bookmark-check" aria-hidden="true"></i> ลงทะเบียนเรื่องนี้</dt>
+              <dt><i class="bi bi-bookmark-check" aria-hidden="true"></i> <span id="teacher-dashboard-topic-attendance-label">ลงทะเบียนเรื่อง</span></dt>
               <dd id="teacher-dashboard-topic-attendance-count">-</dd><span>คน</span>
             </div>
           </dl>
@@ -1165,7 +1171,7 @@
   <!-- Google Sheets form handler -->
   <script defer src="assets/js/google-sheet-form.js?v=20260918-separate-forms"></script>
   <script defer src="assets/js/attendance-registration.js?v=20261004-attendance-subject"></script>
-  <script defer src="assets/js/quiz-builder.js?v=20261011-optional-quiz-rules"></script>
+  <script defer src="assets/js/quiz-builder.js?v=20261022-course-topic-dashboard"></script>
   <script defer src="assets/js/teacher-attitude.js?v=20261022-attitude-reasons"></script>
   <script defer src="assets/js/exam.js?v=20261022-reliable-quiz-sessions"></script>
   <script defer src="assets/js/tactical-score.js?v=20260930-centered-copy-prompt"></script>

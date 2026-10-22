@@ -74,6 +74,9 @@ const QUIZ_ATTEMPT_SESSION_CLEANUP_CACHE_KEY = 'quiz-attempt-session-cleanup';
 function doGet(e) {
   try {
     const params = (e && e.parameter) || {};
+    if (String(params.action || '').toLowerCase() === 'course-list') {
+      return jsonResponse_({ ok: true, subjects: CONFIG.attendanceSubjects });
+    }
     if (String(params.action || '').toLowerCase() === 'quiz-list') {
       return listQuizzes_();
     }
@@ -133,7 +136,7 @@ function doPost(e) {
   }
   if (formName === 'teacher-dashboard') {
     try {
-      return getTeacherDashboard_(data.token);
+      return getTeacherDashboard_(data.token, data.subject);
     } catch (error) {
       return jsonResponse_({ ok: false, message: getErrorMessage_(error) });
     }
@@ -822,7 +825,7 @@ function getQuizIndexHeaders_() {
     'quiz_id', 'title', 'sheet_name', 'created_at', 'created_by', 'duration_minutes',
     'open_at', 'close_at', 'question_count', 'attempts_allowed', 'phase', 'pass_type',
     'pass_value', 'pass_score', 'active', 'location_restricted', 'location_latitude',
-    'location_longitude', 'location_radius_meters'
+    'location_longitude', 'location_radius_meters', 'subject'
   ];
 }
 
@@ -876,6 +879,7 @@ function createQuiz_(data) {
   const email = CacheService.getScriptCache().get('teacher:' + normalizeValue_(data.token));
   if (!email) return jsonResponse_({ ok: false, message: 'กรุณาเข้าสู่ระบบครูใหม่' });
   const title = normalizeValue_(data.title);
+  const subject = normalizeValue_(data.subject);
   const duration = Number(data.duration || 30);
   const questionCount = Number(data.questionCount || 0);
   const attemptsAllowed = Number(normalizeValue_(data.attemptsAllowed) || 1);
@@ -901,7 +905,8 @@ function createQuiz_(data) {
     const answerPattern = questionType === 'yes-no' ? /^[1-2]$/ : /^[1-4]$/;
     return normalizeValue_(row.question) && choicesValid && answerPattern.test(normalizeValue_(row.answer));
   });
-  if (!title || !validRows || !Number.isInteger(duration) || duration < 1
+  if (!title || CONFIG.attendanceSubjects.indexOf(subject) < 0
+    || !validRows || !Number.isInteger(duration) || duration < 1
     || !Number.isInteger(questionCount) || questionCount < 1 || questionCount > rows.length
     || !Number.isInteger(attemptsAllowed) || attemptsAllowed < 1 || attemptsAllowed > 999
     || !isValidDateRange_(openAt, closeAt) || !phase
@@ -930,7 +935,7 @@ function createQuiz_(data) {
     questionCount, attemptsAllowed, phase, passType, passValue === null ? '' : String(passValue),
     passValue === null ? '' : String(passValue), 'TRUE',
     locationRestricted ? 'TRUE' : 'FALSE', locationRestricted ? locationLatitude : '',
-    locationRestricted ? locationLongitude : '', locationRestricted ? locationRadius : '']);
+    locationRestricted ? locationLongitude : '', locationRestricted ? locationRadius : '', subject]);
   return jsonResponse_({ ok: true, quizId: quizId, message: 'สร้างข้อสอบเรียบร้อยแล้ว' });
 }
 
@@ -943,10 +948,11 @@ function listQuizzes_() {
     .filter((row) => row[14] !== 'FALSE')
     .map((row) => ({ quizId: row[0], title: row[1], duration: row[5], openAt: row[6], closeAt: row[7],
       questionCount: row[8], attemptsAllowed: row[9], phase: normalizePhase_(row[10]) || 'pre-test',
+      subject: resolveQuizSubject_(row[19], row[1]),
       passType: normalizeValue_(row[11]) === 'none' ? 'none' : (normalizeValue_(row[11]) === 'count' ? 'count' : 'percent'),
       passValue: normalizeValue_(row[11]) === 'none' ? null : Number(row[12] || row[13] || 70),
       locationRestricted: row[15] === 'TRUE', locationRadius: Number(row[18]) || 0 }));
-  return jsonResponse_({ ok: true, quizzes: rows });
+  return jsonResponse_({ ok: true, subjects: CONFIG.attendanceSubjects, quizzes: rows });
 }
 
 function getQuiz_(quizId, studentId, phase, title, locationLatitude, locationLongitude) {
@@ -2757,7 +2763,7 @@ function setupAnnouncementCleanup() {
   return 'ตั้งค่างานลบประกาศที่หมดอายุเรียบร้อยแล้ว';
 }
 
-function getTeacherDashboard_(token) {
+function getTeacherDashboard_(token, requestedSubject) {
   const email = CacheService.getScriptCache().get('teacher:' + normalizeValue_(token));
   if (!email) return jsonResponse_({ ok: false, message: 'กรุณาเข้าสู่ระบบครูใหม่' });
 
@@ -2776,20 +2782,31 @@ function getTeacherDashboard_(token) {
     .map((row) => ({
       quizId: normalizeValue_(row[0]),
       title: normalizeValue_(row[1]),
-      phase: normalizePhase_(row[10]) || 'pre-test'
+      phase: normalizePhase_(row[10]) || 'pre-test',
+      subject: resolveQuizSubject_(row[19], row[1])
     }))
     .filter((quiz) => quiz.quizId && quiz.title);
-  const historySheet = getOrCreateQuizAttemptHistorySheet_();
-  const historyRows = historySheet.getDataRange().getDisplayValues();
-  const historyHeaders = historyRows[0] || [];
-  const studentIndex = historyHeaders.indexOf('student_id');
-  const lookupIndex = historyHeaders.indexOf('lookup_id');
-  const quizIndexColumn = historyHeaders.indexOf('quiz_id');
-  const phaseIndex = historyHeaders.indexOf('phase');
-  const passedIndex = historyHeaders.indexOf('passed');
+  const unassignedSubject = 'ไม่ระบุเรื่อง';
+  const availableSubjects = CONFIG.attendanceSubjects.slice();
+  if (quizzes.some((quiz) => !quiz.subject)) availableSubjects.push(unassignedSubject);
+  const selectedSubject = normalizeValue_(requestedSubject) || availableSubjects[0];
+  if (availableSubjects.indexOf(selectedSubject) < 0) {
+    return jsonResponse_({ ok: false, message: 'ไม่พบวิชา/เรื่องที่เลือก กรุณาเลือกจากรายการ' });
+  }
+  const selectedQuizIds = new Set(quizzes
+    .filter((quiz) => (quiz.subject || unassignedSubject) === selectedSubject)
+    .map((quiz) => quiz.quizId));
+  const selectedQuizzes = quizzes.filter((quiz) => selectedQuizIds.has(quiz.quizId));
+  const quizHistory = getQuizAttemptRowsForQuizzes_(selectedQuizIds);
+  const historyRows = quizHistory.rows;
+  const studentIndex = quizHistory.headers.indexOf('student_id');
+  const lookupIndex = quizHistory.headers.indexOf('lookup_id');
+  const quizIndexColumn = quizHistory.headers.indexOf('quiz_id');
+  const phaseIndex = quizHistory.headers.indexOf('phase');
+  const passedIndex = quizHistory.headers.indexOf('passed');
   const quizParticipants = new Map();
   const quizById = new Map();
-  quizzes.forEach((quiz) => {
+  selectedQuizzes.forEach((quiz) => {
     quizParticipants.set(quiz.quizId, new Set());
     quizById.set(quiz.quizId, quiz);
   });
@@ -2799,7 +2816,7 @@ function getTeacherDashboard_(token) {
     passedPostTest: new Set(),
     score: new Set()
   };
-  historyRows.slice(1).forEach((row) => {
+  historyRows.forEach((row) => {
     const quizId = normalizeValue_(row[quizIndexColumn]);
     const participants = quizParticipants.get(quizId);
     if (!participants) return;
@@ -2807,11 +2824,7 @@ function getTeacherDashboard_(token) {
     if (!studentId) return;
     participants.add(studentId);
 
-    const quiz = quizById.get(quizId);
-    if (!isDaytimeAttackQuizTitle_(quiz.title)) return;
-    const attemptPhase = phaseIndex >= 0
-      ? normalizePhase_(row[phaseIndex])
-      : quiz.phase;
+    const attemptPhase = normalizePhase_(row[phaseIndex]) || quizById.get(quizId).phase;
     if (attemptPhase === 'pre-test') courseLearners.preTest.add(studentId);
     if (attemptPhase === 'post-test') {
       courseLearners.postTest.add(studentId);
@@ -2821,7 +2834,7 @@ function getTeacherDashboard_(token) {
     }
     if (attemptPhase === 'score') courseLearners.score.add(studentId);
   });
-  quizzes.forEach((quiz) => {
+  selectedQuizzes.forEach((quiz) => {
     quiz.participantCount = quizParticipants.get(quiz.quizId).size;
   });
 
@@ -2873,28 +2886,30 @@ function getTeacherDashboard_(token) {
   const registrationCount = countUniqueRegistrationLearners_(spreadsheet);
   const attendanceSheet = spreadsheet.getSheetByName(CONFIG.attendanceSheetName);
   const dataSheet = spreadsheet.getSheetByName(CONFIG.sourceSheetName);
-  const attendanceCount = countUniqueAttendanceLearners_(
-    attendanceSheet,
-    dataSheet,
-    'รบด้วยวิธีรุก-ตีกลางวัน'
-  );
-  const attendanceByEpisode = countUniqueLearnersByEpisode_(
-    attendanceSheet,
-    'รบด้วยวิธีรุก-ตีกลางวัน',
-    spreadsheet.getSheetByName(CONFIG.registrationSheetName),
-    dataSheet
-  );
+  const attendanceCount = selectedSubject === unassignedSubject
+    ? 0
+    : countUniqueAttendanceLearners_(attendanceSheet, dataSheet, selectedSubject);
+  const attendanceByEpisode = selectedSubject === unassignedSubject
+    ? Array.from({ length: 18 }, (_, index) => ({ episode: 'ตอนที่ ' + (index + 1), count: 0 }))
+    : countUniqueLearnersByEpisode_(
+      attendanceSheet,
+      selectedSubject,
+      spreadsheet.getSheetByName(CONFIG.registrationSheetName),
+      dataSheet
+    );
 
   return jsonResponse_({
     ok: true,
     teacher: { name: normalizeValue_(teacher[2]), email: email },
+    subjects: availableSubjects,
+    selectedSubject: selectedSubject,
     summary: {
-      quizCount: quizzes.length,
+      quizCount: selectedQuizzes.length,
       assessmentCount: assessments.length,
       assessmentParticipantCount: assessmentParticipants.size,
       tacticalScoreParticipantCount: tacticalScoreParticipants.size,
       tacticalScoreAccessCode: tacticalScoreCode,
-      daytimeAttack: {
+      selectedSubject: {
         preTestCount: courseLearners.preTest.size,
         postTestCount: courseLearners.postTest.size,
         passedPostTestCount: courseLearners.passedPostTest.size,
@@ -2904,16 +2919,46 @@ function getTeacherDashboard_(token) {
         topicAttendanceByEpisode: attendanceByEpisode
       }
     },
-    quizzes: quizzes,
+    quizzes: selectedQuizzes,
     assessments: assessments,
     updatedAt: new Date().toISOString()
   });
 }
 
-function isDaytimeAttackQuizTitle_(title) {
-  const normalizedTitle = normalizeValue_(title);
-  return (normalizedTitle.indexOf('กลางวัน') >= 0 || normalizedTitle.indexOf('กางวัน') >= 0)
-    && (normalizedTitle.indexOf('รบด้วยวิธีรุก') >= 0 || normalizedTitle.indexOf('เข้าตี') >= 0);
+function resolveQuizSubject_(subject, title) {
+  const normalizedSubject = normalizeValue_(subject);
+  if (CONFIG.attendanceSubjects.indexOf(normalizedSubject) >= 0) return normalizedSubject;
+  if (normalizedSubject) return '';
+  const normalizedTitle = normalizeQuizTitle_(title);
+  if (!normalizedTitle) return '';
+  return CONFIG.attendanceSubjects.find((candidate) => {
+    const normalizedCandidate = normalizeQuizTitle_(candidate);
+    return normalizedTitle.indexOf(normalizedCandidate) >= 0
+      || normalizedCandidate.indexOf(normalizedTitle) >= 0;
+  }) || '';
+}
+
+function getQuizAttemptRowsForQuizzes_(quizIds) {
+  if (!quizIds.size) return { headers: [], rows: [] };
+  const sheet = getOrCreateQuizAttemptHistorySheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { headers: [], rows: [] };
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  const quizIndex = headers.indexOf('quiz_id');
+  if (quizIndex < 0) throw new Error('ไม่พบคอลัมน์ quiz_id ในชีต QuizAttemptHistory');
+  const matchingRows = new Set();
+  quizIds.forEach((quizId) => {
+    sheet.getRange(2, quizIndex + 1, lastRow - 1, 1)
+      .createTextFinder(quizId)
+      .matchEntireCell(true)
+      .matchCase(true)
+      .findAll()
+      .forEach((range) => matchingRows.add(range.getRow()));
+  });
+  const rows = Array.from(matchingRows).map((rowNumber) =>
+    sheet.getRange(rowNumber, 1, 1, headers.length).getDisplayValues()[0]
+  );
+  return { headers: headers, rows: rows };
 }
 
 function countUniqueLearnersInSheet_(sheet, filterHeader, filterValue) {
