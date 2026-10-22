@@ -997,30 +997,55 @@ function getQuiz_(quizId, studentId, phase, title, locationLatitude, locationLon
     .filter((item) => item.row[7] !== 'FALSE');
   const resolvedQuizId = quiz.quizId || normalizeValue_(quizId);
   const questionCount = Math.min(quiz.questionCount, rows.length);
+  const attemptToken = Utilities.getUuid();
   let selected;
   if (requestedPhase === 'pre-test' || requestedPhase === 'post-test') {
     const stableQuestionSet = shuffleForSeed_(
       rows,
       `${resolvedQuizId}:${normalizeValue_(studentId)}:pre-post`
     ).slice(0, questionCount);
-    selected = requestedPhase === 'post-test'
-      ? shuffleForSeed_(stableQuestionSet, Utilities.getUuid())
-      : stableQuestionSet;
+    selected = shuffleForSeed_(stableQuestionSet, `${attemptToken}:${requestedPhase}:question-order`);
   } else {
     selected = shuffleServer_(rows).slice(0, questionCount);
   }
-  const attemptToken = Utilities.getUuid();
+  const presentedQuestions = prepareQuizQuestions_(selected, attemptToken);
   CacheService.getScriptCache().put('quiz-attempt:' + attemptToken, JSON.stringify({
     quizId: resolvedQuizId, studentId: normalizeValue_(studentId), phase: requestedPhase,
-    questionIds: selected.map((item) => item.rowNumber),
-    questionAnswers: selected.map((item) => [item.rowNumber, normalizeValue_(item.row[5])]),
+    questionIds: presentedQuestions.map((item) => item.id),
+    questionAnswers: presentedQuestions.map((item) => [item.id, item.answer]),
     passType: passRule.passType,
     passValue: passRule.passValue
   }), Math.max(300, quiz.duration * 60 + 300));
   return jsonResponse_({ ok: true, quizId: resolvedQuizId, attemptToken: attemptToken, duration: quiz.duration,
     attemptsAllowed: effectiveAttemptsAllowed, attemptsUsed: quizAttemptCount, remainingAttempts: attemptsRemaining, student: student.examInfo,
     passType: passRule.passType, passValue: passRule.passValue, passScore: passRule.passValue,
-    questions: selected.map((item) => ({ id: item.rowNumber, question: item.row[0], choices: item.row.slice(1, 5) })) });
+    questions: presentedQuestions.map(({ id, question, choices }) => ({ id, question, choices })) });
+}
+
+function prepareQuizQuestions_(selected, attemptToken) {
+  return selected.map((item) => {
+    const choices = item.row.slice(1, 5)
+      .map((choice, index) => ({
+        choice: normalizeValue_(choice),
+        originalIndex: index
+      }));
+    const answerIndex = Number(normalizeValue_(item.row[5])) - 1;
+    if (!Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex >= choices.length
+      || !choices[answerIndex].choice) {
+      throw new Error('เฉลยของข้อสอบข้อที่ ' + (item.rowNumber - 1) + ' ไม่ถูกต้อง');
+    }
+    const availableChoices = choices.filter((choice) => choice.choice);
+    const shuffledChoices = shuffleForSeed_(
+      availableChoices,
+      `${attemptToken}:${item.rowNumber}:choices`
+    );
+    return {
+      id: item.rowNumber,
+      question: item.row[0],
+      choices: shuffledChoices.map((choice) => choice.choice),
+      answer: String(shuffledChoices.findIndex((choice) => choice.originalIndex === answerIndex) + 1)
+    };
+  });
 }
 
 function submitQuiz_(data) {

@@ -281,7 +281,6 @@
     const question = pendingQuestions[currentQuestionIndex];
     if (!question) return;
     const selectedAnswer = collectedAnswers[String(question.id)] || '';
-    const isYesNo = question.type === 'yes-no' || (Array.isArray(question.choices) && question.choices.length <= 2);
     const choices = Array.isArray(question.choices) && question.choices.length ? question.choices : ['ได้', 'ไม่ได้'];
     questionsBox.innerHTML = `
       <fieldset class="quiz-question">
@@ -290,13 +289,6 @@
           <label class="quiz-choice"><input type="radio" name="question-${question.id}" value="${choiceIndex + 1}" ${selectedAnswer === String(choiceIndex + 1) ? 'checked' : ''} required> ${escapeHtml(choice)}</label>
         `).join('')}
       </fieldset>`;
-    if (isYesNo && choices.length === 2) {
-      questionsBox.querySelectorAll('input[name^="question-"]').forEach((radio) => {
-        const value = radio.value;
-        if (value === '1') radio.nextSibling.textContent = ' ได้';
-        if (value === '2') radio.nextSibling.textContent = ' ไม่ได้';
-      });
-    }
     const lastQuestion = currentQuestionIndex === pendingQuestions.length - 1;
     nextButton.classList.toggle('d-none', lastQuestion);
     submitButton.classList.toggle('d-none', !lastQuestion);
