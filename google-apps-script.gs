@@ -2346,7 +2346,7 @@ function submitTacticalScores_(data) {
     let total = 0;
     const scores = [];
     for (const rawScore of entry.scores) {
-      if (rawScore === '' || rawScore === null || rawScore === undefined) {
+      if (normalizeValue_(rawScore) === '') {
         scores.push('');
         continue;
       }
@@ -2356,6 +2356,12 @@ function submitTacticalScores_(data) {
       }
       total += score;
       scores.push(score);
+    }
+    if (scores.filter((score) => score !== '').length < 24) {
+      return jsonResponse_({
+        ok: false,
+        message: 'กรุณากรอกคะแนนอย่างน้อย 24 จาก 25 ช่อง สำหรับเลขที่ ' + lookupId
+      });
     }
     if (total > 200) {
       return jsonResponse_({ ok: false, message: 'คะแนนรวมของเลขที่ ' + lookupId + ' ต้องไม่เกิน 200 คะแนน' });
@@ -3678,10 +3684,21 @@ function syncLearningSummaryAttendance_(headers, values, attendanceRegisteredAt)
 
 function syncLearningSummaryScoresByLookupId_(lookupId, patch) {
   const normalizedLookupId = normalizeLookupId_(lookupId);
-  const summarySheet = getOrCreateLearningSummarySheet_();
-  const summaryRow = findLearningSummaryRowByLookupId_(summarySheet, normalizedLookupId);
-  if (!summaryRow) return;
+  let summarySheet = getOrCreateLearningSummarySheet_();
+  let summaryRow = findLearningSummaryRowByLookupId_(summarySheet, normalizedLookupId);
+  if (!summaryRow) {
+    rebuildLearningSummary_();
+    summarySheet = getOrCreateLearningSummarySheet_();
+    summaryRow = findLearningSummaryRowByLookupId_(summarySheet, normalizedLookupId);
+  }
+  if (!summaryRow) {
+    throw new Error('ไม่พบเลขที่ ' + normalizedLookupId
+      + ' ใน LearningSummary หลังสร้างสรุปใหม่ กรุณาตรวจสอบเลขประจำตัวใน Data หรือ Registration');
+  }
   const personalId = normalizeValue_(summarySheet.getRange(summaryRow, 1).getDisplayValue()).replace(/^'/, '');
+  if (!personalId) {
+    throw new Error('ไม่พบเลขประจำตัวสำหรับเลขที่ ' + normalizedLookupId + ' ใน LearningSummary');
+  }
   writeLearningSummaryPatch_(personalId, normalizedLookupId, patch);
 }
 

@@ -376,6 +376,12 @@
         return;
       }
       seenIds.add(lookupId);
+      const enteredScoreCount = scoreInputs.filter((input) => input.value !== '').length;
+      if (enteredScoreCount < 24) {
+        setStatus(scoreStatus, 'กรุณากรอกคะแนนอย่างน้อย 24 จาก 25 ช่อง สำหรับเลขที่ ' + lookupId, false);
+        scoreInputs.find((input) => input.value === '')?.focus();
+        return;
+      }
       if (updateRowTotal(row) > 200) {
         setStatus(scoreStatus, 'คะแนนรวมของเลขที่ ' + lookupId + ' ต้องไม่เกิน 200 คะแนน', false);
         return;
