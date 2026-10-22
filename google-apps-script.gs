@@ -67,6 +67,9 @@ const CONFIG = {
 };
 
 const LEARNING_SUMMARY_VERSION = '5';
+const QUIZ_ATTEMPT_START_TTL_SECONDS = 21600;
+const QUIZ_ATTEMPT_SESSION_PROPERTY_PREFIX = 'QUIZ_ATTEMPT_SESSION_';
+const QUIZ_ATTEMPT_SESSION_CLEANUP_CACHE_KEY = 'quiz-attempt-session-cleanup';
 
 function doGet(e) {
   try {
@@ -200,6 +203,9 @@ function doPost(e) {
     }
     if (formName === 'create-quiz') {
       return createQuiz_(data);
+    }
+    if (formName === 'begin-quiz') {
+      return beginQuizAttempt_(data);
     }
     if (formName === 'submit-quiz') {
       return submitQuiz_(data);
@@ -1009,17 +1015,146 @@ function getQuiz_(quizId, studentId, phase, title, locationLatitude, locationLon
     selected = shuffleServer_(rows).slice(0, questionCount);
   }
   const presentedQuestions = prepareQuizQuestions_(selected, attemptToken);
-  CacheService.getScriptCache().put('quiz-attempt:' + attemptToken, JSON.stringify({
+  const attempt = {
     quizId: resolvedQuizId, studentId: normalizeValue_(studentId), phase: requestedPhase,
+    duration: quiz.duration,
     questionIds: presentedQuestions.map((item) => item.id),
     questionAnswers: presentedQuestions.map((item) => [item.id, item.answer]),
     passType: passRule.passType,
     passValue: passRule.passValue
-  }), Math.max(300, quiz.duration * 60 + 300));
+  };
+  storeQuizAttemptSession_(attemptToken, attempt, QUIZ_ATTEMPT_START_TTL_SECONDS);
   return jsonResponse_({ ok: true, quizId: resolvedQuizId, attemptToken: attemptToken, duration: quiz.duration,
     attemptsAllowed: effectiveAttemptsAllowed, attemptsUsed: quizAttemptCount, remainingAttempts: attemptsRemaining, student: student.examInfo,
     passType: passRule.passType, passValue: passRule.passValue, passScore: passRule.passValue,
     questions: presentedQuestions.map(({ id, question, choices }) => ({ id, question, choices })) });
+}
+
+function beginQuizAttempt_(data) {
+  const attemptToken = normalizeValue_(data.attemptToken);
+  const quizId = normalizeValue_(data.quizId);
+  const studentId = normalizeValue_(data.studentId);
+  const phase = normalizePhase_(data.phase);
+  const attempt = getQuizAttemptSession_(attemptToken);
+  if (!attempt || attempt.quizId !== quizId || attempt.studentId !== studentId || attempt.phase !== phase) {
+    return jsonResponse_({ ok: false, message: 'เซสชันข้อสอบหมดอายุหรือไม่ถูกต้อง กรุณาเริ่มสอบใหม่' });
+  }
+  storeQuizAttemptSession_(attemptToken, attempt, getQuizAttemptTtlSeconds_(attempt.duration));
+  return jsonResponse_({ ok: true });
+}
+
+function getQuizAttemptTtlSeconds_(durationMinutes) {
+  const maximumTtlSeconds = 21600;
+  return Math.min(maximumTtlSeconds, Math.max(300, Number(durationMinutes || 30) * 60 + 300));
+}
+
+function storeQuizAttemptSession_(attemptToken, attempt, ttlSeconds) {
+  cleanupExpiredQuizAttemptSessions_();
+  const session = { attempt: attempt, expiresAt: Date.now() + ttlSeconds * 1000 };
+  const serialized = JSON.stringify(session);
+  if (serialized.length > 9000) {
+    throw new Error('ข้อมูลข้อสอบมีขนาดเกินกว่าที่ระบบจัดเก็บเซสชันได้ กรุณาติดต่อผู้ดูแล');
+  }
+  const cacheKey = 'quiz-attempt:' + attemptToken;
+  CacheService.getScriptCache().remove(cacheKey);
+  PropertiesService.getScriptProperties().setProperty(
+    QUIZ_ATTEMPT_SESSION_PROPERTY_PREFIX + attemptToken,
+    serialized
+  );
+  CacheService.getScriptCache().put(
+    cacheKey,
+    serialized,
+    Math.min(21600, Math.max(1, Math.ceil(ttlSeconds)))
+  );
+}
+
+function getQuizAttemptSession_(attemptToken) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'quiz-attempt:' + attemptToken;
+  let serialized = cache.get(cacheKey);
+  let session = null;
+  if (serialized) {
+    try {
+      session = JSON.parse(serialized);
+    } catch (error) {
+      cache.remove(cacheKey);
+      serialized = '';
+    }
+  }
+  if (session && session.quizId && !session.attempt) {
+    const legacyAttempt = session;
+    session = {
+      attempt: legacyAttempt,
+      expiresAt: Date.now() + getQuizAttemptTtlSeconds_(legacyAttempt.duration) * 1000
+    };
+    serialized = JSON.stringify(session);
+    PropertiesService.getScriptProperties().setProperty(
+      QUIZ_ATTEMPT_SESSION_PROPERTY_PREFIX + attemptToken,
+      serialized
+    );
+    cache.put(cacheKey, serialized, getQuizAttemptTtlSeconds_(legacyAttempt.duration));
+  }
+  if (!session) {
+    const properties = PropertiesService.getScriptProperties();
+    serialized = properties.getProperty(QUIZ_ATTEMPT_SESSION_PROPERTY_PREFIX + attemptToken);
+    if (!serialized) return null;
+    try {
+      session = JSON.parse(serialized);
+    } catch (error) {
+      throw new Error('ข้อมูลเซสชันข้อสอบที่จัดเก็บไว้ไม่ถูกต้อง กรุณาติดต่อผู้ดูแล');
+    }
+  }
+  if (!session || !session.attempt || !Number.isFinite(Number(session.expiresAt))) {
+    cache.remove(cacheKey);
+    const properties = PropertiesService.getScriptProperties();
+    serialized = properties.getProperty(QUIZ_ATTEMPT_SESSION_PROPERTY_PREFIX + attemptToken);
+    if (!serialized) return null;
+    try {
+      session = JSON.parse(serialized);
+    } catch (error) {
+      throw new Error('ข้อมูลเซสชันข้อสอบที่จัดเก็บไว้ไม่ถูกต้อง กรุณาติดต่อผู้ดูแล');
+    }
+    if (!session || !session.attempt || !Number.isFinite(Number(session.expiresAt))) {
+      throw new Error('ข้อมูลเซสชันข้อสอบที่จัดเก็บไว้ไม่ถูกต้อง กรุณาติดต่อผู้ดูแล');
+    }
+  }
+  const remainingSeconds = Math.ceil((Number(session.expiresAt) - Date.now()) / 1000);
+  if (remainingSeconds <= 0) {
+    removeQuizAttemptSession_(attemptToken);
+    return null;
+  }
+  if (!cache.get(cacheKey)) {
+    cache.put(cacheKey, JSON.stringify(session), Math.min(21600, remainingSeconds));
+  }
+  return session.attempt;
+}
+
+function removeQuizAttemptSession_(attemptToken) {
+  CacheService.getScriptCache().remove('quiz-attempt:' + attemptToken);
+  PropertiesService.getScriptProperties().deleteProperty(
+    QUIZ_ATTEMPT_SESSION_PROPERTY_PREFIX + attemptToken
+  );
+}
+
+function cleanupExpiredQuizAttemptSessions_() {
+  const cache = CacheService.getScriptCache();
+  if (cache.get(QUIZ_ATTEMPT_SESSION_CLEANUP_CACHE_KEY)) return;
+  const properties = PropertiesService.getScriptProperties();
+  const allProperties = properties.getProperties();
+  const now = Date.now();
+  Object.keys(allProperties).forEach((key) => {
+    if (key.indexOf(QUIZ_ATTEMPT_SESSION_PROPERTY_PREFIX) !== 0) return;
+    let session;
+    try {
+      session = JSON.parse(allProperties[key]);
+    } catch (error) {
+      throw new Error('ข้อมูลเซสชันข้อสอบที่จัดเก็บไว้ไม่ถูกต้อง กรุณาติดต่อผู้ดูแล');
+    }
+    if (!session || !Number.isFinite(Number(session.expiresAt)) || Number(session.expiresAt) <= now) {
+      properties.deleteProperty(key);
+    }
+  });
+  cache.put(QUIZ_ATTEMPT_SESSION_CLEANUP_CACHE_KEY, String(now), 600);
 }
 
 function prepareQuizQuestions_(selected, attemptToken) {
@@ -1055,7 +1190,7 @@ function submitQuiz_(data) {
   const attemptToken = normalizeValue_(data.attemptToken);
   if (!studentId) return jsonResponse_({ ok: false, message: 'กรุณาระบุเลขประจำตัว' });
   let attempt;
-  try { attempt = JSON.parse(CacheService.getScriptCache().get('quiz-attempt:' + attemptToken) || 'null'); } catch (error) { attempt = null; }
+  attempt = getQuizAttemptSession_(attemptToken);
   const quiz = findQuizMetadata_(quizId);
   if (!quiz) return jsonResponse_({ ok: false, message: 'ไม่พบแบบทดสอบ' });
   const currentPassRule = getQuizPassRule_(quiz, phase);
@@ -1099,7 +1234,7 @@ function submitQuiz_(data) {
     appendQuizResult_(resultsSheet, resultPayload);
     updateLearningSummaryAfterSourceWrite_(() =>
       refreshLearningSummaryScoresForStudent_(studentId, resultPayload.lookup_id));
-    CacheService.getScriptCache().remove('quiz-attempt:' + attemptToken);
+    removeQuizAttemptSession_(attemptToken);
     return buildQuizSubmissionResponse_(resultPayload, quiz, student);
   }
   if (!isQuizOpen_(quiz)) return jsonResponse_({ ok: false, message: 'แบบทดสอบยังไม่เปิดหรือปิดแล้ว' });
@@ -1177,7 +1312,7 @@ function submitQuiz_(data) {
   appendQuizAttemptHistory_(resultPayload);
   appendQuizResult_(resultsSheet, resultPayload);
   updateLearningSummaryAfterSourceWrite_(() => syncLearningSummaryQuizResult_(resultPayload));
-  CacheService.getScriptCache().remove('quiz-attempt:' + attemptToken);
+  removeQuizAttemptSession_(attemptToken);
   return buildQuizSubmissionResponse_(resultPayload, quiz, student);
 }
 
@@ -1319,9 +1454,6 @@ function getQuizAttemptHistoryRows_(studentId, quizId, phase) {
   const sheet = getOrCreateQuizAttemptHistorySheet_();
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
   const lastRow = sheet.getLastRow();
-  const rows = lastRow > 1
-    ? sheet.getRange(2, 1, lastRow - 1, 9).getDisplayValues()
-    : [];
   const studentIndex = headers.indexOf('student_id');
   const lookupIndex = headers.indexOf('lookup_id');
   const quizIndex = headers.indexOf('quiz_id');
@@ -1329,9 +1461,24 @@ function getQuizAttemptHistoryRows_(studentId, quizId, phase) {
   if ([studentIndex, lookupIndex, quizIndex, phaseIndex].some((index) => index < 0)) {
     throw new Error('โครงสร้างชีต QuizAttemptHistory ไม่ถูกต้อง');
   }
+  if (lastRow < 2) return [];
   const normalizedStudentId = normalizeValue_(studentId);
   const normalizedLookupId = normalizeLookupId_(studentId);
-  return rows.filter((row) => {
+  const matchingRows = new Set();
+  const findMatchingRows = (columnIndex, value) => {
+    if (!value) return;
+    sheet.getRange(2, columnIndex + 1, lastRow - 1, 1)
+      .createTextFinder(value)
+      .matchEntireCell(true)
+      .matchCase(true)
+      .findAll()
+      .forEach((range) => matchingRows.add(range.getRow()));
+  };
+  findMatchingRows(studentIndex, normalizedStudentId);
+  findMatchingRows(lookupIndex, normalizedLookupId);
+  return Array.from(matchingRows).map((rowNumber) =>
+    sheet.getRange(rowNumber, 1, 1, headers.length).getDisplayValues()[0]
+  ).filter((row) => {
     const rowStudentId = normalizeValue_(row[studentIndex] || '');
     const rowLookupId = normalizeLookupId_(row[lookupIndex] || '');
     return row[quizIndex] === normalizeValue_(quizId)
@@ -1712,7 +1859,12 @@ function normalizeQuizTitle_(title) {
 }
 
 function shuffleServer_(items) {
-  return items.sort(() => Math.random() - 0.5);
+  const shuffled = items.slice();
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
 }
 
 function shuffleForSeed_(items, seedText) {

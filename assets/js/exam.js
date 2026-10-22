@@ -294,7 +294,29 @@
     submitButton.classList.toggle('d-none', !lastQuestion);
   }
 
-  function beginExam() {
+  async function beginExam() {
+    beginButton.disabled = true;
+    try {
+      setLoading(true);
+      setError('');
+      await request('', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: new URLSearchParams({
+          formName: 'begin-quiz',
+          quizId: activeQuizId,
+          phase: selectedPhase,
+          studentId: studentIdInput.value.trim(),
+          attemptToken
+        }).toString()
+      });
+    } catch (error) {
+      setError(error.message);
+      return;
+    } finally {
+      setLoading(false);
+      beginButton.disabled = false;
+    }
     currentQuestionIndex = 0;
     collectedAnswers = {};
     if (studentInfoBox) {
