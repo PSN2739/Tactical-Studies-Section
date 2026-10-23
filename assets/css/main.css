@@ -2011,6 +2011,23 @@ section,
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
 }
 
+.hero .btn-get-started.announcement-cta {
+  background-color: #dc2626;
+  animation: announcement-cta-blink 1s steps(2, end) infinite;
+}
+
+@keyframes announcement-cta-blink {
+  50% {
+    background-color: #991b1b;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero .btn-get-started.announcement-cta {
+    animation: none;
+  }
+}
+
 .hero .btn-watch-video {
   font-size: 16px;
   transition: 0.5s;
