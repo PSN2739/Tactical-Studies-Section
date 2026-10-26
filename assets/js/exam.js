@@ -501,10 +501,10 @@
       resultBox.innerHTML = `
         <strong>ผลคะแนน ${formatPhaseLabel(data.phase)}:</strong>
         ${score}/${total} คะแนน
-        ${hasPassThreshold
-          ? `<span class="${passed ? 'success-message' : 'error-message'}">(${passed ? 'ผ่าน' : 'ไม่ผ่าน'} - เกณฑ์ ${thresholdText})</span>`
-          : (belowPostTestMinimum
-            ? '<span class="error-message">(ไม่ผ่าน - หลังเรียนต้องได้อย่างน้อย 8 คะแนน)</span>'
+        ${belowPostTestMinimum
+          ? '<span class="error-message">(ไม่ผ่าน - หลังเรียนต้องได้อย่างน้อย 8 คะแนน)</span>'
+          : (hasPassThreshold
+            ? `<span class="${passed ? 'success-message' : 'error-message'}">(${passed ? 'ผ่าน' : 'ไม่ผ่าน'} - เกณฑ์ ${thresholdText})</span>`
             : '<span>(ไม่ได้กำหนดเกณฑ์ผ่าน แสดงคะแนนตามที่ทำได้)</span>')}
         ${belowPostTestMinimum ? '<p>คะแนนหลังเรียนต่ำกว่า 8 คะแนน จึงไม่นำไปบันทึกสถิติ กรุณาสอบอีกครั้ง</p>' : ''}
         ${canRetry
