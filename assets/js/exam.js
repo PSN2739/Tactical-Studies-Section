@@ -478,29 +478,37 @@
       });
       const passType = data.passType || answerForm.dataset.passType || 'percent';
       const hasPassThreshold = passType !== 'none';
-      const passValue = hasPassThreshold
-        ? Number(data.passValue ?? data.passScore ?? answerForm.dataset.passValue ?? answerForm.dataset.passScore ?? 70)
-        : null;
+      const passValueSource = [
+        data.passValue,
+        data.passScore,
+        answerForm.dataset.passValue,
+        answerForm.dataset.passScore
+      ].find((value) => value !== undefined && value !== null && String(value).trim() !== '');
+      const parsedPassValue = Number(passValueSource ?? 70);
+      const passValue = hasPassThreshold && Number.isFinite(parsedPassValue) ? parsedPassValue : null;
       const score = Number(data.score || 0);
       const total = Number(data.total || 0);
       const percentage = total ? (score / total) * 100 : 0;
-      const passed = hasPassThreshold
-        ? (typeof data.passed === 'boolean'
-          ? data.passed
-          : (passType === 'count' ? score >= passValue : percentage >= passValue))
+      const resultPhase = data.phase || selectedPhase;
+      const belowPostTestMinimum = resultPhase === 'post-test' && score < 8;
+      const passed = hasPassThreshold && passValue !== null
+        ? (!belowPostTestMinimum && (passType === 'count' ? score >= passValue : percentage >= passValue))
         : null;
       const thresholdText = passType === 'count' ? `${passValue} ข้อ` : `${passValue}%`;
-      const canRetry = selectedPhase === 'post-test'
-        ? passed === false
+      const canRetry = resultPhase === 'post-test'
+        ? (belowPostTestMinimum || passed === false)
         : Number(data.remainingAttempts || 0) > 0;
       resultBox.innerHTML = `
         <strong>ผลคะแนน ${formatPhaseLabel(data.phase)}:</strong>
         ${score}/${total} คะแนน
         ${hasPassThreshold
           ? `<span class="${passed ? 'success-message' : 'error-message'}">(${passed ? 'ผ่าน' : 'ไม่ผ่าน'} - เกณฑ์ ${thresholdText})</span>`
-          : '<span>(ไม่ได้กำหนดเกณฑ์ผ่าน แสดงคะแนนตามที่ทำได้)</span>'}
+          : (belowPostTestMinimum
+            ? '<span class="error-message">(ไม่ผ่าน - หลังเรียนต้องได้อย่างน้อย 8 คะแนน)</span>'
+            : '<span>(ไม่ได้กำหนดเกณฑ์ผ่าน แสดงคะแนนตามที่ทำได้)</span>')}
+        ${belowPostTestMinimum ? '<p>คะแนนหลังเรียนต่ำกว่า 8 คะแนน จึงไม่นำไปบันทึกสถิติ กรุณาสอบอีกครั้ง</p>' : ''}
         ${canRetry
-          ? (selectedPhase === 'post-test'
+          ? (resultPhase === 'post-test'
             ? '<p>สอบหลังเรียนไม่ผ่าน สามารถสอบซ้ำได้จนกว่าจะผ่านเกณฑ์</p>'
             : `<p>ยังสอบได้อีก ${Number(data.remainingAttempts)} ครั้ง</p>`)
           : ''}
